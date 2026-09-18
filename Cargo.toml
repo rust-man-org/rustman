@@ -69,13 +69,16 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
 open = "5"
 rfd = "0.17"
+# Resolving relative links in HTML responses against the request URL
+url = "2"
 
 # Response preview: spreadsheet (pure Rust), PDF (native pdfium, auto-fetched
-# binary), and HTML (native OS webview embedded as a child window)
+# binary), and HTML (parsed with scraper and drawn with iced widgets — no
+# native webview, so the same code path runs on every platform)
 calamine = "0.36"
-wry = "0.55"
 pdfium-render = { version = "0.9", features = ["thread_safe"] }
 pdfium-bundled = "0.1"
+scraper = "0.27"
 
 # Pre-request/test scripting language (see vendor/rustman-engine)
 rustman-engine = { path = "vendor/rustman-engine" }

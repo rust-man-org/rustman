@@ -17,6 +17,10 @@ const PREVIEW_BYTE_LIMIT: usize = 32 * 1024 * 1024;
 pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
     match msg {
         AppMsg::HttpResponse { generation, result } => {
+            // Captured before the tab is borrowed mutably below. Relative links
+            // in an HTML body are resolved against the URL actually sent, not
+            // its `{{variable}}` template.
+            let active_env = state.active_env().cloned();
             if let Some(tab) = state.tabs.tabs.iter_mut().find(|t| t.id == result.tab_id) {
                 if !tab.jobs.is_current(JobKind::Request, generation) {
                     return Task::none();
@@ -25,6 +29,9 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
                 tab.parsed_json = None;
                 tab.viewer_processing = true;
                 tab.response = Some(result.response.clone());
+                // A preview from the previous response must not show up under
+                // the new one while its own preview is still being built.
+                tab.response_preview = crate::state::tabs::ResponsePreview::None;
 
                 let entry = HistoryEntry {
                     id: uuid::Uuid::new_v4().to_string(),
@@ -63,6 +70,7 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
 
                 let body = result.response.body.clone();
                 let tab_id = tab.id.clone();
+                let tab_url = tab.url.clone();
                 let body_hash = crate::services::cache::ParsedBodyCache::body_hash(&body);
 
                 if let Some(db) = &state.db {
@@ -207,6 +215,53 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
                     }
                 }
 
+                // HTML responses get an in-app rendered preview, parsed here on
+                // a blocking worker. The raw body still goes to the source view
+                // below, which is what the panel's Source toggle shows.
+                let html_preview_task = if !result.response.is_html() {
+                    Task::none()
+                } else if result.response.body_size > PREVIEW_BYTE_LIMIT {
+                    if let Some(t) = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id) {
+                        t.response_preview = crate::state::tabs::ResponsePreview::Html(Err(
+                            "This response is too large to render as an HTML preview.".to_owned(),
+                        ));
+                    }
+                    Task::none()
+                } else {
+                    let html = body.clone();
+                    let tab_id = tab_id.clone();
+                    let base_url =
+                        crate::domain::environment::substitute(&tab_url, active_env.as_ref());
+                    let started = state
+                        .tabs
+                        .tabs
+                        .iter_mut()
+                        .find(|t| t.id == tab_id)
+                        .map(|t| t.jobs.start(JobKind::HtmlPreview));
+                    let Some((generation, cancel)) = started else {
+                        return Task::none();
+                    };
+                    Task::perform(
+                        async move {
+                            tokio::select! {
+                                biased;
+                                _ = cancel.cancelled() => AppMsg::Noop,
+                                parsed = tokio::task::spawn_blocking(move || {
+                                    crate::domain::html::parse(&html, &base_url)
+                                }) => match parsed {
+                                    Ok(document) => AppMsg::HtmlPreviewReady {
+                                        generation,
+                                        tab_id,
+                                        result: Ok(document),
+                                    },
+                                    Err(_) => AppMsg::Noop,
+                                },
+                            }
+                        },
+                        Message::App,
+                    )
+                };
+
                 if state.parsed_cache.inner_get_by_hash(body_hash).is_some() {
                     let cached_clone = state.parsed_cache.inner_get_by_hash(body_hash).unwrap().clone();
                     let use_tabs = state
@@ -224,7 +279,7 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
                         t.viewer_processing = false;
                         t.jobs.cancel(JobKind::Parse);
                     }
-                    return Task::none();
+                    return html_preview_task;
                 }
 
                 let parse_generation;
@@ -241,30 +296,33 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
                         return Task::none();
                     }
                 }
-                return Task::perform(
-                    async move {
-                        tokio::select! {
-                            biased;
-                            _ = parse_cancel.cancelled() => AppMsg::Noop,
-                            built = tokio::task::spawn_blocking(move || {
-                                let parsed = serde_json::from_str::<serde_json::Value>(&body).ok();
-                                let display = parsed.as_ref()
-                                    .and_then(|j| crate::services::format::pretty_value(j, use_tabs))
-                                    .unwrap_or(body);
-                                (display, parsed.map(Box::new))
-                            }) => match built {
-                                Ok((content_text, parsed_json)) => AppMsg::ViewerReady {
-                                    generation: parse_generation,
-                                    tab_id,
-                                    content_text,
-                                    parsed_json,
+                return Task::batch([
+                    html_preview_task,
+                    Task::perform(
+                        async move {
+                            tokio::select! {
+                                biased;
+                                _ = parse_cancel.cancelled() => AppMsg::Noop,
+                                built = tokio::task::spawn_blocking(move || {
+                                    let parsed = serde_json::from_str::<serde_json::Value>(&body).ok();
+                                    let display = parsed.as_ref()
+                                        .and_then(|j| crate::services::format::pretty_value(j, use_tabs))
+                                        .unwrap_or(body);
+                                    (display, parsed.map(Box::new))
+                                }) => match built {
+                                    Ok((content_text, parsed_json)) => AppMsg::ViewerReady {
+                                        generation: parse_generation,
+                                        tab_id,
+                                        content_text,
+                                        parsed_json,
+                                    },
+                                    Err(_) => AppMsg::Noop,
                                 },
-                                Err(_) => AppMsg::Noop,
-                            },
-                        }
-                    },
-                    Message::App,
-                );
+                            }
+                        },
+                        Message::App,
+                    ),
+                ]);
             }
         }
         AppMsg::AvatarLoaded(bytes) => {
@@ -309,49 +367,12 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
                 );
             }
         }
-        AppMsg::HtmlPreviewTick => {
-            let tab = state.tabs.active_tab();
-            let is_html_now = tab.active_response_tab == crate::message::ResponseTab::Body
-                && tab.response.as_ref().is_some_and(|r| r.is_html());
-
-            if !is_html_now {
-                crate::services::webview::set_visible(false);
-                return Task::none();
+        AppMsg::HtmlPreviewReady { generation, tab_id, result } => {
+            if let Some(tab) = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id)
+                && tab.jobs.is_current(JobKind::HtmlPreview, generation)
+            {
+                tab.response_preview = crate::state::tabs::ResponsePreview::Html(result);
             }
-
-            // The body is shared, not copied: this runs on a repeating timer,
-            // so cloning a multi-megabyte HTML string here (twice — once for
-            // the message, once inside the `map` closure) burned real time and
-            // allocator pressure on every tick.
-            let html: std::sync::Arc<str> = tab
-                .response
-                .as_ref()
-                .map(|r| std::sync::Arc::from(r.body.as_str()))
-                .unwrap_or_else(|| std::sync::Arc::from(""));
-            let ui_scale = state.ui_scale;
-            return crate::ui::widgets::bounds_probe::find(crate::ui::response::body::HTML_PANEL_ID)
-                .map(move |bounds| {
-                    Message::App(AppMsg::HtmlPanelBounds {
-                        // iced reports bounds in its own scaled space; `wry`
-                        // expects window-logical pixels. Convert here so the
-                        // native child window lands in the right place at any
-                        // UI zoom (this is what broke HTML preview on scaled
-                        // Windows displays).
-                        bounds: crate::services::webview::scaled_bounds(bounds, ui_scale),
-                        html: html.clone(),
-                    })
-                });
-        }
-        AppMsg::HtmlPanelBounds { bounds, html } => {
-            if crate::services::webview::exists() {
-                crate::services::webview::set_bounds(bounds);
-                crate::services::webview::set_visible(true);
-                crate::services::webview::load_html_if_changed(&html);
-                return Task::none();
-            }
-            return iced::window::latest().and_then(move |id| {
-                crate::services::webview::ensure_created(id, bounds, html.to_string())
-            });
         }
         AppMsg::Formatted { generation, tab_id, target, text } => {
             if let Some(tab) = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id) {

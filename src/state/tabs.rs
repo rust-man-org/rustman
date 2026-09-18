@@ -26,10 +26,10 @@ pub struct WsMessage {
     pub is_outgoing: bool,
 }
 
-/// A rich preview for a binary response body, populated asynchronously once
-/// the response arrives (see `AppMsg::SpreadsheetPreviewReady` /
-/// `AppMsg::PdfPreviewReady`). `None` means either the response isn't binary,
-/// the binary type has no richer preview, or the preview hasn't finished
+/// A rich preview for a response body, populated asynchronously once the
+/// response arrives (see `AppMsg::SpreadsheetPreviewReady` /
+/// `AppMsg::PdfPreviewReady` / `AppMsg::HtmlPreviewReady`). `None` means either
+/// the response has no richer preview, or the preview hasn't finished
 /// rendering/parsing yet.
 #[derive(Default)]
 pub enum ResponsePreview {
@@ -37,6 +37,9 @@ pub enum ResponsePreview {
     None,
     Spreadsheet(Result<crate::services::spreadsheet::ParsedSheet, String>),
     Pdf(PdfPreviewState),
+    /// The parsed form of an HTML body, or why it could not be previewed
+    /// (currently only "too large", since parsing itself never fails).
+    Html(Result<crate::domain::html::Document, String>),
 }
 
 pub struct PdfPreviewState {
@@ -92,6 +95,10 @@ pub struct RequestTabState {
     pub viewer_processing: bool,
     pub parsed_json: Option<serde_json::Value>,
     pub response_preview: ResponsePreview,
+    /// Whether an HTML response shows its raw source instead of the rendered
+    /// preview. The renderer covers a deliberate subset of HTML, so the body
+    /// itself has to stay reachable.
+    pub html_source_view: bool,
     /// Results of the last test-script run against this tab's response.
     pub test_results: Vec<TestResult>,
     /// Set if the pre-request or test script itself failed to run (syntax
@@ -199,6 +206,7 @@ impl RequestTabState {
             viewer_processing: false,
             parsed_json: None,
             response_preview: ResponsePreview::default(),
+            html_source_view: false,
             test_results: Vec::new(),
             script_error: None,
             script_logs: Vec::new(),

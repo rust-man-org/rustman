@@ -9,5 +9,4 @@ pub mod spreadsheet;
 pub mod storage;
 pub mod update;
 pub mod vcs;
-pub mod webview;
 pub mod websocket;

@@ -87,8 +87,8 @@ Grab the latest binary from the [releases page](https://github.com/animeshchaudh
 You will need a few things first.
 
 - A recent [Rust toolchain](https://www.rust-lang.org/tools/install), 1.85 or newer. Rustman is edition 2024, as is the vendored iced-code-editor widget, so older toolchains will not build it. The latest stable Rust works fine.
-- A C toolchain and CMake. git2 builds with vendored-libgit2 and vendored-openssl, so libgit2 and OpenSSL compile from source, and rusqlite bundles SQLite. You need a C compiler and cmake on the machine.
-- A few system libraries on Linux, listed below.
+- A C toolchain, `pkg-config` and `perl`. git2 builds with vendored-libgit2 and vendored-openssl, so libgit2 and OpenSSL compile from source, and rusqlite bundles SQLite. Perl is what the vendored OpenSSL build scripts use.
+- No GUI development libraries. HTML previews are parsed and drawn by the app itself, so nothing pulls in GTK or WebKit.
 
 ```sh
 git clone https://github.com/animeshchaudhri/rustman
@@ -101,13 +101,10 @@ The binary ends up at `target/release/rustman`. The longer guide lives in [docs/
 ### Linux system dependencies
 
 ```sh
-sudo apt-get install -y \
-  libxkbcommon-dev libxi-dev libx11-dev \
-  libxcb1-dev libxcb-xkb-dev libdbus-1-dev \
-  pkg-config cmake build-essential
+sudo apt-get install -y build-essential pkg-config perl
 ```
 
-macOS and Windows want the platform C toolchain (Xcode command line tools or MSVC build tools) plus CMake for the vendored native bits, on top of Rust.
+macOS and Windows want the platform C toolchain (Xcode command line tools or MSVC build tools) on top of Rust. `cmake` is not needed by the current vendored builds — the vendored libgit2 and AWS-LC both compile through `cc` — but a dependency that switches to a CMake-based build would want it installed.
 
 ### Development
 

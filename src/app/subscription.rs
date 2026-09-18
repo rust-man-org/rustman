@@ -60,19 +60,6 @@ pub(crate) fn subscription(state: &AppState) -> Subscription<Message> {
                 .map(|_| Message::App(crate::message::AppMsg::SpinnerTick)),
         );
     }
-    // Keeps the embedded HTML-preview webview's position/visibility in sync
-    // with the response panel — re-probed on a timer rather than hooked into
-    // every resize/tab-switch/panel-split message, so it can't drift out of
-    // sync if some layout-changing path is missed.
-    let active_is_html =
-        state.tabs.active_tab().response.as_ref().is_some_and(|r| r.is_html());
-    let webview_usable = !crate::services::webview::creation_failed();
-    if webview_usable && (active_is_html || crate::services::webview::exists()) {
-        all.push(
-            iced::time::every(std::time::Duration::from_millis(150))
-                .map(|_| Message::App(crate::message::AppMsg::HtmlPreviewTick)),
-        );
-    }
     all.extend(ws_subs);
     Subscription::batch(all)
 }

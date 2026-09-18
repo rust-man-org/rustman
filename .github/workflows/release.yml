@@ -77,18 +77,10 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -y
+          # Only the C toolchain is needed: libgit2, OpenSSL and SQLite are
+          # vendored, and the HTML preview is drawn in-app rather than by a
+          # native webview, so no GTK/WebKit development packages are required.
           sudo apt-get install -y \
-            libxkbcommon-dev \
-            libxkbcommon-x11-dev \
-            libxi-dev \
-            libx11-dev \
-            libxcb1-dev \
-            libxcb-xkb-dev \
-            libdbus-1-dev \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
             pkg-config \
             cmake \
             build-essential

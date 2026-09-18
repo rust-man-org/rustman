@@ -8,7 +8,11 @@ use crate::{
     message::{Message, ResponseMsg},
     services::spreadsheet::ParsedSheet,
     state::tabs::{PdfPreviewState, RequestTabState, ResponsePreview},
-    ui::{icons, theme::{Palette, MONO, TEXT_SM, TEXT_LG, TEXT_XS}},
+    ui::{
+        icons,
+        request::tabs::pill_tab,
+        theme::{Palette, MONO, TEXT_SM, TEXT_LG, TEXT_XS},
+    },
 };
 
 pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
@@ -39,22 +43,31 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
             ResponsePreview::Spreadsheet(Ok(sheet)) => spreadsheet_view(sheet),
             ResponsePreview::Spreadsheet(Err(err)) => binary_view_with_note(resp, err),
             ResponsePreview::Pdf(preview) => pdf_view(preview),
-            ResponsePreview::None => binary_view(resp),
+            // HTML previews only apply to text responses, which never reach
+            // this branch (and are reset when a new response arrives).
+            ResponsePreview::None | ResponsePreview::Html(_) => binary_view(resp),
         };
     }
 
-    if resp.is_html() && !crate::services::webview::creation_failed() {
-        return html_view();
-    }
-    // Either not HTML, or it is but the embedded webview couldn't attach on
-    // this platform/configuration (e.g. no child-window support under
-    // native Wayland) — fall through to the plain text/source view below,
-    // with a banner explaining why (the underlying error used to go only to
-    // stderr, which a windowed build has no console for).
-    let webview_note: Option<String> = resp
-        .is_html()
-        .then(crate::services::webview::last_error)
-        .flatten();
+    // An HTML response is previewed in-app by `ui::response::html`, so no
+    // native webview is involved and every platform takes the same path. The
+    // renderer covers a deliberate subset of HTML, so the raw body stays
+    // reachable behind the format toggle below.
+    let html_preview: Option<Element<Message>> = match (&tab.response_preview, tab.html_source_view) {
+        (ResponsePreview::Html(Ok(document)), false) => {
+            Some(crate::ui::response::html::view(document))
+        }
+        _ => None,
+    };
+    let preview_note: Option<&str> = match &tab.response_preview {
+        ResponsePreview::Html(Err(reason)) if !tab.html_source_view => Some(reason.as_str()),
+        _ => None,
+    };
+    // The parse runs on a background job; until it lands the body panel has
+    // nothing rendered to show yet.
+    let html_pending = resp.is_html()
+        && !tab.html_source_view
+        && matches!(tab.response_preview, ResponsePreview::None);
 
     let size_note: Element<Message> = match tab.response_truncated_bytes {
         Some(full_len) => text(format!(
@@ -73,6 +86,7 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
             text(format!("{} lines", tab.response_viewer_lines)).size(TEXT_XS).color(Palette::text_subtle()),
             size_note,
             Space::new().width(Length::Fill),
+            html_view_toggle(tab),
             button(
                 row![
                     icons::copy().size(11).color(Palette::text_muted()),
@@ -98,7 +112,15 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
     )
     .width(Length::Fill);
 
-    let body: Element<Message> = if tab.viewer_processing {
+    let body: Element<Message> = if let Some(preview) = html_preview {
+        preview
+    } else if html_pending {
+        container(text("Rendering preview…").size(TEXT_SM).color(Palette::text_subtle()))
+            .padding([8, 12])
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
+    } else if tab.viewer_processing {
         container(text("Parsing…").size(TEXT_SM).color(Palette::text_subtle()))
             .padding([8, 12])
             .width(Length::Fill)
@@ -111,14 +133,14 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
     };
 
     let mut panel = column![].spacing(0).height(Length::Fill);
-    if let Some(note) = webview_note {
-        panel = panel.push(preview_unavailable_banner(&note));
+    if let Some(note) = preview_note {
+        panel = panel.push(preview_unavailable_banner(note));
     }
     panel.push(toolbar).push(body).into()
 }
 
-/// Shown above the raw-source fallback when the embedded HTML preview could not
-/// be created, so the user knows the source view is a fallback and why.
+/// Shown above the raw-source view when an HTML preview could not be built, so
+/// the user knows why they are looking at markup instead of the body.
 fn preview_unavailable_banner(reason: &str) -> Element<'static, Message> {
     container(
         column![
@@ -143,21 +165,38 @@ fn preview_unavailable_banner(reason: &str) -> Element<'static, Message> {
     .into()
 }
 
-/// Id of the placeholder container reserving screen space for the embedded
-/// HTML-preview webview (see `services::webview` and `AppMsg::HtmlPreviewTick`).
-/// The container itself renders nothing visible — the native webview is
-/// positioned to exactly cover it from outside Iced's own rendering.
-pub const HTML_PANEL_ID: iced::widget::Id = iced::widget::Id::new("response-html-panel");
-
-fn html_view() -> Element<'static, Message> {
+/// Preview/Source switch for an HTML response.
+///
+/// Rendered by the renderer rather than a webview, `ui::response::html` covers
+/// a subset of HTML, so the body itself has to stay one click away. Empty when
+/// the response has no preview to switch away from.
+fn html_view_toggle(tab: &RequestTabState) -> Element<'_, Message> {
+    if !matches!(tab.response_preview, ResponsePreview::Html(Ok(_))) {
+        return Space::new().into();
+    }
+    let option = |label: &str, source: bool| {
+        pill_tab(
+            label,
+            None,
+            None,
+            tab.html_source_view == source,
+            Message::Response(ResponseMsg::HtmlSourceView(source)),
+        )
+    };
     container(
-        text("Loading preview…").size(TEXT_SM).color(Palette::text_subtle()),
+        container(row![option("Preview", false), option("Source", true)].spacing(2).padding(3)).style(
+            |_| container::Style {
+                background: Some(Background::Color(Palette::background())),
+                border: Border {
+                    color: Palette::border_subtle(),
+                    width: 1.0,
+                    radius: 9.0.into(),
+                },
+                ..Default::default()
+            },
+        ),
     )
-    .id(HTML_PANEL_ID)
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .center_x(Length::Fill)
-    .center_y(Length::Fill)
+    .padding([0, 6])
     .into()
 }
 

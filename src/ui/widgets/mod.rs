@@ -1,4 +1,3 @@
-pub mod bounds_probe;
 pub mod centered_button;
 pub mod focus_nav;
 pub mod key_guard;
