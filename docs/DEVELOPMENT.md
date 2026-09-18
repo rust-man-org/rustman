@@ -106,6 +106,7 @@ Ctrl+Enter or Cmd+Enter sends the current request without moving your hands to t
 | Pre-request and test scripts | UI only | Two editors store script text into `SavedRequest`, but nothing runs them. There is no scripting engine in the dep tree, so the results and console panels stay empty. |
 | Self update | works | Checks GitHub releases, downloads and extracts, swaps the binary with `self_replace`, then offers a restart. Pure Rust. |
 | Content-Type suggestions | works | When the header key is `Content-Type`, a picklist of 29 common values shows up. |
+| Clone a request | works | The copy icon in a sidebar request row saves a duplicate into the same collection under `<name> copy` (numbered when that name is taken), opens it as the active tab, and lands in the rename field so the name can be changed straight away. `SavedRequest::duplicate_in` copies every field but the id. |
 
 ## Roadmap
 
