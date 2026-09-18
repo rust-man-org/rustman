@@ -70,6 +70,39 @@ pub async fn send(
     }
 }
 
+/// The URL actually sent: `{{var}}` tokens expanded, then a scheme defaulted in
+/// if the result still has none (`http://` for loopback/RFC-1918, else
+/// `https://`).
+///
+/// Order matters. Substitution comes first because an env var may hold the
+/// scheme itself (`API_BACKEND=https://api.example.com`), which no amount of
+/// template inspection can see. Defaulting the scheme on the raw template
+/// instead is what made `{{API_BACKEND}}/graphql/{{GRAPHQL}}` send to
+/// `https://https://api.www.visitdenmark.com/graphql/…` — a host literally named
+/// `https`, failing DNS resolution while the URL bar's preview looked correct.
+///
+/// The URL bar's preview calls this too, so the two cannot disagree.
+pub(crate) fn resolve_url(raw_url: &str, env: Option<&AppEnvironment>) -> String {
+    let url = substitute(raw_url, env);
+    let url = url.trim();
+    if url.is_empty()
+        || url.starts_with("http://")
+        || url.starts_with("https://")
+        || url.starts_with("ws://")
+        || url.starts_with("wss://")
+    {
+        return url.to_owned();
+    }
+    let host = url.split('/').next().unwrap_or(url);
+    let host = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
+    let local = matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1")
+        || host.starts_with("127.")
+        || host.starts_with("10.")
+        || host.starts_with("192.168.")
+        || host.starts_with("172."); // covers 172.16-31.x.x private range
+    format!("{}://{url}", if local { "http" } else { "https" })
+}
+
 async fn do_send(
     client: &Client,
     _tab_id: &str,
@@ -77,7 +110,7 @@ async fn do_send(
     env: Option<&AppEnvironment>,
     default_timeout_ms: u64,
 ) -> Result<HttpResponse, String> {
-    let url = substitute(&req.url, env);
+    let url = resolve_url(&req.url, env);
     // The query is sent from `params`; if the URL also carries one (e.g. older
     // imports), drop it so each value isn't sent twice (which APIs read as an array).
     let will_add_query = req.params.iter().any(|p| p.enabled && !p.key.is_empty())
@@ -442,6 +475,59 @@ fn root_cause(err: &dyn std::error::Error) -> String {
 /// `Display` so the (possibly secret-bearing) request URL isn't echoed back.
 fn describe_send_error(e: &reqwest::Error) -> String {
     format!("{}: {}", classify_send_error(e), root_cause(e))
+}
+
+#[cfg(test)]
+mod url_tests {
+    use super::*;
+
+    fn env_with(vars: &[(&str, &str)]) -> AppEnvironment {
+        AppEnvironment {
+            id: "test".to_owned(),
+            name: "test".to_owned(),
+            variables: vars.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect(),
+            is_active: true,
+        }
+    }
+
+    /// The reported bug: a template with no literal scheme, whose first variable
+    /// expands to a scheme-bearing URL. Scheme defaulting on the raw template
+    /// produced `https://https://…`, so the request went to a host named `https`
+    /// and failed to resolve, even though the URL bar preview showed the fully
+    /// expanded URL and looked right.
+    #[test]
+    fn variable_supplied_scheme_is_not_double_prefixed() {
+        let env = env_with(&[
+            ("API_BACKEND", "api.www.visitdenmark.com"),
+            ("GRAPHQL", "e9e32dbc-0bae-4278-b349-1bcdecb53f7d"),
+        ]);
+        assert_eq!(
+            resolve_url("{{API_BACKEND}}/graphql/{{GRAPHQL}}", Some(&env)),
+            "https://api.www.visitdenmark.com/graphql/e9e32dbc-0bae-4278-b349-1bcdecb53f7d"
+        );
+    }
+
+    /// The variable may carry the scheme itself; substitution must win over
+    /// defaulting so this stays a single prefix.
+    #[test]
+    fn scheme_inside_the_variable_is_honoured() {
+        let env = env_with(&[
+            ("API_BACKEND", "https://api.www.visitdenmark.com"),
+            ("GRAPHQL", "abc"),
+        ]);
+        assert_eq!(
+            resolve_url("{{API_BACKEND}}/graphql/{{GRAPHQL}}", Some(&env)),
+            "https://api.www.visitdenmark.com/graphql/abc"
+        );
+    }
+
+    /// Ordinary schemeless hosts still get `https://` (and locals `http://`), so
+    /// the convenience the old code provided is preserved.
+    #[test]
+    fn raw_schemeless_urls_still_get_a_scheme() {
+        assert_eq!(resolve_url("api.example.com/x", None), "https://api.example.com/x");
+        assert_eq!(resolve_url("localhost:8899/x", None), "http://localhost:8899/x");
+    }
 }
 
 #[cfg(test)]

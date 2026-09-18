@@ -4,7 +4,7 @@ use iced::{
 };
 
 use crate::{
-    domain::{environment::substitute, request::HttpMethod},
+    domain::request::HttpMethod,
     message::{Message, RequestMsg},
     state::tabs::RequestTabState,
     ui::{theme::{Palette, TEXT_MD, TEXT_SM}, icons},
@@ -120,8 +120,11 @@ pub fn view<'a>(tab: &'a RequestTabState, env: Option<&'a crate::domain::environ
         bar = bar.push(curl_btn);
     }
 
+    // Same resolution the send path uses, so the preview can't claim a different
+    // URL than the one that goes out — the mismatch between this line and the
+    // wire is how the double-scheme bug hid.
     let expanded = (!ws_mode && env.is_some() && tab.url.contains("{{"))
-        .then(|| substitute(&tab.url, env));
+        .then(|| crate::services::http::resolve_url(&tab.url, env));
 
     let mut outer = iced::widget::Column::new()
         .push(container(bar).style(url_bar_container).width(Length::Fill));

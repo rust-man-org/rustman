@@ -75,6 +75,14 @@ reqwest's top level error message echoes the request URL, which can carry a secr
 
 The URL bar shows the expanded URL below the input, so you can see what `{{variable}}` resolves to before you send. The params table also shows expanded values as a preview row for any param with an env var.
 
+The preview and the wire both go through `http::resolve_url`, so they cannot disagree.
+
+### Scheme defaulting happens after substitution
+
+A URL typed without a scheme (`api.example.com/x`) still gets one: `http://` for loopback and RFC-1918 addresses, `https://` otherwise. That defaulting lives in `resolve_url` in `services/http.rs` and runs *after* `{{var}}` expansion, not before.
+
+The order is load bearing. A template like `{{API_BACKEND}}/graphql/{{GRAPHQL}}` carries no literal scheme, so defaulting it first prepends `https://` and substitution then appends a second one — `https://https://api.www.visitdenmark.com/graphql/…`, which resolves a host literally named `https` and dies with "connection failed: Name or service not known". The URL bar showed the correctly expanded URL throughout, because it substituted without defaulting, which is what made the failure look impossible. Because an env var may hold either a bare host or the full URL, only the post-substitution string can be inspected to decide whether a scheme is missing. `resolve_url` is unit tested against both shapes.
+
 ### Cmd+Enter to send
 
 Ctrl+Enter or Cmd+Enter sends the current request without moving your hands to the mouse. The key guard widget at `ui/widgets/key_guard.rs` captures the combination before the body editor can insert a newline, so it always sends.
@@ -91,7 +99,7 @@ Ctrl+Enter or Cmd+Enter sends the current request without moving your hands to t
 | Feature | Status | Notes |
 |---|---|---|
 | HTTP methods | works | Parsed with `Method::from_str`, full reqwest send path. |
-| Environment variables (`{{var}}`) | partial | Single pass, non recursive replace over the active env only. Applied to URL, headers, params, and the JSON or Text body. Not auth fields, not form data. Exact `{{key}}` only. With no env active the token goes out as written. |
+| Environment variables (`{{var}}`) | partial | Single pass, non recursive replace over the active env only. Applied to URL, headers, params, and the JSON or Text body. Not auth fields, not form data. Exact `{{key}}` only. With no env active the token goes out as written. A variable may hold a bare host or a full URL — the scheme is defaulted after expansion (see "Scheme defaulting happens after substitution"). |
 | File upload (multipart) | works | The file is read, base64 stored on the field, decoded to a part with a Content-Type guessed from the extension, and sent with `builder.multipart`. Fully in memory, no streaming. |
 | Auth (Bearer, Basic, API Key, Cookie, JWT HS256) | works | All five are implemented. Auth values are not run through `substitute()`, so a `{{var}}` in a token goes out as written. |
 | WebSocket | works | Type a ws:// or wss:// URL and the panel switches to WebSocket mode. Real connect through tokio-tungstenite, events stream in over a subscription. The ws url and state are not persisted, so reconnect after restart is not possible from saved state. |
