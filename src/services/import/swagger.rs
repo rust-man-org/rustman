@@ -211,6 +211,7 @@ fn walk_paths(
                 params: vec![], // params already folded into URL above
                 body,
                 body_type,
+                graphql_variables: String::new(),
                 auth_type: AuthType::None,
                 bearer_token: String::new(),
                 basic_user: String::new(),

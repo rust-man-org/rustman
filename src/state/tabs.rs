@@ -62,6 +62,9 @@ pub struct RequestTabState {
     pub params: Vec<KeyValue>,
     pub body_type: BodyType,
     pub body_editor: CodeEditor,
+    /// GraphQL variables pane. Holds JSON text; only sent when `body_type` is
+    /// `GraphQL` (the query lives in `body_editor`).
+    pub graphql_variables_editor: CodeEditor,
     pub form_fields: Vec<FormField>,
     pub auth_type: AuthType,
     pub bearer_token: String,
@@ -171,6 +174,7 @@ impl RequestTabState {
             params: Vec::new(),
             body_type: BodyType::None,
             body_editor: make_code_editor("", "json"),
+            graphql_variables_editor: make_code_editor("", "json"),
             form_fields: Vec::new(),
             auth_type: AuthType::None,
             bearer_token: String::new(),
@@ -330,7 +334,7 @@ impl RequestTabState {
 
     /// Re-applies the current palette to **every** code editor this tab owns.
     ///
-    /// All four must be included. This used to re-theme only `body_editor` and
+    /// All of them must be included. This used to re-theme only `body_editor` and
     /// `response_editor`, so after a theme change the two Scripts-tab editors
     /// kept rendering with the previous palette — wrong background, gutter and
     /// selection colours — until the app was restarted and they were rebuilt
@@ -339,6 +343,7 @@ impl RequestTabState {
         let style = crate::ui::theme::Palette::code_editor_style();
         for editor in [
             &mut self.body_editor,
+            &mut self.graphql_variables_editor,
             &mut self.response_editor,
             &mut self.pre_request_editor,
             &mut self.test_editor,
@@ -363,6 +368,7 @@ impl RequestTabState {
         tab.params = params;
         tab.body_type = req.body_type.clone();
         tab.body_editor = make_code_editor(&req.body, body_syntax_for(&req.body_type, &req.body));
+        tab.graphql_variables_editor = make_code_editor(&req.graphql_variables, "json");
         tab.form_fields = req.form_data_fields.clone();
         tab.auth_type = req.auth_type.clone();
         tab.bearer_token = req.bearer_token.clone();
@@ -440,6 +446,8 @@ pub fn clamp_for_viewer(text: &str) -> (&str, Option<usize>) {
 pub fn body_syntax(body_type: &BodyType) -> &'static str {
     match body_type {
         BodyType::Json => "json",
+        // GraphQL has no syntax in the editor's default set, and its queries
+        // are brace-delimited — plain text is the honest answer here.
         _ => "txt",
     }
 }
@@ -453,11 +461,18 @@ pub fn body_syntax(body_type: &BodyType) -> &'static str {
 /// highlighting follows what is really there, while the declared type still
 /// decides how the request is *sent*.
 pub fn body_syntax_for(body_type: &BodyType, content: &str) -> &'static str {
-    if body_syntax(body_type) == "json" || looks_like_json(content) {
+    if body_syntax(body_type) == "json" || looks_like_json_body(body_type, content) {
         "json"
     } else {
         "txt"
     }
+}
+
+/// Whether content-based JSON detection applies. A GraphQL query is itself
+/// brace-delimited (`{ me { id } }`), so sniffing there would tokenize every
+/// query as JSON.
+pub fn looks_like_json_body(body_type: &BodyType, content: &str) -> bool {
+    !matches!(body_type, BodyType::GraphQL) && looks_like_json(content)
 }
 
 /// Cheap structural check for JSON: does the text start with `{`/`[` and end
@@ -578,6 +593,8 @@ pub struct TabSnapshot {
     pub params: Vec<KeyValue>,
     pub body_type: BodyType,
     pub body: String,
+    #[serde(default)]
+    pub graphql_variables: String,
     pub form_fields: Vec<FormField>,
     pub auth_type: AuthType,
     pub bearer_token: String,
@@ -617,6 +634,7 @@ impl From<&RequestTabState> for TabSnapshot {
             params: t.params.clone(),
             body_type: t.body_type.clone(),
             body: t.body_editor.content(),
+            graphql_variables: t.graphql_variables_editor.content(),
             form_fields: t.form_fields.clone(),
             auth_type: t.auth_type.clone(),
             bearer_token: t.bearer_token.clone(),
@@ -677,6 +695,18 @@ mod body_syntax_tests {
         assert_eq!(body_syntax_for(&BodyType::Text, "hello world"), "txt");
         assert_eq!(body_syntax_for(&BodyType::None, ""), "txt");
         assert_eq!(body_syntax_for(&BodyType::Text, "key=value&x=1"), "txt");
+    }
+
+    /// A GraphQL query is brace-delimited exactly like JSON, so the structural
+    /// sniff must not claim it — the whole query would render as broken JSON.
+    #[test]
+    fn graphql_queries_are_not_sniffed_as_json() {
+        assert_eq!(body_syntax(&BodyType::GraphQL), "txt");
+        assert_eq!(body_syntax_for(&BodyType::GraphQL, "{ me { id } }"), "txt");
+        assert_eq!(
+            body_syntax_for(&BodyType::GraphQL, r#"{"query":"{ me }"}"#),
+            "txt"
+        );
     }
 
     /// Detection is structural, not a parse: a half-typed body is still JSON as

@@ -4,7 +4,7 @@ use iced::Task;
 use crate::app::request_ops::{format_body, save_request, send_request};
 use crate::app::session::persist_session;
 use crate::app::AppState;
-use crate::domain::request::{sync_params_from_url, sync_url_from_params};
+use crate::domain::request::{sync_params_from_url, sync_url_from_params, BodyType};
 use crate::jobs::JobKind;
 use crate::message::{AppMsg, FormatTarget, Message, RequestMsg};
 use crate::services::curl;
@@ -66,8 +66,11 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             if content_changed {
                 // Only the first and last non-space characters decide this, so
                 // ask the editor for those rather than calling `content()`
-                // (a full buffer copy) on every keystroke.
-                let looks_json = tab.body_editor.looks_structural();
+                // (a full buffer copy) on every keystroke. GraphQL is excluded:
+                // its queries are brace-delimited too, and tokenizing them as
+                // JSON paints the whole buffer as malformed.
+                let looks_json = tab.body_editor.looks_structural()
+                    && !matches!(tab.body_type, BodyType::GraphQL);
                 let syntax = if body_syntax(&tab.body_type) == "json" || looks_json {
                     "json"
                 } else {
@@ -76,6 +79,17 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                 tab.body_editor.set_syntax(syntax);
             }
             return task.map(|m| Message::Request(RequestMsg::BodyEdited(m)));
+        }
+        RequestMsg::GraphQLVariablesEdited(msg) => {
+            if is_body_edit(&msg) {
+                tab.modified = true;
+            }
+            // Always JSON, never sniffed: this pane only ever holds variables.
+            tab.graphql_variables_editor.set_syntax("json");
+            return tab
+                .graphql_variables_editor
+                .update(&msg)
+                .map(|m| Message::Request(RequestMsg::GraphQLVariablesEdited(m)));
         }
         RequestMsg::PreRequestScriptEdited(msg) => {
             if is_body_edit(&msg) {
@@ -295,14 +309,44 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             tab.body_editor.set_indent_style(style);
         }
         RequestMsg::ExportCurl => {
-            use crate::domain::request::{BodyType, FormFieldType};
+            use crate::domain::request::{graphql_body, FormFieldType};
             use crate::services::curl::{generate, FormFieldInput, GenerateCurlInput, KvPair};
             let body_text = tab.body_editor.content();
-            let body = if body_text.trim().is_empty() { None } else { Some(body_text) };
-            let headers: Vec<KvPair> = tab.headers.iter()
+            let is_graphql = tab.body_type == BodyType::GraphQL;
+            let body = if is_graphql {
+                // Export what would actually be sent, not the raw query, so the
+                // generated command is runnable as-is.
+                let variables = tab.graphql_variables_editor.content();
+                if body_text.trim().is_empty() && variables.trim().is_empty() {
+                    None
+                } else {
+                    match graphql_body(&body_text, &variables) {
+                        Ok(compiled) => Some(compiled),
+                        Err(err) => {
+                            state.status_message = Some(err);
+                            return Task::none();
+                        }
+                    }
+                }
+            } else if body_text.trim().is_empty() {
+                None
+            } else {
+                Some(body_text)
+            };
+            let mut headers: Vec<KvPair> = tab.headers.iter()
                 .filter(|h| h.enabled && !h.key.is_empty())
                 .map(|h| KvPair { key: h.key.clone(), value: h.value.clone() })
                 .collect();
+            // The GraphQL body is JSON, and unlike the JSON body type nothing
+            // else here says so — without this curl would send it as form data.
+            if is_graphql
+                && !headers.iter().any(|h| h.key.eq_ignore_ascii_case("content-type"))
+            {
+                headers.push(KvPair {
+                    key: "Content-Type".to_owned(),
+                    value: "application/json".to_owned(),
+                });
+            }
             let form_fields: Vec<FormFieldInput> = if tab.body_type == BodyType::FormData {
                 tab.form_fields.iter()
                     .filter(|f| f.enabled && !f.key.is_empty())

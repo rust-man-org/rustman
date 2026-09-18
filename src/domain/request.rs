@@ -65,6 +65,7 @@ pub enum BodyType {
     Json,
     Text,
     FormData,
+    GraphQL,
 }
 
 impl BodyType {
@@ -74,6 +75,7 @@ impl BodyType {
             Self::Json => "json",
             Self::Text => "text",
             Self::FormData => "form-data",
+            Self::GraphQL => "graphql",
         }
     }
 }
@@ -85,6 +87,7 @@ impl std::str::FromStr for BodyType {
             "json" => Ok(Self::Json),
             "text" => Ok(Self::Text),
             "form-data" => Ok(Self::FormData),
+            "graphql" => Ok(Self::GraphQL),
             _ => Ok(Self::None),
         }
     }
@@ -309,6 +312,66 @@ pub struct FormField {
 pub enum FormFieldType {
     Text,
     File,
+}
+
+/// Compile a GraphQL request into the body every GraphQL server accepts:
+/// `{"query": "...", "variables": {...}}`.
+///
+/// `variables` is omitted when blank, and rejected — rather than sent as a
+/// string — when it isn't a JSON object, since a server expecting a variables
+/// map fails the whole operation on a stringified one.
+pub fn graphql_body(query: &str, variables: &str) -> Result<String, String> {
+    let mut body = serde_json::Map::new();
+    body.insert("query".to_owned(), serde_json::Value::String(query.to_owned()));
+
+    let variables = variables.trim();
+    if !variables.is_empty() {
+        let parsed: serde_json::Value = serde_json::from_str(variables)
+            .map_err(|e| format!("GraphQL variables are not valid JSON: {e}"))?;
+        if !parsed.is_object() {
+            return Err(
+                "GraphQL variables must be a JSON object, e.g. {\"id\": 1}".to_owned(),
+            );
+        }
+        body.insert("variables".to_owned(), parsed);
+    }
+
+    serde_json::to_string(&serde_json::Value::Object(body))
+        .map_err(|e| format!("GraphQL body: {e}"))
+}
+
+#[cfg(test)]
+mod graphql_tests {
+    use super::*;
+
+    #[test]
+    fn query_only_omits_variables() {
+        assert_eq!(
+            graphql_body("query { me { id } }", "").unwrap(),
+            r#"{"query":"query { me { id } }"}"#
+        );
+        // Whitespace-only variables are still "no variables".
+        assert_eq!(
+            graphql_body("{ me }", "  \n ").unwrap(),
+            r#"{"query":"{ me }"}"#
+        );
+    }
+
+    #[test]
+    fn variables_are_embedded_as_json_not_a_string() {
+        let body = graphql_body("query($id: ID!) { user(id: $id) { name } }", r#"{"id": "42"}"#)
+            .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(parsed["variables"].is_object());
+        assert_eq!(parsed["variables"]["id"], "42");
+    }
+
+    #[test]
+    fn invalid_variables_json_is_an_error() {
+        let err = graphql_body("{ me }", "{oops").unwrap_err();
+        assert!(err.contains("not valid JSON"), "{err}");
+        assert!(graphql_body("{ me }", "[1, 2]").is_err());
+    }
 }
 
 #[cfg(test)]

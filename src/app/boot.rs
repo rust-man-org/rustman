@@ -84,6 +84,7 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
                 t.body_type = snap.body_type.clone();
                 t.body_editor =
                     make_code_editor(&snap.body, body_syntax_for(&snap.body_type, &snap.body));
+                t.graphql_variables_editor = make_code_editor(&snap.graphql_variables, "json");
                 t.form_fields = snap.form_fields;
                 t.auth_type = snap.auth_type;
                 t.bearer_token = snap.bearer_token;
@@ -103,6 +104,7 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
                 t.active_request_tab = snap.active_request_tab;
                 t.active_response_tab = snap.active_response_tab;
                 t.body_editor.invalidate_render_cache();
+                t.graphql_variables_editor.invalidate_render_cache();
                 t.response_editor.invalidate_render_cache();
                 t.pre_request_editor.invalidate_render_cache();
                 t.test_editor.invalidate_render_cache();
