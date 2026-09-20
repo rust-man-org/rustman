@@ -1,4 +1,4 @@
-//! In-app self-update from GitHub releases (https://github.com/animeshchaudhri/rustman).
+//! In-app self-update from GitHub releases (https://github.com/rust-man-org/rustman).
 //!
 //! Uses the app's existing async `reqwest` to fetch the latest release and the
 //! matching platform asset, then extracts the binary and atomically swaps the
@@ -6,7 +6,7 @@
 //! produced by `.github/workflows/release.yml`.
 
 const LATEST_RELEASE_API: &str =
-    "https://api.github.com/repos/animeshchaudhri/rustman/releases/latest";
+    "https://api.github.com/repos/rust-man-org/rustman/releases/latest";
 
 /// Substring matched against the release asset names for the running platform.
 #[cfg(target_os = "macos")]

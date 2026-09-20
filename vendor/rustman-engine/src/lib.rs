@@ -5,7 +5,7 @@
 //! here — scripts in this language are meant to be *generated*, by an AI,
 //! from a plain-English description of what the user wants. The spec lives in
 //! `docs/scripting.html` in the main rustman repo (published at
-//! <https://animeshchaudhri.github.io/rustman/scripting.html>); it has the
+//! <https://rust-man-org.github.io/rustman/scripting.html>); it has the
 //! exact grammar, the built-in function reference, and a copy-pasteable
 //! prompt to hand an AI as context.
 //!

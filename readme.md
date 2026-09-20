@@ -4,7 +4,7 @@ A free and open source API client built in Rust with iced. Native, no webview.
 
 I got tired of API clients that want an account, eat hundreds of megabytes, and ship a whole browser just to send an HTTP request. So I built my own. It is small, it is fast, and nothing you do leaves your machine.
 
-**[Download](https://github.com/animeshchaudhri/rustman/releases/latest)** · **[Website](https://animeshchaudhri.github.io/rustman/)** · **[Discord](https://discord.gg/vfa8rKYzKG)**
+**[Download](https://github.com/rust-man-org/rustman/releases/latest)** · **[Website](https://rust-man-org.github.io/rustman/)** · **[Discord](https://discord.gg/vfa8rKYzKG)**
 
 ---
 
@@ -72,7 +72,7 @@ test("user is an admin", contains(response.json().roles, "admin"))
 
 It is a substring test on a string, a membership test on an array, and a key test on an object, and `haystack.contains(needle)` is the same function spelled the other way.
 
-Full grammar, built-ins, and a copy-pasteable **LLM prompt** that writes scripts for you: [animeshchaudhri.github.io/rustman/scripting.html](https://animeshchaudhri.github.io/rustman/scripting.html).
+Full grammar, built-ins, and a copy-pasteable **LLM prompt** that writes scripts for you: [rust-man-org.github.io/rustman/scripting.html](https://rust-man-org.github.io/rustman/scripting.html).
 
 ## What works and what does not
 
@@ -83,7 +83,7 @@ I would rather be straight with you than oversell. A few things are half done ri
 
 ## Download
 
-Grab the latest binary from the [releases page](https://github.com/animeshchaudhri/rustman/releases/latest).
+Grab the latest binary from the [releases page](https://github.com/rust-man-org/rustman/releases/latest).
 
 | Platform | File |
 |---|---|
@@ -100,7 +100,7 @@ You will need a few things first.
 - A few system libraries on Linux, listed below.
 
 ```sh
-git clone https://github.com/animeshchaudhri/rustman
+git clone https://github.com/rust-man-org/rustman
 cd rustman
 cargo build --release
 ```
@@ -138,8 +138,8 @@ cargo run
 ## Documentation
 
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) walks through building from source, the toolchain, the module layout, and how persistence works.
-- [animeshchaudhri.github.io/rustman/scripting.html](https://animeshchaudhri.github.io/rustman/scripting.html) is the full scripting language reference, with worked examples and an LLM prompt you can copy.
-- [animeshchaudhri.github.io/rustman/#roadmap](https://animeshchaudhri.github.io/rustman/#roadmap) is what I am building next.
+- [rust-man-org.github.io/rustman/scripting.html](https://rust-man-org.github.io/rustman/scripting.html) is the full scripting language reference, with worked examples and an LLM prompt you can copy.
+- [rust-man-org.github.io/rustman/#roadmap](https://rust-man-org.github.io/rustman/#roadmap) is what I am building next.
 
 ## Thanks
 

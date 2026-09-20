@@ -119,7 +119,7 @@ Ctrl+Enter or Cmd+Enter sends the current request without moving your hands to t
 
 ## Roadmap
 
-Roughly in order of how much it matters to users. The user facing version of this, with the bigger features on it, is the [roadmap section on the site](https://animeshchaudhri.github.io/rustman/#roadmap). This list is the implementation view of the same thing plus the internal work nobody outside would ask for.
+Roughly in order of how much it matters to users. The user facing version of this, with the bigger features on it, is the [roadmap section on the site](https://rust-man-org.github.io/rustman/#roadmap). This list is the implementation view of the same thing plus the internal work nobody outside would ask for.
 
 ### 1. Flows
 
