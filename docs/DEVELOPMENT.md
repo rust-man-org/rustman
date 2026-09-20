@@ -1,6 +1,6 @@
 # Rustman development notes
 
-This is the doc I keep for myself about how Rustman is built, what is solid, and what is still rough. It is a little over 13k lines of pure Rust, an [iced](https://iced.rs) GUI API client that ships as one binary. Entry point is `src/main.rs` which calls `app::run` in `src/app/mod.rs`.
+This is the doc I keep for myself about how Rustman is built, what is solid, and what is still rough. It is about 18k lines of pure Rust under `src/` plus a vendored scripting engine, an [iced](https://iced.rs) GUI API client that ships as one binary. Entry point is `src/main.rs` which calls `app::run` in `src/app/mod.rs`.
 
 I try to be honest here. Where something is UI only, stubbed, or half wired, I say so.
 
@@ -90,7 +90,7 @@ Ctrl+Enter or Cmd+Enter sends the current request without moving your hands to t
 ## Rough edges I know about
 
 - **The request field set is copied by hand in a few places** (`send_request`, `save_request`, the history entry, and `TabSnapshot::from`) with no single canonical conversion. Because Rust will not warn on a hand written copy that forgets a field, the shapes can drift silently — worth a periodic check that a new field on `RequestTabState` actually made it into all four.
-- **`timeout_ms` is half wired.** It lives on the tab and round trips through the session, but `SavedRequest` has no such field, no message edits it, and the HTTP layer hardcodes 30s. See the roadmap.
+- **Timeout is global only.** `default_timeout_ms` lives on `AppState`, is editable in Settings, and round trips through the session. `http::do_send` takes it as an argument and falls back to 30s if it is under a second. There is no per-request override: `SavedRequest` has no timeout field and neither does the tab. See the roadmap.
 - **Save dialog can duplicate a request across collections.** It mints a fresh id before saving, so re-saving an already saved tab into a different collection can update an id that is not in the DB yet and orphan the old row. Quick save with Cmd+S avoids this by reusing `saved_as`.
 - **File upload sends can fail silently if no file was selected.** This now returns a clear error message: `"File field 'X' has no data - pick a file first"`.
 
@@ -105,32 +105,42 @@ Ctrl+Enter or Cmd+Enter sends the current request without moving your hands to t
 | WebSocket | works | Type a ws:// or wss:// URL and the panel switches to WebSocket mode. Real connect through tokio-tungstenite, events stream in over a subscription. The ws url and state are not persisted, so reconnect after restart is not possible from saved state. |
 | Import cURL | works | Tokenizer and flag handling in `services/curl/parser.rs`, pasted into the URL bar. Unit tested. |
 | Import Postman v2.x | works, lossy | Drops auth, flattens folders, tags every body as JSON, ignores urlencoded, graphql, and file body modes. |
-| Import OpenAPI | partial | JSON only, even though the file dialog advertises yaml. No security scheme to auth mapping. |
+| Import OpenAPI | partial | `import::swagger` parses JSON and falls back to `serde_yaml`, so YAML specs do work (there is a `yaml_input_detected` test for it). The block is the picker: `update/import.rs` only registers `.add_filter("JSON", &["json"])`, so a `.yaml` file cannot be selected through the dialog. No security scheme to auth mapping either. |
 | Import HTTPie | works | Detected from the URL bar like cURL. |
 | Export cURL | works | method, url, headers, cookies, body, and bearer, basic, apikey auth, shell escaped, shown in a copyable modal. |
 | Export Postman v2.1 | works, lossy | Omits query params, auth, cookies, and scripts, so round trips are not lossless. |
 | Git for collections | works | Source Control panel with manual commit, log, restore with a confirmation prompt, branches, working diff, multiple repos, and remote clone, fetch, pull, and push through system git. SQLite stays the source of truth. |
 | Git identity | works | Resolved from the repo's git config. Settings panel lets you set it directly. No hardcoded fallback. |
-| Pre-request and test scripts | UI only | Two editors store script text into `SavedRequest`, but nothing runs them. There is no scripting engine in the dep tree, so the results and console panels stay empty. |
+| Pre-request and test scripts | works | Both slots run on `vendor/rustman-engine`, a custom language rather than JS. `app/scripting.rs` builds a `HostInput`, calls `rustman_engine::run`, and applies the returned effects (`SetHeader`, `SetBody`, `SetEnv`, `Test`, `Log`), so the Tests tab and its console fill in. A Global Scripts pair in Settings runs first and the request's own script can override it. |
+| Scripting built-ins | works | `env`, `set_env`, `header`, `headers`, `set_header`, `cookie`, `body`, `set_body`, `url`, `test`, `print`, `contains`, base64, `jwt_decode`, `json_parse`, `json_stringify`, and AES-256-GCM. No loops, no user-defined functions, no regex. |
 | Self update | works | Checks GitHub releases, downloads and extracts, swaps the binary with `self_replace`, then offers a restart. Pure Rust. |
 | Content-Type suggestions | works | When the header key is `Content-Type`, a picklist of 29 common values shows up. |
 | Clone a request | works | The copy icon in a sidebar request row saves a duplicate into the same collection under `<name> copy` (numbered when that name is taken), opens it as the active tab, and lands in the rename field so the name can be changed straight away. `SavedRequest::duplicate_in` copies every field but the id. |
 
 ## Roadmap
 
-Roughly in order of how much it matters to users.
+Roughly in order of how much it matters to users. The user facing version of this, with the bigger features on it, is the [roadmap section on the site](https://animeshchaudhri.github.io/rustman/#roadmap). This list is the implementation view of the same thing plus the internal work nobody outside would ask for.
 
-### 1. Script runner
+### 1. Flows
 
-The body editor, the script panels, the test results panel, and the console panel all exist already. Only the part that runs the scripts is missing. A runner needs an engine (`boa_engine` keeps the pure Rust story, `rquickjs` is faster but needs a C toolchain, `rhai` is pure Rust but is not JS so it would break Postman compatibility), a `pm.*` shim for request, response, environment, variables, test, and expect plus `console.log` capture, and the binding points. Run the pre-request hook before `http::send` and feed its changes back into the request, then run the test hook in the response handler and push `TestResult` and `ConsoleEntry` into the tab, which lights up the panels that already exist.
+A saved flow is a named chain of requests that runs start to finish, carrying values out of one response and into the next. Nothing exists for this yet. It needs a `Flow` domain type (an ordered list of request ids plus the extract-and-bind steps between them), storage for it next to collections, a runner that reuses the existing `http::send` path per step so scripts and auth keep working, and a panel to build and watch a run. The extraction step overlaps with what test scripts already do, so `set_env` between steps is the cheap first version and a real per-flow variable scope is the proper one.
+
+Browser capture is the harder half: open a browser from the app, record what it fires, and write it into a flow. `wry` is already a dependency for the HTML response preview, so a webview exists, but capturing requests from it is a separate problem from displaying a page and needs a proxy or CDP-style hook. Unstarted and unscoped.
 
 ### 2. Finish the git story
 
-A lot of the original git plan is built now (remote, restore, branches, diff, two way read back). What is left is mostly polish. Commit on save or delete as an option, real author identity instead of a hardcoded one, a `.gitignore` and secret externalization so plaintext credentials are not committed, per request files to keep diffs small and stable, and stabilizing the per row UUIDs and request ordering so commits do not churn. See [GIT_GUI_PLAN.md](GIT_GUI_PLAN.md).
+A lot of the original git plan is built now (remote, restore, branches, diff, two way read back, real author identity from the repo's git config). What is left:
+
+- Commit on save or delete, as an option. Today every commit is a manual button press.
+- A `.gitignore` written at init, and secrets pulled out of the committed JSON. Auth tokens, passwords, API keys, and JWT secrets currently serialize in plaintext into the collection files, so pushing to a remote pushes them too. This is the one that actually needs fixing.
+- One file per request instead of one JSON blob per collection, so a reordered request stops rewriting the whole file and two people editing different requests stop colliding.
+- Conflict detection. Pull can conflict and the app neither notices nor surfaces it; you have to resolve it in a terminal and let the app read the result back.
+- Stable per row UUIDs and request ordering, so commits stop churning on no real change.
+- Log for the whole repo, not just its first collection.
 
 ### 3. More import and export
 
-OpenAPI yaml (add `serde_yaml` so the advertised filter works, and map security schemes to auth), lossless Postman round trip (include params, auth, and scripts), and optional HAR or OpenAPI export.
+OpenAPI yaml is a one line fix: `serde_yaml` is already wired into the parser, so the picker in `update/import.rs` just needs a `yaml`/`yml` filter alongside `json`. Then map security schemes to auth. After that, a lossless Postman round trip (include params, auth, and scripts), and optional HAR or OpenAPI export.
 
 ### 4. Variable scopes
 
@@ -138,7 +148,11 @@ OpenAPI yaml (add `serde_yaml` so the advertised filter works, and map security 
 
 ### 5. Per-request timeout
 
-The plumbing is half there. The tab carries and persists `timeout_ms`, but `SavedRequest` does not have it, nothing edits it, and the HTTP layer hardcodes 30s. Add the field to `SavedRequest`, add a message and a control to edit it, and thread it through. Low risk and isolated.
+There is one global timeout in Settings and nothing narrower. Add a `timeout_ms` to `SavedRequest` and the tab, a message and a control to edit it, and have `request_ops` pass it to `http::do_send` in place of the global when it is set. Low risk and isolated.
+
+### 6. Grow the scripting engine
+
+The language is deliberately small and the next additions are the ones scripts keep needing: loops and array helpers (there is no way to walk a JSON array today), regex matching, and standalone hash and HMAC built-ins, since the engine has AES-256-GCM and base64 but no way to just hash something. `contains` landed in 0.3.13. Each one is a `call_builtin` arm in `vendor/rustman-engine/src/interpreter.rs`, a row in the docs table, and a line in the LLM prompt block on `docs/scripting.html` — the prompt is what an AI is handed as context, so anything missing from it effectively does not exist.
 
 ### Hygiene
 

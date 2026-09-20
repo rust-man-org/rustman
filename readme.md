@@ -49,7 +49,7 @@ This is not a startup and I am not trying to sell you anything. It is a tool I w
 - **Environment variables.** `{{variable}}` substitution from the active environment, applied to the URL, headers, query params, and the JSON or Text body.
 - **Collections and history.** Organize requests and replay them from history. Local SQLite is the source of truth.
 - **Git for collections.** A built in Source Control panel. Commit collections (they are stored as JSON), browse the log, restore any commit back into the app, make and switch branches, see the working diff, and juggle several repos. Clone, fetch, pull, and push go through your system git, so they use the SSH keys and logins you already have. SQLite stays the source of truth and git sits on top.
-- **Import.** cURL commands (native Rust tokenizer), Postman v2 and v2.1 collections, and OpenAPI specs (JSON).
+- **Import.** cURL commands (native Rust tokenizer), Postman v2 and v2.1 collections, and OpenAPI specs. The OpenAPI parser reads JSON or YAML, but the file picker only offers `.json`, so a `.yaml` spec cannot be chosen through the dialog yet.
 - **Export.** Turn any request into a cURL command, or export a collection as Postman v2.1 JSON.
 - **Command palette.** Keyboard driven access to everything.
 - **Multiple request tabs.** Work on a few requests at once.
@@ -59,9 +59,18 @@ This is not a startup and I am not trying to sell you anything. It is a tool I w
 
 ## Scripting
 
-![Rustman Scripting](public/rustman-scripting.png)
+![Rustman Scripting](docs/rustman-scripting.png)
 
 Pre-request and test scripts run on **rustman-engine**, a small scripting language built from scratch in Rust for this app — not JavaScript, no `pm.*` API, no embedded runtime. A test script's assertions land in a **Tests** tab with a selectable, copyable **Console** for anything you `print(...)`. A **Global Scripts** pair (Settings panel) runs before every request's own script and can be overridden by it, so common setup doesn't need copy-pasting into every request.
+
+You get `env`/`set_env`, `header`/`headers`/`set_header`, `cookie`, `body`/`set_body`, `url`, `test`, `print`, `contains`, base64, `jwt_decode`, `json_parse`/`json_stringify`, and AES-256-GCM. `contains` covers the keyword checks you actually reach for:
+
+```
+test("no stack trace leaked", !contains(response.text(), "panicked at"))
+test("user is an admin", contains(response.json().roles, "admin"))
+```
+
+It is a substring test on a string, a membership test on an array, and a key test on an object, and `haystack.contains(needle)` is the same function spelled the other way.
 
 Full grammar, built-ins, and a copy-pasteable **LLM prompt** that writes scripts for you: [animeshchaudhri.github.io/rustman/scripting.html](https://animeshchaudhri.github.io/rustman/scripting.html).
 
@@ -129,8 +138,8 @@ cargo run
 ## Documentation
 
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) walks through building from source, the toolchain, the module layout, and how persistence works.
-- [docs/GIT_GUI_PLAN.md](docs/GIT_GUI_PLAN.md) covers where the git store is today and where it is going.
-- [docs/scripting.md](docs/scripting.md) (or the live version at [animeshchaudhri.github.io/rustman/scripting.html](https://animeshchaudhri.github.io/rustman/scripting.html)) is the full scripting language reference and LLM prompt.
+- [animeshchaudhri.github.io/rustman/scripting.html](https://animeshchaudhri.github.io/rustman/scripting.html) is the full scripting language reference, with worked examples and an LLM prompt you can copy.
+- [animeshchaudhri.github.io/rustman/#roadmap](https://animeshchaudhri.github.io/rustman/#roadmap) is what I am building next.
 
 ## Thanks
 

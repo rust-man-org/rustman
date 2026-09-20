@@ -440,3 +440,186 @@ fn print_nested_field_access_on_an_object() {
         ]
     );
 }
+
+#[test]
+fn contains_matches_a_substring_of_the_response_body_both_spellings() {
+    let script = r#"
+        test("function form", contains(response.text(), "expired"))
+        test("method form", response.text().contains("expired"))
+        test("whole response shorthand", response.contains("expired"))
+        test("absent keyword", contains(response.text(), "refreshed"))
+    "#;
+    let input = HostInput {
+        response: Some(ResponseInput {
+            status: 401,
+            body: r#"{"error": "token expired"}"#.to_owned(),
+        }),
+        ..Default::default()
+    };
+
+    let outcome = run(script, input).expect("script should run");
+
+    assert_eq!(
+        outcome.effects,
+        vec![
+            Effect::Test { name: "function form".to_owned(), passed: true },
+            Effect::Test { name: "method form".to_owned(), passed: true },
+            Effect::Test { name: "whole response shorthand".to_owned(), passed: true },
+            Effect::Test { name: "absent keyword".to_owned(), passed: false },
+        ]
+    );
+}
+
+#[test]
+fn contains_is_case_sensitive() {
+    let script = r#"
+        test("exact case", contains(response.text(), "Expired"))
+        test("wrong case", contains(response.text(), "expired"))
+    "#;
+    let input = HostInput {
+        response: Some(ResponseInput { status: 401, body: "Token Expired".to_owned() }),
+        ..Default::default()
+    };
+
+    let outcome = run(script, input).expect("script should run");
+
+    assert_eq!(
+        outcome.effects,
+        vec![
+            Effect::Test { name: "exact case".to_owned(), passed: true },
+            Effect::Test { name: "wrong case".to_owned(), passed: false },
+        ]
+    );
+}
+
+#[test]
+fn contains_tests_membership_on_an_array_and_keys_on_an_object() {
+    let script = r#"
+        let body = response.json()
+        test("array holds the value", contains(body.roles, "admin"))
+        test("array lacks the value", contains(body.roles, "owner"))
+        test("array holds a number", body.ids.contains(2))
+        test("object has the key", contains(body, "roles"))
+        test("object lacks the key", contains(body, "permissions"))
+    "#;
+    let input = HostInput {
+        response: Some(ResponseInput {
+            status: 200,
+            body: r#"{"roles": ["admin", "editor"], "ids": [1, 2, 3]}"#.to_owned(),
+        }),
+        ..Default::default()
+    };
+
+    let outcome = run(script, input).expect("script should run");
+
+    assert_eq!(
+        outcome.effects,
+        vec![
+            Effect::Test { name: "array holds the value".to_owned(), passed: true },
+            Effect::Test { name: "array lacks the value".to_owned(), passed: false },
+            Effect::Test { name: "array holds a number".to_owned(), passed: true },
+            Effect::Test { name: "object has the key".to_owned(), passed: true },
+            Effect::Test { name: "object lacks the key".to_owned(), passed: false },
+        ]
+    );
+}
+
+#[test]
+fn contains_on_a_header_drives_an_if_branch() {
+    let script = r#"
+        if contains(header("Content-Type"), "json") {
+            set_env("last_content_type", "json")
+        } else {
+            set_env("last_content_type", "other")
+        }
+    "#;
+    let input = HostInput {
+        headers: vec![("Content-Type".to_owned(), "application/json; charset=utf-8".to_owned())],
+        response: Some(ResponseInput { status: 200, body: "{}".to_owned() }),
+        ..Default::default()
+    };
+
+    let outcome = run(script, input).expect("script should run");
+
+    assert_eq!(
+        outcome.effects,
+        vec![Effect::SetEnv("last_content_type".to_owned(), "json".to_owned())]
+    );
+}
+
+#[test]
+fn contains_on_a_missing_value_is_false_not_an_error() {
+    // A missing env var is "", a missing field is null -- neither contains
+    // anything, and neither should abort the run.
+    let script = r#"
+        test("missing env var", contains(env("nope"), "x"))
+        test("missing field", contains(response.json().nothing, "x"))
+        test("number haystack", contains(response.status, "40"))
+    "#;
+    let input = HostInput {
+        response: Some(ResponseInput { status: 404, body: "{}".to_owned() }),
+        ..Default::default()
+    };
+
+    let outcome = run(script, input).expect("script should run");
+
+    assert_eq!(
+        outcome.effects,
+        vec![
+            Effect::Test { name: "missing env var".to_owned(), passed: false },
+            Effect::Test { name: "missing field".to_owned(), passed: false },
+            Effect::Test { name: "number haystack".to_owned(), passed: false },
+        ]
+    );
+}
+
+#[test]
+fn contains_stringifies_a_non_string_needle_against_a_string_haystack() {
+    let script = r#"test("id is in the body", contains(response.text(), 7))"#;
+    let input = HostInput {
+        response: Some(ResponseInput { status: 200, body: r#"{"id": 7}"#.to_owned() }),
+        ..Default::default()
+    };
+
+    let outcome = run(script, input).expect("script should run");
+
+    assert_eq!(
+        outcome.effects,
+        vec![Effect::Test { name: "id is in the body".to_owned(), passed: true }]
+    );
+}
+
+#[test]
+fn contains_with_a_missing_argument_is_an_error() {
+    let err = run(r#"test("x", contains("haystack"))"#, HostInput::default())
+        .expect_err("contains() needs both a haystack and a needle");
+    assert!(err.message.contains("contains"), "unexpected message: {}", err.message);
+}
+
+#[test]
+fn negated_contains_asserts_a_keyword_is_absent() {
+    // The form the readme and docs page both use as their example.
+    let script = r#"test("no stack trace leaked", !contains(response.text(), "panicked at"))"#;
+
+    let clean = HostInput {
+        response: Some(ResponseInput { status: 200, body: r#"{"ok": true}"#.to_owned() }),
+        ..Default::default()
+    };
+    let leaked = HostInput {
+        response: Some(ResponseInput {
+            status: 500,
+            body: "thread 'main' panicked at src/main.rs:1".to_owned(),
+        }),
+        ..Default::default()
+    };
+
+    let name = "no stack trace leaked".to_owned();
+    assert_eq!(
+        run(script, clean).expect("script should run").effects,
+        vec![Effect::Test { name: name.clone(), passed: true }]
+    );
+    assert_eq!(
+        run(script, leaked).expect("script should run").effects,
+        vec![Effect::Test { name, passed: false }]
+    );
+}

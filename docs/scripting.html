@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Scripting · Rustman docs</title>
-  <meta name="description" content="Rustman's pre-request and test scripting language: a small, Rust-native interpreter — not JavaScript." />
+  <meta name="description" content="Rustman's pre-request and test scripting language: a small, Rust-native interpreter, not JavaScript." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -251,24 +251,24 @@
     <h1>Rustman scripting language</h1>
     <p class="docs-lede">
       Pre-request and test scripts run on <strong>rustman-engine</strong>, a small interpreted
-      language written from scratch in Rust — not JavaScript. There is no <code>pm.*</code> API,
+      language written from scratch in Rust, not JavaScript. There is no <code>pm.*</code> API,
       no Node builtins, no <code>require</code>/<code>import</code>. It's deliberately tiny: the
       target audience for actually typing this syntax is an AI generating a script from a
       plain-English request, not a person memorizing a grammar. This page is a complete
-      reference — every construct that exists is listed below, and nothing else exists at
+      reference: every construct that exists is listed below, and nothing else exists at
       runtime.
     </p>
 
     <h2 id="global">Global scripts</h2>
     <p>
-      The Settings panel has a <strong>Global Scripts</strong> section — a pre-request/test
+      The Settings panel has a <strong>Global Scripts</strong> section: a pre-request/test
       script pair that runs for <em>every</em> request, so common setup (an auth header every
       request needs, environment bootstrapping) doesn't need copy-pasting into each request's
       own Scripts tab.
     </p>
     <p>
       The global script always runs first, then the request's own script runs second and can see
-      (and override) anything the global script already did — its <code>set_header</code>/<code>set_body</code>
+      (and override) anything the global script already did; its <code>set_header</code>/<code>set_body</code>
       effects are folded into what <code>header()</code>/<code>body()</code> return inside the
       per-request script. Test results and <code>print(...)</code> logs from both accumulate in
       that order. If either script fails, that phase's error is labeled so it's clear which one
@@ -283,8 +283,8 @@
         <tr><td>env(...)</td><td colspan="2">Active environment's variables</td></tr>
         <tr><td>header(...)</td><td>The request's own headers</td><td>The <strong>response's</strong> headers</td></tr>
         <tr><td>cookie(...)</td><td colspan="2">The request's cookie jar</td></tr>
-        <tr><td>response</td><td>Not available — doesn't exist yet</td><td>Available — status + body</td></tr>
-        <tr><td>body(), url()</td><td>The request's own body/URL</td><td>Same — what was actually sent (not the response)</td></tr>
+        <tr><td>response</td><td>Not available (doesn't exist yet)</td><td>Available: status + body</td></tr>
+        <tr><td>body(), url()</td><td>The request's own body/URL</td><td>Same: what was actually sent (not the response)</td></tr>
         <tr><td>headers()</td><td>All of the request's own headers</td><td>All of the <strong>response's</strong> headers</td></tr>
         <tr><td>Effects that matter</td><td><code>set_header</code>, <code>set_body</code>, <code>set_env</code></td><td><code>test</code>, <code>set_env</code></td></tr>
       </table>
@@ -292,10 +292,10 @@
     <p>
       A pre-request script's <code>set_header</code> calls are merged into the outgoing
       request's headers, and a <code>set_body</code> call replaces the outgoing body.
-      Neither touches what's saved in the request editor — only the one outgoing
+      Neither touches what's saved in the request editor; only the one outgoing
       request is affected. A test script's <code>test</code> calls populate the response's
       <strong>Tests</strong> tab. <code>set_env</code> works in either script and writes to the
-      active environment, persisted immediately — same as editing it by hand.
+      active environment, persisted immediately, the same as editing it by hand.
     </p>
     <div class="callout">
       If a script errors, nothing partial happens: the request still runs (or the response
@@ -312,14 +312,14 @@
 &lt;expr&gt;</pre>
     <p>
       A trailing <code>;</code> is allowed but optional. There are no loops
-      (<code>for</code>/<code>while</code>) and no user-defined functions — scripts are a short,
+      (<code>for</code>/<code>while</code>) and no user-defined functions; scripts are a short,
       flat (plus <code>if</code>/<code>else</code>) sequence of statements.
     </p>
 
     <h3>Comments &amp; literals</h3>
     <ul>
-      <li><code>// rest of line</code> — no block comments.</li>
-      <li>Numbers: <code>42</code>, <code>3.14</code> — always floating point. <code>-5</code> is
+      <li><code>// rest of line</code>. No block comments.</li>
+      <li>Numbers: <code>42</code>, <code>3.14</code>. Always floating point. <code>-5</code> is
         <strong>not</strong> valid syntax (no unary minus for numbers); write <code>0 - 5</code>.</li>
       <li>Strings: <code>"double-quoted"</code>, escapes <code>\n</code> <code>\t</code> <code>\"</code> <code>\\</code>.</li>
       <li>Booleans: <code>true</code>, <code>false</code>. And <code>null</code>.</li>
@@ -328,7 +328,7 @@
     <h3>Variables</h3>
     <p>
       <code>let x = &lt;expr&gt;</code> binds <code>x</code> for the rest of the script. There's
-      no block scoping — everything is one flat scope, including names bound inside an
+      no block scoping: everything is one flat scope, including names bound inside an
       <code>if</code>/<code>else</code> branch.
     </p>
 
@@ -339,8 +339,8 @@
         <tr><td>1</td><td><code>.field</code> / <code>.method()</code> / <code>fn(args)</code></td><td>Field access and calls</td></tr>
         <tr><td>2</td><td><code>!</code></td><td>Logical not (prefix)</td></tr>
         <tr><td>3</td><td><code>+</code> <code>-</code></td><td>Add/subtract, see string concatenation below</td></tr>
-        <tr><td>4</td><td><code>&lt; &gt; &lt;= &gt;=</code></td><td>Numeric comparison only — runtime error on non-numbers</td></tr>
-        <tr><td>5</td><td><code>== !=</code></td><td>Equality — different types are always unequal, never coerced</td></tr>
+        <tr><td>4</td><td><code>&lt; &gt; &lt;= &gt;=</code></td><td>Numeric comparison only; runtime error on non-numbers</td></tr>
+        <tr><td>5</td><td><code>== !=</code></td><td>Equality; different types are always unequal, never coerced</td></tr>
         <tr><td>6</td><td><code>&amp;&amp;</code></td><td>Logical and, short-circuits</td></tr>
         <tr><td>7</td><td><code>||</code></td><td>Logical or, short-circuits</td></tr>
       </table>
@@ -351,14 +351,14 @@
     <p>
       <code>+</code> on two numbers adds them. If <strong>either</strong> side isn't a number,
       it falls back to string concatenation, so <code>"Bearer " + token</code> and
-      <code>"count: " + 3</code> both just work — there's no separate concat operator.
+      <code>"count: " + 3</code> both just work. There's no separate concat operator.
     </p>
 
     <h3>Field access</h3>
     <p>
       <code>value.field</code> reads a field off an object (from <code>jwt_decode(...)</code>,
       <code>json_parse(...)</code>, or <code>response.json()</code>). A missing field, or a
-      field access on a non-object, evaluates to <code>null</code> — not an error. This is a
+      field access on a non-object, evaluates to <code>null</code>, not an error. This is a
       <strong>different convention</strong> from <code>env()</code>/<code>header()</code>/<code>cookie()</code>
       below: JSON payload shape is expected to vary, so a missing field is a normal, silent
       <code>null</code>; a missing env var or header instead comes back as <code>""</code>,
@@ -371,9 +371,11 @@
       <li><code>response.json()</code> — parses the body as JSON into a value tree you can
         field-access into; <code>null</code> if the body isn't valid JSON.</li>
       <li><code>response.text()</code> — the raw response body as a string.</li>
+      <li><code>response.contains("...")</code> — true if the raw body has that text in it
+        anywhere, short for <code>response.text().contains("...")</code>.</li>
     </ul>
     <p>
-      There's no <code>response.headers</code> field — read response headers with the
+      There's no <code>response.headers</code> field; read response headers with the
       <code>header(...)</code> builtin, which is fed response headers specifically in test
       scripts so the same name works in both script slots.
     </p>
@@ -396,6 +398,7 @@
         <tr><td>base64_encode(s)</td><td>(string) → string</td><td>Standard base64 (not URL-safe).</td></tr>
         <tr><td>base64_decode(s)</td><td>(string) → string</td><td>Accepts standard or URL-safe-no-pad base64. Null if invalid or not UTF-8 once decoded.</td></tr>
         <tr><td>jwt_decode(token)</td><td>(string) → object</td><td>No signature verification — claims only. Accepts a bare token or one prefixed with "Bearer ". Returns <code>{ header, payload }</code>, or null if malformed.</td></tr>
+        <tr><td>contains(haystack, needle)</td><td>(value, value) → bool</td><td>Substring test on a string, membership test on an array, key test on an object. <strong>Case-sensitive.</strong> Also spelled <code>haystack.contains(needle)</code> — same function. False (never an error) on a null/bool/number haystack.</td></tr>
         <tr><td>json_parse(s)</td><td>(string) → value</td><td>Parses arbitrary JSON text. Null on invalid JSON.</td></tr>
         <tr><td>json_stringify(value)</td><td>(value) → string</td><td>Serializes any value back into real, properly-quoted JSON — the inverse of json_parse/jwt_decode's output.</td></tr>
         <tr><td>aes_encrypt(text, key)</td><td>(string, string) → string</td><td>AES-256-GCM, keyed by the SHA-256 hash of key (any string works, any length). Returns base64(nonce || ciphertext).</td></tr>
@@ -412,7 +415,7 @@
     <div class="callout">
       <code>aes_encrypt</code>/<code>aes_decrypt</code> round-trip with each other, but the exact
       framing (SHA-256 key derivation, <code>nonce || ciphertext</code> layout) is this engine's
-      own convention — it's <strong>not guaranteed to match another system's AES-GCM
+      own convention, and it's <strong>not guaranteed to match another system's AES-GCM
       implementation</strong>. If an external API dictates its own key derivation or nonce
       handling, treat these as a starting point, not a drop-in match.
     </div>
@@ -445,6 +448,34 @@
     <span class="fn">test</span>(<span class="st">"ok range"</span>, <span class="kw">false</span>)
 }</pre>
 
+    <h3>Assert on a keyword in the response</h3>
+    <p>
+      When the body isn't JSON, or the check is "did this word show up at all", test the text
+      directly. All three of these are the same test written three ways:
+    </p>
+    <pre><span class="fn">test</span>(<span class="st">"no stack trace leaked"</span>, !<span class="fn">contains</span>(response.<span class="fn">text</span>(), <span class="st">"panicked at"</span>))
+<span class="fn">test</span>(<span class="st">"says expired"</span>, response.<span class="fn">text</span>().<span class="fn">contains</span>(<span class="st">"expired"</span>))
+<span class="fn">test</span>(<span class="st">"says expired"</span>, response.<span class="fn">contains</span>(<span class="st">"expired"</span>))</pre>
+    <p>
+      Matching is case-sensitive, so <code>"Expired"</code> does not match <code>"expired"</code>.
+      There's no way to change a string's case in this language, so pick a substring that's
+      already stable, like <code>"xpired"</code>, when the server's capitalization isn't.
+    </p>
+
+    <h3>Branch on a header, then check a role is in a list</h3>
+    <pre><span class="kw">if</span> <span class="fn">contains</span>(<span class="fn">header</span>(<span class="st">"Content-Type"</span>), <span class="st">"json"</span>) {
+    <span class="kw">let</span> body = response.<span class="fn">json</span>()
+    <span class="fn">test</span>(<span class="st">"user is an admin"</span>, <span class="fn">contains</span>(body.roles, <span class="st">"admin"</span>))
+    <span class="fn">test</span>(<span class="st">"payload carries a roles key"</span>, <span class="fn">contains</span>(body, <span class="st">"roles"</span>))
+} <span class="kw">else</span> {
+    <span class="fn">test</span>(<span class="st">"json response"</span>, <span class="kw">false</span>)
+}</pre>
+    <p>
+      On an array <code>contains</code> tests membership by equality, and on an object it tests
+      whether a key is present, so the same call answers "is admin one of these roles" and "did
+      the payload include a roles field at all".
+    </p>
+
     <h3>Check a cookie was set</h3>
     <pre><span class="fn">test</span>(<span class="st">"has session"</span>, <span class="fn">cookie</span>(<span class="st">"session_id"</span>) != <span class="st">""</span>)</pre>
 
@@ -458,7 +489,7 @@
     <p>
       <code>set_header</code> auto-converts a non-string value, so passing the object directly
       JSON-stringifies it the same as calling <code>json_stringify(claims.payload)</code> by hand.
-      If only one field is actually needed, send just that field — it's already a string:
+      If only one field is actually needed, send just that field, which is already a string:
     </p>
     <pre><span class="kw">let</span> claims = <span class="fn">jwt_decode</span>(<span class="fn">cookie</span>(<span class="st">"accessToken"</span>))
 <span class="fn">set_header</span>(<span class="st">"X-User-Detail"</span>, claims.payload.masterPhrId)</pre>
@@ -483,14 +514,15 @@
       No loops, no user-defined functions, no array/object literals (you can only
       <strong>receive</strong> arrays/objects from <code>jwt_decode</code>/<code>json_parse</code>/<code>response.json()</code>,
       not construct them), no <code>try</code>/<code>catch</code> (a runtime error just aborts
-      the script), no string indexing/slicing, no regex. If a task needs any of these, it's out
-      of scope for a script — solve it with headers/env vars/assertions in the shapes above
+      the script), no string indexing/slicing, no case conversion, and no regex —
+      <code>contains</code> is the whole of the pattern matching on offer. If a task needs any of these, it's out
+      of scope for a script. Solve it with headers/env vars/assertions in the shapes above
       instead of reaching for a workaround.
     </p>
 
     <h2 id="ai">Prompt for an LLM</h2>
     <p>
-      Don't hand-write these scripts — copy the block below into ChatGPT, Claude, or any other
+      Don't hand-write these scripts. Copy the block below into ChatGPT, Claude, or any other
       LLM, add your own request at the end, and let it write the script for you.
     </p>
     <div class="prompt-block">
@@ -528,11 +560,15 @@ BUILT-IN FUNCTIONS:
   base64_encode(s) / base64_decode(s)
   jwt_decode(token) -&gt; {header, payload}  (no signature check; accepts a bare
                                            token or "Bearer &lt;token&gt;")
+  contains(haystack, needle) -&gt; bool     (substring in a string, membership in an
+                                           array, key in an object; case-sensitive.
+                                           Also written haystack.contains(needle))
   json_parse(s) -&gt; value
   json_stringify(value) -&gt; string
   aes_encrypt(text, key) / aes_decrypt(text, key)   (AES-256-GCM, key is any
                                            string, SHA-256 derived, base64(nonce||ciphertext))
   response.status (test scripts only, number) / response.json() / response.text()
+  response.contains(needle)              (short for response.text().contains(needle))
 
 set_env/set_header/set_body accept ANY value type — objects/arrays are
 auto-JSON-stringified, everything else uses its plain text form. So
@@ -561,7 +597,7 @@ My request: &lt;describe what you want the script to do&gt;</pre>
     &nbsp;·&nbsp;
     <a href="https://github.com/animeshchaudhri/rustman" target="_blank" rel="noopener">GitHub</a>
     &nbsp;·&nbsp;
-    <a href="https://github.com/animeshchaudhri/rustman/blob/master/docs/scripting.md" target="_blank" rel="noopener">Raw source (scripting.md)</a>
+    <a href="https://github.com/animeshchaudhri/rustman/tree/master/vendor/rustman-engine" target="_blank" rel="noopener">Engine source</a>
   </p>
 </footer>
 

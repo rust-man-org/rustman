@@ -3,9 +3,11 @@
 //!
 //! It exists because hand-writing Postman-style JavaScript is not the point
 //! here — scripts in this language are meant to be *generated*, by an AI,
-//! from a plain-English description of what the user wants (see the spec
-//! in `docs/scripting.md` in the main rustman repo for the exact grammar
-//! and built-in function reference an AI should be given as context).
+//! from a plain-English description of what the user wants. The spec lives in
+//! `docs/scripting.html` in the main rustman repo (published at
+//! <https://animeshchaudhri.github.io/rustman/scripting.html>); it has the
+//! exact grammar, the built-in function reference, and a copy-pasteable
+//! prompt to hand an AI as context.
 //!
 //! Deliberately small on purpose: `let`, `if`/`else`, function calls, field
 //! access, and a handful of comparison/logic operators — no loops, no

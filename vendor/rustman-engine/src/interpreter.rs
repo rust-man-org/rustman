@@ -285,13 +285,22 @@ impl Interpreter {
                 let key = expect_string(&args, 1, "aes_decrypt")?;
                 Ok(builtins::aes_decrypt(ciphertext, key))
             }
+            "contains" => {
+                let haystack = expect_any(&args, 0, "contains")?;
+                let needle = expect_any(&args, 1, "contains")?;
+                Ok(Value::Bool(value_contains(haystack, needle)))
+            }
             other => Err(RuntimeError { message: format!("unknown function '{other}'") }),
         }
     }
 }
 
-fn call_method(receiver: &Value, method: &str, _args: &[Value]) -> Result<Value, RuntimeError> {
+fn call_method(receiver: &Value, method: &str, args: &[Value]) -> Result<Value, RuntimeError> {
     match method {
+        "contains" => {
+            let needle = expect_any(args, 0, ".contains")?;
+            Ok(Value::Bool(value_contains(receiver, needle)))
+        }
         "json" => {
             let raw = receiver.get_field("__raw_body");
             match raw.as_str() {
@@ -314,6 +323,43 @@ fn call_method(receiver: &Value, method: &str, _args: &[Value]) -> Result<Value,
     }
 }
 
+/// Backs both `contains(haystack, needle)` and `haystack.contains(needle)`,
+/// which are the same function spelled two ways — scripts read better one way
+/// or the other depending on whether the haystack is a call result
+/// (`response.text().contains("...")`) or a variable (`contains(body, "...")`).
+///
+/// What "contains" means depends on the haystack: a substring test on a
+/// string, a membership test on an array, and a key test on an object. A
+/// non-string needle is compared by its text form against a string haystack,
+/// so `contains(body(), 404)` works without stringifying by hand.
+///
+/// Matching is case-sensitive. There is no `lower()` in this language, so a
+/// case-insensitive match would be impossible to opt out of, while an exact
+/// one can always be loosened by passing a shorter needle.
+///
+/// Anything else — `null`, a bool, a number — contains nothing and returns
+/// `false` rather than erroring, matching how field access on a non-object is
+/// a silent `null`: a script asking "is X in this missing field" wants a
+/// usable `false`, not an aborted run.
+fn value_contains(haystack: &Value, needle: &Value) -> bool {
+    match haystack {
+        Value::String(text) => text.contains(&needle.to_string()),
+        Value::Array(items) => items.iter().any(|item| values_equal(item, needle)),
+        Value::Object(fields) => match haystack.get_field("__raw_body") {
+            // `response` is an object carrying the body in a private field, so
+            // `response.contains("...")` searches the body. Its own field
+            // names are an implementation detail no script can see, which
+            // makes them the one thing nobody can mean here.
+            Value::String(body) => body.contains(&needle.to_string()),
+            _ => {
+                let key = needle.to_string();
+                fields.iter().any(|(name, _)| *name == key)
+            }
+        },
+        Value::Null | Value::Bool(_) | Value::Number(_) => false,
+    }
+}
+
 fn values_equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Null, Value::Null) => true,
@@ -330,6 +376,15 @@ fn expect_string<'a>(args: &'a [Value], index: usize, fn_name: &str) -> Result<&
         .ok_or_else(|| RuntimeError {
             message: format!("{fn_name}() expects a string argument at position {}", index + 1),
         })
+}
+
+/// For arguments where every type is meaningful and none needs converting —
+/// `contains`, whose answer depends on whether it was handed a string, an
+/// array or an object. Only presence is checked.
+fn expect_any<'a>(args: &'a [Value], index: usize, fn_name: &str) -> Result<&'a Value, RuntimeError> {
+    args.get(index).ok_or_else(|| RuntimeError {
+        message: format!("{fn_name}() expects an argument at position {}", index + 1),
+    })
 }
 
 /// Like [`expect_string`], but for value-shaped arguments (a header/env/body
