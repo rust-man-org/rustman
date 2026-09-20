@@ -108,20 +108,6 @@ pub(crate) fn send_request(state: &mut AppState) -> Task<Message> {
     tab.test_results.clear();
     let (generation, cancel) = tab.jobs.start(JobKind::Request);
 
-    // Local addresses (loopback/RFC-1918) get http://; everything else https://.
-    let raw_url = tab.url.trim().to_owned();
-    let url_with_scheme = if !raw_url.is_empty()
-        && !raw_url.starts_with("http://")
-        && !raw_url.starts_with("https://")
-        && !raw_url.starts_with("ws://")
-        && !raw_url.starts_with("wss://")
-    {
-        let scheme = if is_local_url(&raw_url) { "http" } else { "https" };
-        format!("{scheme}://{raw_url}")
-    } else {
-        raw_url
-    };
-
     let mut headers = tab.headers.clone();
     for (key, value) in extra_headers {
         headers.push(crate::domain::request::KeyValue {
@@ -137,7 +123,7 @@ pub(crate) fn send_request(state: &mut AppState) -> Task<Message> {
         collection_id: String::new(),
         name: tab.title.clone(),
         method: tab.method.clone(),
-        url: url_with_scheme,
+        url: tab.url.clone(),
         headers,
         params: tab.params.clone(),
         body: body_override.unwrap_or_else(|| tab.body_editor.content()),
@@ -321,14 +307,4 @@ pub(crate) fn flush_modified_tabs(state: &mut AppState) {
             tab.modified = false;
         }
     }
-}
-
-fn is_local_url(url: &str) -> bool {
-    let host = url.split('/').next().unwrap_or(url);
-    let host = host.split(':').next().unwrap_or(host).to_ascii_lowercase();
-    matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1")
-        || host.starts_with("127.")
-        || host.starts_with("10.")
-        || host.starts_with("192.168.")
-        || host.starts_with("172.") // covers 172.16-31.x.x private range
 }
