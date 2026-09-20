@@ -1,5 +1,12 @@
 use crate::message::SidebarPanel;
 
+/// Widget id of a request's rename `text_input`. Shared by the sidebar view
+/// (which puts it on the input) and the update handler (which focuses it right
+/// after a clone), so the two cannot drift apart.
+pub fn rename_input_id(request_id: &str) -> iced::widget::Id {
+    format!("request-rename-{request_id}").into()
+}
+
 #[derive(Debug, Clone)]
 pub struct SidebarState {
     pub panel: SidebarPanel,

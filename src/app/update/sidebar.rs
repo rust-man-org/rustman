@@ -97,6 +97,39 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
                 }
             }
         }
+        SidebarMsg::CloneRequest { id, collection_id } => {
+            let existing = state
+                .requests
+                .get(&collection_id)
+                .and_then(|reqs| reqs.iter().find(|r| r.id == id))
+                .cloned();
+            let Some(existing) = existing else {
+                return Task::none();
+            };
+
+            let names: Vec<String> = state
+                .requests
+                .get(&collection_id)
+                .map(|reqs| reqs.iter().map(|r| r.name.clone()).collect())
+                .unwrap_or_default();
+            let cloned = existing.duplicate_in(collection_id.clone(), clone_name(&existing.name, &names));
+
+            if let Some(db) = &state.db {
+                let _ = storage::create_request(db, &cloned);
+            }
+            state.requests.entry(collection_id).or_default().push(cloned.clone());
+            state.sidebar.selected_request = Some(cloned.id.clone());
+            // Open straight into the rename field: the clone only earns its
+            // keep once it has a name of its own.
+            state.sidebar.req_renaming = Some(cloned.id.clone());
+            state.tabs.open_request(&cloned);
+            // Expanding the collection is what puts the input in the tree; if
+            // it stayed collapsed the focus below would have nothing to land on.
+            state.sidebar.expanded.insert(cloned.collection_id.clone());
+            return iced::widget::operation::focus(crate::state::sidebar::rename_input_id(
+                &cloned.id,
+            ));
+        }
         SidebarMsg::NewRequestIn(collection_id) => {
             let req = crate::domain::collection::SavedRequest::new_in(
                 collection_id.clone(),
@@ -207,6 +240,23 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
     Task::none()
 }
 
+/// Name for a clone: `<name> copy`, then `<name> copy 2`, `<name> copy 3` …
+/// until it is unique within the collection. Matching is case insensitive
+/// because two names differing only in case are confusing in the sidebar.
+fn clone_name(name: &str, existing: &[String]) -> String {
+    let taken = |candidate: &str| {
+        existing.iter().any(|n| n.eq_ignore_ascii_case(candidate))
+    };
+    let base = format!("{name} copy");
+    if !taken(&base) {
+        return base;
+    }
+    (2..)
+        .map(|n| format!("{base} {n}"))
+        .find(|candidate| !taken(candidate))
+        .expect("an unbounded range always yields a free name")
+}
+
 fn rebuild_env_vars(state: &mut AppState, env_id: &str) {
     let vars: std::collections::HashMap<String, String> = state
         .sidebar
@@ -220,5 +270,57 @@ fn rebuild_env_vars(state: &mut AppState, env_id: &str) {
         if let Some(db) = &state.db {
             let _ = storage::save_environment(db, env);
         }
+    }
+}
+
+#[cfg(test)]
+mod clone_request_tests {
+    use super::*;
+    use crate::domain::collection::SavedRequest;
+
+    fn names(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    #[test]
+    fn first_clone_of_an_untaken_name_gets_the_copy_suffix() {
+        assert_eq!(clone_name("Get user", &names(&["Get user"])), "Get user copy");
+    }
+
+    #[test]
+    fn repeated_clones_number_upward() {
+        let existing = names(&["Get user", "Get user copy", "Get user copy 2"]);
+        assert_eq!(clone_name("Get user", &existing), "Get user copy 3");
+    }
+
+    #[test]
+    fn taken_names_match_case_insensitively() {
+        let existing = names(&["Get user", "GET USER COPY"]);
+        assert_eq!(clone_name("Get user", &existing), "Get user copy 2");
+    }
+
+    #[test]
+    fn a_clone_is_a_new_row_with_the_same_payload() {
+        let mut original = SavedRequest::new_in("col-1".into(), "Get user".into());
+        original.method = crate::domain::request::HttpMethod::Post;
+        original.url = "https://example.com/users".into();
+        original.headers.push(crate::domain::request::KeyValue {
+            id: "h1".into(),
+            key: "Accept".into(),
+            value: "application/json".into(),
+            enabled: true,
+        });
+        original.body = "{\"a\":1}".into();
+
+        let clone = original.duplicate_in("col-1".into(), "Get user copy".into());
+
+        assert_ne!(clone.id, original.id, "a clone needs its own row id");
+        assert_eq!(clone.collection_id, "col-1");
+        assert_eq!(clone.name, "Get user copy");
+        assert_eq!(clone.method, original.method);
+        assert_eq!(clone.url, original.url);
+        assert_eq!(clone.body, original.body);
+        assert_eq!(clone.headers.len(), 1);
+        assert_eq!(clone.headers[0].key, "Accept");
     }
 }

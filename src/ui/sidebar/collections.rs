@@ -141,6 +141,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
                     let rcol = req.collection_id.clone();
                     let rid_done = req.id.clone();
                     text_input("Request name", &req.name)
+                        .id(crate::state::sidebar::rename_input_id(&rid))
                         .on_input(move |s| {
                             Message::Sidebar(SidebarMsg::RenameRequest {
                                 id: rid.clone(),
@@ -178,6 +179,13 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
                 let item_row = container(
                     row![
                         name_part,
+                        hover_icon_btn(
+                            icons::copy().size(10),
+                            Message::Sidebar(SidebarMsg::CloneRequest {
+                                id: req.id.clone(),
+                                collection_id: req.collection_id.clone(),
+                            }),
+                        ),
                         hover_icon_btn(
                             icons::edit().size(10),
                             Message::Sidebar(SidebarMsg::ToggleRenameRequest(req.id.clone())),

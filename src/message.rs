@@ -33,6 +33,7 @@ pub enum SidebarMsg {
     RenameRequest { id: String, collection_id: String, name: String },
     DeleteCollection(String),
     DeleteRequest { id: String, collection_id: String },
+    CloneRequest { id: String, collection_id: String },
     HistoryEntryOpened(HistoryEntry),
     ClearHistory,
     EnvironmentSelected(String),

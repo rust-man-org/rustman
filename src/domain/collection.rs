@@ -43,6 +43,16 @@ pub struct SavedRequest {
 }
 
 impl SavedRequest {
+    /// A copy of an existing request saved as a *new* row: fresh id, same
+    /// collection, the given name.
+    ///
+    /// Every other field — method, url, headers, params, body, auth, form
+    /// data, cookies, scripts — is carried over, so the name is the only
+    /// thing the caller has to decide.
+    pub fn duplicate_in(&self, collection_id: String, name: String) -> Self {
+        Self { id: uuid::Uuid::new_v4().to_string(), collection_id, name, ..self.clone() }
+    }
+
     pub fn new_in(collection_id: String, name: String) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
