@@ -43,6 +43,7 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
                         params: tab.params.clone(),
                         body: tab.body_editor.content(),
                         body_type: tab.body_type.clone(),
+                        graphql_variables: tab.graphql_variables_editor.content(),
                         auth_type: tab.auth_type.clone(),
                         bearer_token: tab.bearer_token.clone(),
                         basic_user: tab.basic_user.clone(),

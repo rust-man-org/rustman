@@ -53,6 +53,7 @@ pub fn import(json: &str) -> Result<Vec<(Collection, Vec<SavedRequest>)>, String
 
         let body_type = match req.body_type.as_deref() {
             Some("json") => BodyType::Json,
+            Some("graphql") => BodyType::GraphQL,
             Some("text") | Some("plain") => BodyType::Text,
             Some("form") | Some("form-data") => BodyType::FormData,
             _ => {

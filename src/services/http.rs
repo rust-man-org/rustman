@@ -176,7 +176,7 @@ async fn do_send(
         _ => {}
     }
 
-    if matches!(req.body_type, BodyType::Json)
+    if matches!(req.body_type, BodyType::Json | BodyType::GraphQL)
         && !header_map.contains_key(reqwest::header::CONTENT_TYPE)
     {
         header_map.insert(
@@ -253,6 +253,15 @@ async fn do_send(
             let body = substitute(&req.body, env);
             if !body.is_empty() {
                 builder = builder.body(body);
+            }
+        }
+        BodyType::GraphQL => {
+            // Query and variables both take `{{var}}` substitution, then get
+            // compiled into the single JSON document GraphQL servers expect.
+            let query = substitute(&req.body, env);
+            let variables = substitute(&req.graphql_variables, env);
+            if !(query.trim().is_empty() && variables.trim().is_empty()) {
+                builder = builder.body(crate::domain::request::graphql_body(&query, &variables)?);
             }
         }
         BodyType::None => {}

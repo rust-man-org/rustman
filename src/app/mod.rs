@@ -167,7 +167,10 @@ impl AppState {
 
         let tab = self.tabs.active_tab();
         let request_panel_focused = match tab.active_request_tab {
-            RequestTab::Body => tab.body_editor.has_keyboard_focus(),
+            RequestTab::Body => {
+                tab.body_editor.has_keyboard_focus()
+                    || tab.graphql_variables_editor.has_keyboard_focus()
+            }
             RequestTab::Scripts => {
                 tab.pre_request_editor.has_keyboard_focus() || tab.test_editor.has_keyboard_focus()
             }

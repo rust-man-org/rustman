@@ -46,7 +46,7 @@ This is not a startup and I am not trying to sell you anything. It is a tool I w
 - **File upload.** multipart/form-data with a real file picker. The file's bytes go to the server with a Content-Type guessed from the extension.
 - **All common auth types.** Bearer, Basic, API Key (header or query), Cookie, and JWT (HS256).
 - **Scripting.** Pre-request and test scripts run on a custom Rust scripting language — see below.
-- **Environment variables.** `{{variable}}` substitution from the active environment, applied to the URL, headers, query params, and the JSON or Text body.
+- **Environment variables.** `{{variable}}` substitution from the active environment, applied to the URL, headers, query params, and the JSON, Text or GraphQL body.
 - **Collections and history.** Organize requests and replay them from history. Local SQLite is the source of truth.
 - **Git for collections.** A built in Source Control panel. Commit collections (they are stored as JSON), browse the log, restore any commit back into the app, make and switch branches, see the working diff, and juggle several repos. Clone, fetch, pull, and push go through your system git, so they use the SSH keys and logins you already have. SQLite stays the source of truth and git sits on top.
 - **Import.** cURL commands (native Rust tokenizer), Postman v2 and v2.1 collections, and OpenAPI specs. The OpenAPI parser reads JSON or YAML, but the file picker only offers `.json`, so a `.yaml` spec cannot be chosen through the dialog yet.
@@ -78,7 +78,7 @@ Full grammar, built-ins, and a copy-pasteable **LLM prompt** that writes scripts
 
 I would rather be straight with you than oversell. A few things are half done right now.
 
-- **Environment variables use the active environment only.** Substitution pulls from the one active environment and hits the URL, headers, query params, and the JSON or Text body. It does not touch auth fields (tokens, keys, passwords) or form-data fields. There are no collection, global, or dynamic (`{{$guid}}`) variables, and it resolves in a single non-recursive pass. With no environment active, `{{var}}` goes out as written.
+- **Environment variables use the active environment only.** Substitution pulls from the one active environment and hits the URL, headers, query params, and the JSON, Text or GraphQL body. It does not touch auth fields (tokens, keys, passwords) or form-data fields. There are no collection, global, or dynamic (`{{$guid}}`) variables, and it resolves in a single non-recursive pass. With no environment active, `{{var}}` goes out as written.
 - **Git commits are manual, and the store is two way.** No commit on save yet, but the git store does read back into the app. Restore loads a commit's collections over your current state after it asks you. Clone, fetch, pull, and push shell out to your system git. SQLite is still the source of truth.
 
 ## Download

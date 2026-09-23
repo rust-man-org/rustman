@@ -83,6 +83,7 @@ pub enum RequestMsg {
     // Body
     BodyTypeChanged(String),
     BodyEdited(iced_code_editor::Message),
+    GraphQLVariablesEdited(iced_code_editor::Message),
     FormFieldAdded,
     FormFieldRemoved(usize),
     FormFieldKeyChanged(usize, String),

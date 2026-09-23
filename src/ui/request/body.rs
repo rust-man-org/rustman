@@ -17,6 +17,7 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
             body_type_btn("JSON", BodyType::Json, &tab.body_type),
             body_type_btn("Text", BodyType::Text, &tab.body_type),
             body_type_btn("Form", BodyType::FormData, &tab.body_type),
+            body_type_btn("GraphQL", BodyType::GraphQL, &tab.body_type),
         ]
         .spacing(2)
         .padding(3),
@@ -38,7 +39,7 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
             column![
                 Space::new().height(20),
                 text("No body").size(13).color(Palette::text_muted()),
-                text("Select JSON, Text, or Form to add a body")
+                text("Select JSON, Text, Form, or GraphQL to add a body")
                     .size(11)
                     .color(Palette::text_subtle()),
             ]
@@ -116,6 +117,30 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
         }
 
         BodyType::FormData => form_data_view(&tab.form_fields),
+
+        BodyType::GraphQL => {
+            // Postman's layout: query on top, variables underneath. Both panes
+            // are code editors, so both keep their own undo history and the
+            // shared gutter/theme look.
+            let query: Element<Message> = tab
+                .body_editor
+                .view()
+                .map(|m| Message::Request(RequestMsg::BodyEdited(m)));
+            let variables: Element<Message> = tab
+                .graphql_variables_editor
+                .view()
+                .map(|m| Message::Request(RequestMsg::GraphQLVariablesEdited(m)));
+
+            column![
+                pane_label("Query"),
+                container(query).height(Length::FillPortion(3)).width(Length::Fill),
+                pane_label("Variables"),
+                container(variables).height(Length::FillPortion(2)).width(Length::Fill),
+            ]
+            .spacing(0)
+            .height(Length::Fill)
+            .into()
+        }
     };
 
     column![type_tabs_row, body_panel]
@@ -136,6 +161,18 @@ fn body_type_btn<'a>(
         )))
         .style(move |t, s| type_btn_style(t, s, active))
         .padding([5, 12])
+        .into()
+}
+
+/// Section header above a split pane (GraphQL's Query / Variables).
+fn pane_label(label: &'static str) -> Element<'static, Message> {
+    container(text(label).size(10).color(Palette::text_muted()))
+        .style(|_| iced::widget::container::Style {
+            background: Some(Background::Color(Palette::background())),
+            ..Default::default()
+        })
+        .padding(iced::Padding { top: 3.0, right: 8.0, bottom: 3.0, left: 8.0 })
+        .width(Length::Fill)
         .into()
 }
 

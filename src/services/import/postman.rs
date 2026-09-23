@@ -77,6 +77,16 @@ struct PostmanBody {
     mode: Option<String>,
     raw: Option<String>,
     formdata: Option<Vec<PostmanFormField>>,
+    graphql: Option<PostmanGraphQl>,
+}
+
+/// Postman's GraphQL body: the query and its variables live side by side. Older
+/// exports carry the variables as a JSON *string*, newer ones as an object, so
+/// both shapes are accepted and normalised to text.
+#[derive(Deserialize)]
+struct PostmanGraphQl {
+    query: Option<String>,
+    variables: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -168,9 +178,23 @@ fn convert_request(collection_id: &str, item: &PostmanRequestItem) -> SavedReque
         })
         .collect();
 
-    let (body, body_type, form_fields) = match &r.body {
+    let (body, body_type, form_fields, graphql_variables) = match &r.body {
         Some(b) => match b.mode.as_deref() {
-            Some("raw") => (b.raw.clone().unwrap_or_default(), BodyType::Json, vec![]),
+            Some("raw") => (b.raw.clone().unwrap_or_default(), BodyType::Json, vec![], String::new()),
+            Some("graphql") => {
+                let gql = b.graphql.as_ref();
+                let query = gql.and_then(|g| g.query.clone()).unwrap_or_default();
+                let variables = match gql.and_then(|g| g.variables.as_ref()) {
+                    // Postman stores variables as a string in its own exports
+                    // and as an object in newer ones; both become editor text.
+                    Some(serde_json::Value::String(s)) => s.clone(),
+                    Some(v @ serde_json::Value::Object(_)) => {
+                        serde_json::to_string_pretty(v).unwrap_or_default()
+                    }
+                    _ => String::new(),
+                };
+                (query, BodyType::GraphQL, vec![], variables)
+            }
             Some("formdata") => {
                 let fields = b
                     .formdata
@@ -192,11 +216,11 @@ fn convert_request(collection_id: &str, item: &PostmanRequestItem) -> SavedReque
                         mime_type: None,
                     })
                     .collect();
-                (String::new(), BodyType::FormData, fields)
+                (String::new(), BodyType::FormData, fields, String::new())
             }
-            _ => (String::new(), BodyType::None, vec![]),
+            _ => (String::new(), BodyType::None, vec![], String::new()),
         },
-        None => (String::new(), BodyType::None, vec![]),
+        None => (String::new(), BodyType::None, vec![], String::new()),
     };
 
     SavedRequest {
@@ -209,6 +233,7 @@ fn convert_request(collection_id: &str, item: &PostmanRequestItem) -> SavedReque
         params,
         body,
         body_type,
+        graphql_variables,
         auth_type: AuthType::None,
         bearer_token: String::new(),
         basic_user: String::new(),
@@ -264,6 +289,13 @@ pub fn export(collection: &Collection, requests: &[SavedRequest]) -> String {
                         .collect();
                     json!({ "mode": "formdata", "formdata": fields })
                 }
+                BodyType::GraphQL => json!({
+                    "mode": "graphql",
+                    "graphql": {
+                        "query": req.body,
+                        "variables": req.graphql_variables,
+                    },
+                }),
                 BodyType::None => json!({ "mode": "none" }),
             };
 

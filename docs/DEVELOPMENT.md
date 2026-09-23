@@ -99,15 +99,15 @@ Ctrl+Enter or Cmd+Enter sends the current request without moving your hands to t
 | Feature | Status | Notes |
 |---|---|---|
 | HTTP methods | works | Parsed with `Method::from_str`, full reqwest send path. |
-| Environment variables (`{{var}}`) | partial | Single pass, non recursive replace over the active env only. Applied to URL, headers, params, and the JSON or Text body. Not auth fields, not form data. Exact `{{key}}` only. With no env active the token goes out as written. A variable may hold a bare host or a full URL — the scheme is defaulted after expansion (see "Scheme defaulting happens after substitution"). |
+| Environment variables (`{{var}}`) | partial | Single pass, non recursive replace over the active env only. Applied to URL, headers, params, and the JSON, Text or GraphQL body (query and variables). Not auth fields, not form data. Exact `{{key}}` only. With no env active the token goes out as written. A variable may hold a bare host or a full URL — the scheme is defaulted after expansion (see "Scheme defaulting happens after substitution"). |
 | File upload (multipart) | works | The file is read, base64 stored on the field, decoded to a part with a Content-Type guessed from the extension, and sent with `builder.multipart`. Fully in memory, no streaming. |
 | Auth (Bearer, Basic, API Key, Cookie, JWT HS256) | works | All five are implemented. Auth values are not run through `substitute()`, so a `{{var}}` in a token goes out as written. |
 | WebSocket | works | Type a ws:// or wss:// URL and the panel switches to WebSocket mode. Real connect through tokio-tungstenite, events stream in over a subscription. The ws url and state are not persisted, so reconnect after restart is not possible from saved state. |
 | Import cURL | works | Tokenizer and flag handling in `services/curl/parser.rs`, pasted into the URL bar. Unit tested. |
-| Import Postman v2.x | works, lossy | Drops auth, flattens folders, tags every body as JSON, ignores urlencoded, graphql, and file body modes. |
+| Import Postman v2.x | works, lossy | Drops auth and flattens folders. Raw, form-data and GraphQL bodies keep their mode (GraphQL queries and variables included); urlencoded and file body modes are ignored. |
 | Import OpenAPI | partial | `import::swagger` parses JSON and falls back to `serde_yaml`, so YAML specs do work (there is a `yaml_input_detected` test for it). The block is the picker: `update/import.rs` only registers `.add_filter("JSON", &["json"])`, so a `.yaml` file cannot be selected through the dialog. No security scheme to auth mapping either. |
 | Import HTTPie | works | Detected from the URL bar like cURL. |
-| Export cURL | works | method, url, headers, cookies, body, and bearer, basic, apikey auth, shell escaped, shown in a copyable modal. |
+| Export cURL | works | method, url, headers, cookies, body, and bearer, basic, apikey auth, shell escaped, shown in a copyable modal. A GraphQL body is exported already compiled, with the Content-Type the app would send. |
 | Export Postman v2.1 | works, lossy | Omits query params, auth, cookies, and scripts, so round trips are not lossless. |
 | Git for collections | works | Source Control panel with manual commit, log, restore with a confirmation prompt, branches, working diff, multiple repos, and remote clone, fetch, pull, and push through system git. SQLite stays the source of truth. |
 | Git identity | works | Resolved from the repo's git config. Settings panel lets you set it directly. No hardcoded fallback. |

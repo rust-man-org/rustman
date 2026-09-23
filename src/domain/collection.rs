@@ -22,6 +22,10 @@ pub struct SavedRequest {
     pub params: Vec<KeyValue>,
     pub body: String,
     pub body_type: BodyType,
+    /// The GraphQL *variables*, as typed (JSON text). Only meaningful when
+    /// `body_type` is `GraphQL` — the query itself is `body`.
+    #[serde(default)]
+    pub graphql_variables: String,
     pub auth_type: AuthType,
     pub bearer_token: String,
     pub basic_user: String,
@@ -64,6 +68,7 @@ impl SavedRequest {
             params: Vec::new(),
             body: String::new(),
             body_type: BodyType::None,
+            graphql_variables: String::new(),
             auth_type: AuthType::None,
             bearer_token: String::new(),
             basic_user: String::new(),
