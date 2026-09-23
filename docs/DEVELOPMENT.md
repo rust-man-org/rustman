@@ -6,7 +6,7 @@ I try to be honest here. Where something is UI only, stubbed, or half wired, I s
 
 ## Toolchain
 
-You need Rust 1.85 or newer. Rustman is edition 2024, as is the vendored `iced-code-editor`, so older toolchains will not build it. The latest stable Rust works fine. You also need a C toolchain and CMake, because git2 builds vendored libgit2 and OpenSSL and rusqlite bundles SQLite, all from source. On Linux add the X, xkb, and dbus dev packages (`libxkbcommon-dev libxi-dev libx11-dev libxcb1-dev libxcb-xkb-dev libdbus-1-dev pkg-config cmake build-essential`). Build with `cargo build --release` and the binary lands at `target/release/rustman`. Day to day I just use `cargo run`.
+You need Rust 1.85 or newer. Rustman is edition 2024, as is the vendored `iced-code-editor`, so older toolchains will not build it. The latest stable Rust works fine. You also need a C toolchain, `perl` and `pkg-config`, because git2 builds vendored libgit2 and OpenSSL and rusqlite bundles SQLite, all from source. No GUI development packages are needed: the HTML preview used to need a native webview and now does not, so there is nothing to install for GTK, WebKit, X11 or Wayland. Build with `cargo build --release` and the binary lands at `target/release/rustman`. Day to day I just use `cargo run`.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ Everything under `src/` splits into six concerns.
 
 | Module | What lives there |
 |--------|------------------|
-| `domain/` | Pure data and logic, no I/O. `SavedRequest` and `Collection` (`collection.rs`), `KeyValue`, `FormField`, and the auth and body enums (`request.rs`), `HttpResponse`, `TestResult`, `ConsoleEntry` (`response.rs`), `AppEnvironment` and `substitute()` (`environment.rs`). |
+| `domain/` | Pure data and logic, no I/O. `SavedRequest` and `Collection` (`collection.rs`), `KeyValue`, `FormField`, and the auth and body enums (`request.rs`), `HttpResponse`, `TestResult`, `ConsoleEntry` (`response.rs`), `AppEnvironment` and `substitute()` (`environment.rs`), and the HTML response model (`html.rs`). |
 | `state/` | Mutable runtime state. `RequestTabState` and `TabSnapshot` (`tabs.rs`), `AppSession` (`session.rs`), sidebar state. This is the in memory model the UI draws and the reducers change. |
 | `services/` | All the I/O and side effects. `http.rs` (reqwest), `storage.rs` (SQLite), `vcs.rs` (git2 and your system git), `websocket.rs` (tokio-tungstenite), `update.rs` (self update), `curl/` and `import/` (parsers and generators), `cache.rs` and `response_store.rs`. |
 | `app/` | The core. `mod.rs` holds `AppState` and the `update()` entry, `boot.rs` builds the first state from SQLite, `session.rs` persists the session, `request_ops.rs` assembles and sends requests, and `update/` holds the per message reducers. |
@@ -63,6 +63,17 @@ A multi megabyte JSON response should not crash the UI, blow up memory, or freez
 - **Parsed JSON LRU cache (wired).** `ParsedBodyCache` in `services/cache.rs` is a 20 entry LRU keyed by a hash of the raw body, so two tabs with the same response share one parse and eviction only drops the parsed tree. The raw text always survives on `HttpResponse`.
 - **Windowed viewing for large bodies (not started).** `HttpResponse::body_stored` gets set when a response crosses `INLINE_BODY_THRESHOLD`, but there is no store backing it yet — a `body_stored` response is flagged and comes back with an empty body today. Windowed slice-and-search viewing is still just an idea, not code.
 
+### HTML preview without a webview
+
+HTML responses used to be previewed by a native webview (`wry`) overlaid on the response panel, which meant WebKitGTK on Linux, WebView2 on Windows and WKWebView on macOS, plus a thread-local `WebView`, a bounds-probing `Operation` and a 150 ms timer to keep the child window aligned with the panel. It also never worked under native Wayland, where a child window cannot attach, so the preview silently fell back to source with a banner.
+
+The preview is now drawn by the app itself. `domain/html.rs` parses the body with `scraper` (html5ever) into a small model — headings, paragraphs, emphasis, links, lists, quotes, code, tables — and `ui/response/html.rs` draws that model with `Rich` text and ordinary widgets. Consequences worth keeping in mind:
+
+- **The build has no native preview dependency left.** `wry` was the only thing in the tree pulling in GTK/WebKit, so the Linux build no longer needs `webkit2gtk4.1-devel` and `gtk3-devel`.
+- **The model is a subset, on purpose.** Scripts, styles and embedded media are dropped rather than guessed at, and images contribute only their `alt` text. That is why the response panel has a Preview/Source toggle: the raw body has to stay reachable.
+- **Only safe link schemes become clickable.** `http`, `https` and `mailto` are resolved against the URL the request was sent to (after env substitution) and handed to the OS opener; `javascript:`, `data:`, `file:` and fragments stay plain text.
+- **Parsing runs on a blocking worker** under `JobKind::HtmlPreview`, kept separate from `JobKind::Parse` so it cannot cancel the raw-source/JSON job for the same response.
+
 ### Release profile
 
 I ship one small binary. The release profile uses `opt-level = 'z'`, `lto = true`, `codegen-units = 1`, `strip = true`, and `panic = "abort"`. The catch with `panic = "abort"` is that there is no per task isolation, a panic kills the whole process. That makes every stray `.unwrap()` matter more, so the fallible ones (the git2 `workdir().unwrap()` sites, the LRU double lookup, `build_client().expect()`) are worth converting to `?` over time.
@@ -103,6 +114,7 @@ Ctrl+Enter or Cmd+Enter sends the current request without moving your hands to t
 | File upload (multipart) | works | The file is read, base64 stored on the field, decoded to a part with a Content-Type guessed from the extension, and sent with `builder.multipart`. Fully in memory, no streaming. |
 | Auth (Bearer, Basic, API Key, Cookie, JWT HS256) | works | All five are implemented. Auth values are not run through `substitute()`, so a `{{var}}` in a token goes out as written. |
 | WebSocket | works | Type a ws:// or wss:// URL and the panel switches to WebSocket mode. Real connect through tokio-tungstenite, events stream in over a subscription. The ws url and state are not persisted, so reconnect after restart is not possible from saved state. |
+| HTML preview | works, lossy | `text/html` bodies are parsed and drawn in-app (headings, paragraphs, emphasis, links, lists, quotes, code, tables). No webview, so it renders the same on every platform. Scripts, styles, media and images are dropped, and the Preview/Source toggle shows the raw body. |
 | Import cURL | works | Tokenizer and flag handling in `services/curl/parser.rs`, pasted into the URL bar. Unit tested. |
 | Import Postman v2.x | works, lossy | Drops auth and flattens folders. Raw, form-data and GraphQL bodies keep their mode (GraphQL queries and variables included); urlencoded and file body modes are ignored. |
 | Import OpenAPI | partial | `import::swagger` parses JSON and falls back to `serde_yaml`, so YAML specs do work (there is a `yaml_input_detected` test for it). The block is the picker: `update/import.rs` only registers `.add_filter("JSON", &["json"])`, so a `.yaml` file cannot be selected through the dialog. No security scheme to auth mapping either. |

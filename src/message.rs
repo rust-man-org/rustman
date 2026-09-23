@@ -157,6 +157,9 @@ pub enum RequestTab {
 pub enum ResponseMsg {
     TabSelected(ResponseTab),
     CopyBody,
+    /// Show the raw HTML body instead of its rendered preview (`true`), or go
+    /// back to the preview (`false`).
+    HtmlSourceView(bool),
     ViewerEdited(iced_code_editor::Message),
     PdfPageRequested(usize),
     ConsoleEdited(iced::widget::text_editor::Action),
@@ -326,10 +329,11 @@ pub enum AppMsg {
         result: Result<crate::services::spreadsheet::ParsedSheet, String>,
     },
 
-    HtmlPreviewTick,
-    /// `html` is shared rather than owned: this message is produced on a
-    /// repeating timer, and copying a large HTML body every tick was pure waste.
-    HtmlPanelBounds { bounds: iced::Rectangle, html: std::sync::Arc<str> },
+    HtmlPreviewReady {
+        generation: u64,
+        tab_id: String,
+        result: Result<crate::domain::html::Document, String>,
+    },
     PdfPagePreviewReady {
         generation: u64,
         tab_id: String,

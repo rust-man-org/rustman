@@ -33,6 +33,9 @@ pub(super) fn handle(state: &mut AppState, msg: ResponseMsg) -> Task<Message> {
             state.status_message = Some("Copied!".to_owned());
             return clipboard::write::<Message>(body);
         }
+        ResponseMsg::HtmlSourceView(source) => {
+            state.tabs.active_tab_mut().html_source_view = source;
+        }
         ResponseMsg::ViewerEdited(msg) => {
             let tab = state.tabs.active_tab_mut();
             return tab.response_editor.update(&msg)
