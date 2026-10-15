@@ -8,7 +8,7 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
         ImportMsg::OpenPostmanDialog => Task::perform(
             async {
                 let file = rfd::AsyncFileDialog::new()
-                    .add_filter("JSON", &["json"])
+                    .add_filter("JSON | YAML", &["json", "yml", "yaml"])
                     .set_title("Import Collection (Postman / HTTPie / Rustman)")
                     .pick_file()
                     .await;
