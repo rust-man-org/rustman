@@ -318,10 +318,13 @@ fn extract_binary(bytes: &[u8], out: &std::path::Path) -> Result<(), String> {
     let mut archive = tar::Archive::new(gz);
     for entry in archive.entries().map_err(|e| e.to_string())? {
         let mut entry = entry.map_err(|e| e.to_string())?;
-        let is_bin = entry
-            .path()
-            .map(|p| p.file_name() == Some(std::ffi::OsStr::new(BIN_NAME)))
-            .unwrap_or(false);
+        // Regular files only: the Linux tarball opens with a `rustman/`
+        // directory entry, whose file name is also `rustman`.
+        let is_bin = entry.header().entry_type().is_file()
+            && entry
+                .path()
+                .map(|p| p.file_name() == Some(std::ffi::OsStr::new(BIN_NAME)))
+                .unwrap_or(false);
         if is_bin {
             let mut buf = Vec::new();
             entry.read_to_end(&mut buf).map_err(|e| e.to_string())?;
@@ -458,5 +461,63 @@ mod tests {
     fn leaves_a_normal_path_untouched() {
         let normal = std::path::PathBuf::from("/usr/local/bin/rustman");
         assert_eq!(strip_deleted_suffix(normal.clone()), normal);
+    }
+
+    /// A tar.gz laid out the way release.yml packs it: `dir` (if any) as its
+    /// own directory entry first, as GNU tar writes it, then the binary.
+    #[cfg(not(target_os = "windows"))]
+    fn release_tarball(dir: Option<&str>, binary: &[u8]) -> Vec<u8> {
+        let mut builder = tar::Builder::new(Vec::new());
+        let path = match dir {
+            Some(dir) => {
+                let mut header = tar::Header::new_gnu();
+                header.set_entry_type(tar::EntryType::Directory);
+                header.set_size(0);
+                header.set_mode(0o755);
+                builder
+                    .append_data(&mut header, format!("{dir}/"), std::io::empty())
+                    .unwrap();
+                format!("{dir}/{BIN_NAME}")
+            }
+            None => BIN_NAME.to_owned(),
+        };
+        let mut header = tar::Header::new_gnu();
+        header.set_size(binary.len() as u64);
+        header.set_mode(0o755);
+        builder.append_data(&mut header, path, binary).unwrap();
+        let tar = builder.into_inner().unwrap();
+        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        std::io::Write::write_all(&mut gz, &tar).unwrap();
+        gz.finish().unwrap()
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn assert_extracts_from(dir: Option<&str>) {
+        let binary = b"\x7fELF and the rest of a binary";
+        let out = std::env::temp_dir().join(format!(
+            "rustman-extract-test-{}-{}",
+            std::process::id(),
+            dir.unwrap_or("root")
+        ));
+        let result = extract_binary(&release_tarball(dir, binary), &out);
+        let extracted = std::fs::read(&out).unwrap_or_default();
+        let _ = std::fs::remove_file(&out);
+        result.unwrap();
+        assert_eq!(extracted, binary);
+    }
+
+    /// Regression test: the Linux tarball opens with a `rustman/` directory
+    /// entry, whose file name is also `rustman`, and extracting that gave an
+    /// empty file ("extracted binary is too small").
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn extracts_the_binary_from_the_linux_tarball_layout() {
+        assert_extracts_from(Some("rustman"));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn extracts_the_binary_from_the_macos_tarball_layout() {
+        assert_extracts_from(None);
     }
 }
