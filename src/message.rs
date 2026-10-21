@@ -382,6 +382,7 @@ pub enum LayoutMsg {
     ZoomIn,
     ZoomOut,
     ZoomReset,
+    SetZoom(f64),
     PanelSplitChanged(u16),
     /// Drag on the sidebar/main-area splitter (issue #53): new sidebar width.
     SidebarWidthChanged(f32),

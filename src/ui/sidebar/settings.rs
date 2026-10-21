@@ -8,7 +8,7 @@ const LOGO_SVG: &[u8] = include_bytes!("../../../public/rustman-logo.svg");
 #[cfg(feature = "self-update")]
 use crate::{app::UpdateState, message::UpdateMsg};
 use crate::{
-    message::{AppMsg, Message, SettingsMsg},
+    message::{AppMsg, LayoutMsg, Message, SettingsMsg},
     ui::theme::{Palette, TEXT_SM, THEMES, ThemeSpec},
     ui::tree_label::{tree_label, tree_label_styled},
 };
@@ -21,7 +21,11 @@ pub fn view(state: &crate::app::AppState) -> Element<'_, Message> {
         &state.git_user_email,
     ));
     let appearance = card(build_appearance(state.theme_idx));
-    let layout = card(build_layout(state.horizontal_layout, state.sidebar_width));
+    let layout = card(build_layout(
+        state.horizontal_layout,
+        state.ui_scale,
+        state.sidebar_width,
+    ));
     let request_defaults = card(build_request_defaults(&state.default_timeout_text));
     let tls = card(build_tls(state.tls_options));
     let global_scripts = card(build_global_scripts(
@@ -376,7 +380,11 @@ fn swatch(color: Color) -> Element<'static, Message> {
         .into()
 }
 
-fn build_layout(horizontal: bool, content_width: f32) -> Element<'static, Message> {
+fn build_layout(
+    horizontal: bool,
+    ui_scale: f64,
+    content_width: f32,
+) -> Element<'static, Message> {
     let options = [("Top / Bottom", false), ("Left / Right", true)];
 
     let mut buttons = Vec::new();
@@ -426,7 +434,7 @@ fn build_layout(horizontal: bool, content_width: f32) -> Element<'static, Messag
     // Side-by-side needs ~95px per button ("Left / Right" ≈ 72px text +
     // padding); below that the labels wrap inside the buttons and the row
     // grows ragged. Stack vertically instead.
-    let mut col = column![section_label("LAYOUT")].spacing(6);
+    let mut col = column![section_label("LAYOUT"), field_label("Panels")].spacing(6);
     if content_width >= 230.0 {
         let mut row_el = row![].spacing(6);
         for b in buttons {
@@ -438,6 +446,152 @@ fn build_layout(horizontal: bool, content_width: f32) -> Element<'static, Messag
             col = col.push(b);
         }
     }
+
+    col = col.push(Space::new().height(4));
+    col = col.push(field_label("UI Scale"));
+
+    let pct = (ui_scale * 100.0).round() as i64;
+    let pct_label = format!("{pct}%");
+    let is_default = (ui_scale - 1.0).abs() < 0.01;
+
+    let btn_out = button(
+        text("−")
+            .size(TEXT_SM)
+            .color(Palette::text())
+            .align_x(iced::alignment::Horizontal::Center),
+    )
+    .on_press(Message::Layout(LayoutMsg::ZoomOut))
+    .style(|_t, s| {
+        use iced::widget::button::Status;
+        iced::widget::button::Style {
+            background: Some(Background::Color(if matches!(s, Status::Hovered) {
+                Palette::hover()
+            } else {
+                Palette::surface_high()
+            })),
+            border: Border {
+                color: Palette::border_subtle(),
+                width: 1.0,
+                radius: 6.0.into(),
+            },
+            ..Default::default()
+        }
+    })
+    .padding([4, 12]);
+
+    let btn_reset = button(
+        text(pct_label)
+            .size(TEXT_SM)
+            .color(if is_default {
+                Palette::text()
+            } else {
+                Palette::accent()
+            })
+            .align_x(iced::alignment::Horizontal::Center),
+    )
+    .on_press(Message::Layout(LayoutMsg::ZoomReset))
+    .style(move |_t, s| {
+        use iced::widget::button::Status;
+        iced::widget::button::Style {
+            background: Some(Background::Color(if !is_default {
+                Palette::accent_soft()
+            } else if matches!(s, Status::Hovered) {
+                Palette::hover()
+            } else {
+                Palette::surface_high()
+            })),
+            border: Border {
+                color: if !is_default {
+                    Palette::accent()
+                } else {
+                    Palette::border_subtle()
+                },
+                width: 1.0,
+                radius: 6.0.into(),
+            },
+            ..Default::default()
+        }
+    })
+    .padding([4, 8])
+    .width(Length::Fill);
+
+    let btn_in = button(
+        text("+")
+            .size(TEXT_SM)
+            .color(Palette::text())
+            .align_x(iced::alignment::Horizontal::Center),
+    )
+    .on_press(Message::Layout(LayoutMsg::ZoomIn))
+    .style(|_t, s| {
+        use iced::widget::button::Status;
+        iced::widget::button::Style {
+            background: Some(Background::Color(if matches!(s, Status::Hovered) {
+                Palette::hover()
+            } else {
+                Palette::surface_high()
+            })),
+            border: Border {
+                color: Palette::border_subtle(),
+                width: 1.0,
+                radius: 6.0.into(),
+            },
+            ..Default::default()
+        }
+    })
+    .padding([4, 12]);
+
+    let zoom_row = row![btn_out, btn_reset, btn_in]
+        .spacing(6)
+        .align_y(iced::Alignment::Center);
+
+    col = col.push(zoom_row);
+
+    let presets = [0.8, 1.0, 1.25, 1.5];
+    let mut preset_row = row![].spacing(4);
+    for preset in presets {
+        let is_selected = (ui_scale - preset).abs() < 0.01;
+        let p_label = format!("{:.0}%", preset * 100.0);
+        let btn = button(
+            text(p_label)
+                .size(10)
+                .font(crate::ui::theme::MONO)
+                .color(if is_selected {
+                    Palette::accent()
+                } else {
+                    Palette::text_muted()
+                })
+                .align_x(iced::alignment::Horizontal::Center),
+        )
+        .on_press(Message::Layout(LayoutMsg::SetZoom(preset)))
+        .style(move |_t, s| {
+            use iced::widget::button::Status;
+            iced::widget::button::Style {
+                background: Some(Background::Color(if is_selected {
+                    Palette::accent_soft()
+                } else if matches!(s, Status::Hovered) {
+                    Palette::hover()
+                } else {
+                    Palette::surface_high()
+                })),
+                border: Border {
+                    color: if is_selected {
+                        Palette::accent()
+                    } else {
+                        Palette::border_subtle()
+                    },
+                    width: 1.0,
+                    radius: 4.0.into(),
+                },
+                ..Default::default()
+            }
+        })
+        .padding([3, 4])
+        .width(Length::Fill);
+
+        preset_row = preset_row.push(btn);
+    }
+    col = col.push(preset_row);
+
     col.into()
 }
 
@@ -529,6 +683,8 @@ fn build_shortcuts(content_width: f32) -> Element<'static, Message> {
         (format!("{cmd}E"), "Export cURL"),
         (format!("{cmd}Enter"), "Send"),
         (format!("{alt}1-9"), "Switch tab"),
+        (format!("{cmd}+/-"), "Zoom in/out"),
+        (format!("{cmd}0"), "Reset zoom"),
         ("Esc".to_owned(), "Close dialog"),
         ("↑/↓".to_owned(), "Navigate"),
     ];

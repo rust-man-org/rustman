@@ -60,6 +60,7 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
     let mut global_pre_request_script = String::new();
     let mut global_test_script = String::new();
     let mut sidebar_width = 200.0;
+    let mut ui_scale = 1.0;
     #[cfg(feature = "self-update")]
     let mut auto_check_updates = false;
     let mut tls_options = crate::services::http::TlsOptions::default();
@@ -69,6 +70,9 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
         global_pre_request_script = sess.global_pre_request_script.clone();
         global_test_script = sess.global_test_script.clone();
         sidebar_width = sess.sidebar_width;
+        if sess.ui_scale >= 0.5 && sess.ui_scale <= 2.0 {
+            ui_scale = sess.ui_scale;
+        }
         #[cfg(feature = "self-update")]
         {
             auto_check_updates = sess.auto_check_updates;
@@ -196,7 +200,7 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
         panel_split: 50,
         sidebar_width,
         horizontal_layout: false,
-        ui_scale: 1.0,
+        ui_scale,
         #[cfg(feature = "self-update")]
         update: crate::app::UpdateState::Idle,
         #[cfg(feature = "self-update")]
