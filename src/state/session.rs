@@ -12,6 +12,9 @@ pub struct AppSession {
     /// Sidebar content width in px (issue #53).
     #[serde(default = "default_sidebar_width")]
     pub sidebar_width: f32,
+    /// UI scale factor (scale_factor).
+    #[serde(default = "default_ui_scale")]
+    pub ui_scale: f64,
     #[serde(default)]
     pub theme_idx: usize,
     #[serde(default = "default_timeout_ms")]
@@ -44,4 +47,29 @@ fn default_timeout_ms() -> u64 {
 
 fn default_sidebar_width() -> f32 {
     200.0
+}
+
+fn default_ui_scale() -> f64 {
+    1.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_defaults_ui_scale_when_missing() {
+        let json = r#"{"tabs":[],"active_tab":0,"sidebar_panel":"collections"}"#;
+        let session: AppSession = serde_json::from_str(json).unwrap();
+        assert_eq!(session.ui_scale, 1.0);
+    }
+
+    #[test]
+    fn session_roundtrips_ui_scale() {
+        let mut session = AppSession::default();
+        session.ui_scale = 1.25;
+        let json = serde_json::to_string(&session).unwrap();
+        let loaded: AppSession = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.ui_scale, 1.25);
+    }
 }

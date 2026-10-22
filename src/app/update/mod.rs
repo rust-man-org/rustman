@@ -92,9 +92,14 @@ fn dispatch(state: &mut AppState, message: Message) -> Task<Message> {
 
 fn handle_layout(state: &mut AppState, msg: LayoutMsg) -> Task<Message> {
     match msg {
-        LayoutMsg::ZoomIn => state.ui_scale = (state.ui_scale + 0.1).min(2.0),
-        LayoutMsg::ZoomOut => state.ui_scale = (state.ui_scale - 0.1).max(0.5),
+        LayoutMsg::ZoomIn => {
+            state.ui_scale = (((state.ui_scale + 0.1) * 10.0).round() / 10.0).min(2.0);
+        }
+        LayoutMsg::ZoomOut => {
+            state.ui_scale = (((state.ui_scale - 0.1) * 10.0).round() / 10.0).max(0.5);
+        }
         LayoutMsg::ZoomReset => state.ui_scale = 1.0,
+        LayoutMsg::SetZoom(scale) => state.ui_scale = scale.clamp(0.5, 2.0),
         LayoutMsg::PanelSplitChanged(split) => {
             if split >= 1 && split <= 99 {
                 state.panel_split = split;
