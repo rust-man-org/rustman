@@ -48,6 +48,14 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
         }
     }
 
+    // Local drafts (01, C9): loaded after base rows so orphans are known.
+    let drafts = crate::state::drafts::DraftsState::from_loaded(
+        db.as_ref()
+            .and_then(|c| storage::drafts::get_drafts(c).ok())
+            .unwrap_or_default(),
+        &requests,
+    );
+
     let session: Option<AppSession> = db
         .as_ref()
         .and_then(|c| storage::load_session(c).ok())
@@ -210,7 +218,7 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
         global_scripts_modal_open: false,
         tls_options,
         session_dirty: false,
-        drafts: Default::default(),
+        drafts,
         meta: Default::default(),
         auth: Default::default(),
         secrets: Default::default(),
