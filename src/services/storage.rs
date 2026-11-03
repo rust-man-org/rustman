@@ -13,9 +13,9 @@ use crate::domain::{
 use crate::state::session::AppSession;
 
 // Company-edition table owners (contract C11).
-mod drafts;
-mod meta;
-mod secrets;
+pub mod drafts;
+pub mod meta;
+pub mod secrets;
 
 // ── DB init ───────────────────────────────────────────────────────────────────
 
