@@ -23,8 +23,11 @@ target
 *.suo
 *.ntvs*
 *.njsproj
-*.sln
+*.sln   
 *.sw?
 /target
 
 scripts/uploads/
+.commandcode
+.vscode
+.github

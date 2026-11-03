@@ -19,7 +19,7 @@ path = "src/main.rs"
 # boot-time check and its archive/swapping dependencies are compiled out
 # entirely — nothing in the binary can overwrite a package-owned file.
 default = ["self-update"]
-self-update = ["dep:self-replace", "dep:flate2", "dep:tar", "dep:zip"]
+self-update = ["dep:self-replace", "dep:flate2", "dep:tar", "dep:zip", "dep:minisign-verify"]
 
 [dependencies]
 # GUI
@@ -80,7 +80,11 @@ lru = "0.18"
 self-replace = { version = "1", optional = true }
 flate2 = { version = "1", optional = true }
 tar = { version = "0.4", optional = true }
-zip = { version = "8", default-features = false, features = ["deflate"], optional = true }
+zip = { version = "9", default-features = false, features = ["deflate"], optional = true }
+# Verifies the minisign signature on a release's SHA256SUMS before the updater
+# swaps the binary. Zero-dependency, pure Rust (no C toolchain), like the rest
+# of the updater. Optional so `--no-default-features` builds drop it.
+minisign-verify = { version = "0.3", optional = true }
 
 # Misc
 uuid = { version = "1", features = ["v4"] }
@@ -91,7 +95,7 @@ rfd = "0.17"
 
 # Response preview: spreadsheet (pure Rust). HTML responses are converted to
 # readable text instead of embedding a native web engine.
-calamine = "0.36"
+calamine = "0.38"
 
 # Pre-request/test scripting language: its own repo under rust-man-org. Bump
 # the tag to pick up engine changes. For local engine work, point the
@@ -106,7 +110,7 @@ rustls = { version = "0.23.43", default-features = false, features = ["aws_lc_rs
 # builds the `zip` crate arrives through the self-update feature (above), but
 # tests must also compile under `--no-default-features`, so it is listed here
 # non-optionally as well.
-zip = { version = "8", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 
 # The editor widget is the rust-man-org fork of upstream iced-code-editor
 # (see its README), pinned by tag. For local work against a checkout, swap
