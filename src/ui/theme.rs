@@ -18,7 +18,7 @@ pub const TEXT_SM: f32 = 12.0; // secondary labels, buttons, table cells
 pub const TEXT_MD: f32 = 13.0; // primary body text
 pub const TEXT_LG: f32 = 15.0; // section/card headers
 
-static THEME_IDX: AtomicUsize = AtomicUsize::new(0);
+static THEME_IDX: AtomicUsize = AtomicUsize::new(DEFAULT_THEME_IDX);
 
 pub const RESPONSE_BODY_PADDING: iced::Padding = iced::Padding {
     top: 12.0,
@@ -193,7 +193,51 @@ pub const THEMES: &[ThemeSpec] = &[
         chrome: Color::from_rgb(0.925, 0.940, 0.963),
         syntax_theme: Some("InspiredGitHub"),
     },
+    // ── Rustman company themes (workstream 09) ──
+    // Tokens from the design mockups (`agent/plan/mockup`, `:root` and
+    // `[data-theme=dark]`). Appended, never inserted: sessions persist the
+    // theme as an index, so earlier entries must keep their positions.
+    ThemeSpec {
+        name: "Rustman Light",
+        dark: false,
+        background: Color::from_rgb8(0xF9, 0xF9, 0xF9), // bg-1
+        surface: Color::from_rgb8(0xFF, 0xFF, 0xFF),    // bg-0
+        surface_high: Color::from_rgb8(0xF2, 0xF2, 0xF2), // bg-2
+        surface_raised: Color::from_rgb8(0xED, 0xED, 0xED),
+        row_odd: Color::from_rgb8(0xFC, 0xFC, 0xFC),
+        border: Color::from_rgb8(0xE6, 0xE6, 0xE6),        // bd-2
+        border_subtle: Color::from_rgb8(0xED, 0xED, 0xED), // bd-1
+        text: Color::from_rgb8(0x21, 0x21, 0x21),          // tx-1
+        text_muted: Color::from_rgb8(0x6B, 0x6B, 0x6B),    // tx-2
+        text_subtle: Color::from_rgb8(0xA6, 0xA6, 0xA6),   // tx-3
+        accent: Color::from_rgb8(0xFF, 0x6C, 0x37),
+        hover: Color::from_rgb8(0xF2, 0xF2, 0xF2),
+        chrome: Color::from_rgb8(0xED, 0xED, 0xED), // studio
+        syntax_theme: Some("InspiredGitHub"),
+    },
+    ThemeSpec {
+        name: "Rustman Dark",
+        dark: true,
+        background: Color::from_rgb8(0x1A, 0x1A, 0x1A), // bg-1
+        surface: Color::from_rgb8(0x21, 0x21, 0x21),    // bg-0
+        surface_high: Color::from_rgb8(0x2B, 0x2B, 0x2B), // bg-2
+        surface_raised: Color::from_rgb8(0x30, 0x30, 0x30),
+        row_odd: Color::from_rgb8(0x1E, 0x1E, 0x1E),
+        border: Color::from_rgb8(0x3B, 0x3B, 0x3B),        // bd-2
+        border_subtle: Color::from_rgb8(0x30, 0x30, 0x30), // bd-1
+        text: Color::from_rgb8(0xF2, 0xF2, 0xF2),          // tx-1
+        text_muted: Color::from_rgb8(0xA6, 0xA6, 0xA6),    // tx-2
+        text_subtle: Color::from_rgb8(0x6B, 0x6B, 0x6B),   // tx-3
+        accent: Color::from_rgb8(0xFF, 0x6C, 0x37),
+        hover: Color::from_rgb8(0x2B, 0x2B, 0x2B),
+        chrome: Color::from_rgb8(0x16, 0x16, 0x16), // studio
+        syntax_theme: Some("base16-eighties.dark"),
+    },
 ];
+
+/// Theme used when no session has been saved yet (fresh install). Existing
+/// users keep the index stored in their session.
+pub const DEFAULT_THEME_IDX: usize = THEMES.len() - 2; // "Rustman Light"
 
 /// Width used for interactive scrollbars, in pixels.
 ///
@@ -502,5 +546,83 @@ impl Palette {
             syntax_theme_name: t.syntax_theme,
             json_key_color: accent,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// WCAG relative luminance of an sRGB color.
+    fn luminance(c: Color) -> f32 {
+        let ch = |v: f32| {
+            if v <= 0.03928 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b)
+    }
+
+    fn contrast(a: Color, b: Color) -> f32 {
+        let (la, lb) = (luminance(a), luminance(b));
+        let (hi, lo) = if la > lb { (la, lb) } else { (lb, la) };
+        (hi + 0.05) / (lo + 0.05)
+    }
+
+    fn theme(name: &str) -> &'static ThemeSpec {
+        THEMES.iter().find(|t| t.name == name).expect(name)
+    }
+
+    #[test]
+    fn saved_theme_indices_keep_pointing_at_the_same_theme() {
+        // Sessions store the index. Reordering or inserting would silently
+        // switch every existing user's theme.
+        let legacy = [
+            "Violet", "Amber", "Midnight", "Nord", "Dracula", "Kanagawa", "Solarized", "Light",
+        ];
+        for (i, name) in legacy.iter().enumerate() {
+            assert_eq!(THEMES[i].name, *name, "theme index {i} moved");
+        }
+    }
+
+    #[test]
+    fn fresh_install_defaults_to_rustman_light() {
+        assert_eq!(THEMES[DEFAULT_THEME_IDX].name, "Rustman Light");
+        assert!(!THEMES[DEFAULT_THEME_IDX].dark);
+    }
+
+    #[test]
+    fn theme_names_are_unique() {
+        for (i, a) in THEMES.iter().enumerate() {
+            for b in &THEMES[i + 1..] {
+                assert_ne!(a.name, b.name);
+            }
+        }
+    }
+
+    #[test]
+    fn rustman_themes_have_readable_body_text() {
+        for name in ["Rustman Light", "Rustman Dark"] {
+            let t = theme(name);
+            for (label, bg) in [
+                ("surface", t.surface),
+                ("background", t.background),
+                ("surface_high", t.surface_high),
+            ] {
+                let c = contrast(t.text, bg);
+                assert!(c >= 4.5, "{name}: text on {label} contrast {c:.2} < 4.5");
+            }
+            let muted = contrast(t.text_muted, t.surface);
+            assert!(muted >= 4.5, "{name}: muted text contrast {muted:.2} < 4.5");
+        }
+    }
+
+    #[test]
+    fn rustman_themes_use_the_mockup_accent() {
+        let orange = Color::from_rgb8(0xFF, 0x6C, 0x37);
+        assert_eq!(theme("Rustman Light").accent, orange);
+        assert_eq!(theme("Rustman Dark").accent, orange);
     }
 }

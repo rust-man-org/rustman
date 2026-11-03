@@ -55,7 +55,7 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
 
     let mut tabs = TabManager::default();
     let mut sidebar = SidebarState::default();
-    let mut theme_idx = 0;
+    let mut theme_idx = crate::ui::theme::DEFAULT_THEME_IDX;
     let mut default_timeout_ms = 30_000u64;
     let mut global_pre_request_script = String::new();
     let mut global_test_script = String::new();

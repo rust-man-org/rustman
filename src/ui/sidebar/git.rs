@@ -232,7 +232,7 @@ fn repo_card(state: &AppState) -> Element<'_, Message> {
         sync_row = sync_row.push(
             text(format!("↓{behind}"))
                 .size(9)
-                .color(Color::from_rgb(0.9, 0.5, 0.2))
+                .color(Palette::WARNING)
                 .font(MONO),
         );
     }
