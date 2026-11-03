@@ -65,6 +65,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             if let Some(db) = &state.db {
                 let _ = storage::delete_collection(db, &id);
             }
+            crate::app::drafts::mark_orphans(state);
         }
         SidebarMsg::DeleteRequest { id, collection_id } => {
             if let Some(reqs) = state.requests.get_mut(&collection_id) {
@@ -76,6 +77,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             if let Some(db) = &state.db {
                 let _ = storage::delete_request(db, &id);
             }
+            crate::app::drafts::mark_orphans(state);
         }
         SidebarMsg::RenameCollection { id, name } => {
             if let Some(c) = state.collections.iter_mut().find(|c| c.id == id) {

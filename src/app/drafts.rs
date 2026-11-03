@@ -132,8 +132,7 @@ pub(crate) fn rebase_all_after_sync(state: &mut AppState) -> Result<(), String> 
 
 /// Throw away the draft of `request_id`, including unsaved edits in its open
 /// tabs, and show the shared version again. The row is deleted before memory
-/// changes. An orphaned draft has no shared version: its tabs keep the
-/// content but are detached, so closing them asks before losing it.
+/// changes. An orphaned draft has no shared version, so its tabs close.
 pub(crate) fn discard_draft(state: &mut AppState, request_id: &str) -> Result<(), String> {
     if let Some(db) = &state.db {
         storage::drafts::delete_draft(db, request_id)?;
@@ -148,14 +147,115 @@ pub(crate) fn discard_draft(state: &mut AppState, request_id: &str) -> Result<()
             }
         }
         None => {
-            for tab in tabs_of(state, request_id) {
-                let tab = &mut state.tabs.tabs[tab];
-                tab.saved_as = None;
-                tab.modified = true;
+            for tab in tabs_of(state, request_id).into_iter().rev() {
+                state.tabs.close_tab(tab);
             }
         }
     }
     Ok(())
+}
+
+/// Mark drafts whose endpoint is gone (deleted locally or upstream) as
+/// orphaned. Drafts are kept for recovery; boot re-derives the flag.
+pub(crate) fn mark_orphans(state: &mut AppState) {
+    let requests = &state.requests;
+    for draft in state.drafts.by_request.values_mut() {
+        if find_base(requests, &draft.request_id).is_none() {
+            draft.orphaned = true;
+        }
+    }
+}
+
+/// Re-add an orphaned draft as a **new** endpoint (fresh id, so a deletion
+/// that was merged upstream is not undone under the old id). It goes back
+/// into its collection when that still exists; otherwise it opens as an
+/// unsaved tab. Write only (C10). Returns the status label.
+pub(crate) fn restore_as_new(state: &mut AppState, request_id: &str) -> Result<String, String> {
+    if !state.auth.can_write() {
+        return Err("you have read-only access".to_owned());
+    }
+    capture_orphan_tabs(state, request_id);
+    let draft = state
+        .drafts
+        .get(request_id)
+        .cloned()
+        .ok_or_else(|| "no local draft".to_owned())?;
+    if !draft.orphaned {
+        return Err("endpoint still exists".to_owned());
+    }
+    let mut req = draft.data.clone();
+    req.id = uuid::Uuid::new_v4().to_string();
+    let tabs = tabs_of(state, request_id);
+
+    if state.collections.iter().any(|c| c.id == req.collection_id) {
+        if req
+            .group_id
+            .as_ref()
+            .is_some_and(|g| !state.groups.iter().any(|x| &x.id == g))
+        {
+            req.group_id = None;
+        }
+        let parent = req.group_id.clone().unwrap_or_else(|| req.collection_id.clone());
+        req.sort_order = state
+            .requests
+            .get(&req.collection_id)
+            .map(|rs| crate::app::tree::next_request_order(rs, &parent, req.group_id.is_none()))
+            .unwrap_or(0);
+        if let Some(db) = &state.db {
+            storage::create_request(db, &req)?;
+            storage::drafts::delete_draft(db, request_id)?;
+        }
+        state.drafts.by_request.remove(request_id);
+        state
+            .requests
+            .entry(req.collection_id.clone())
+            .or_default()
+            .push(req.clone());
+        if tabs.is_empty() {
+            state.tabs.open_request(&req);
+        }
+        for tab in tabs {
+            let tab = &mut state.tabs.tabs[tab];
+            tab.saved_as = Some((req.collection_id.clone(), req.id.clone()));
+            tab.apply_saved(&req);
+            tab.modified = false;
+        }
+        Ok(format!("Restored '{}' as a new endpoint", req.name))
+    } else {
+        if let Some(db) = &state.db {
+            storage::drafts::delete_draft(db, request_id)?;
+        }
+        state.drafts.by_request.remove(request_id);
+        if tabs.is_empty() {
+            state.tabs.open_request(&req);
+            let tab = state.tabs.active_tab_mut();
+            tab.saved_as = None;
+            tab.modified = true;
+        }
+        for tab in tabs {
+            let tab = &mut state.tabs.tabs[tab];
+            tab.saved_as = None;
+            tab.modified = true;
+        }
+        Ok("Collection is gone: opened as an unsaved request".to_owned())
+    }
+}
+
+/// Unsaved edits in an orphan's tabs belong to its draft, not to a base.
+fn capture_orphan_tabs(state: &mut AppState, request_id: &str) {
+    for idx in tabs_of(state, request_id) {
+        let tab = &state.tabs.tabs[idx];
+        if !tab.modified {
+            continue;
+        }
+        let Some((col, id)) = tab.saved_as.clone() else {
+            continue;
+        };
+        let data = crate::app::request_ops::saved_request_from_tab(tab, col, id);
+        if let Some(d) = state.drafts.by_request.get_mut(request_id) {
+            d.data = data;
+        }
+    }
 }
 
 /// Settle one conflicting field. Unsaved tab edits are captured first so the
@@ -461,7 +561,7 @@ mod flow_tests {
     }
 
     #[test]
-    fn discarding_an_orphan_keeps_the_tab_content_detached() {
+    fn discarding_an_orphan_closes_its_tab() {
         use crate::message::draft::DraftMsg;
         let mut e = env(true);
         edit_body(&mut e.state, "mine");
@@ -469,9 +569,78 @@ mod flow_tests {
         send(&mut e.state, DraftMsg::Discard(REQ.into()));
 
         assert!(e.state.drafts.get(REQ).is_none());
+        assert!(e.state.tabs.tabs.iter().all(|t| t.saved_as.is_none()));
+    }
+
+    fn delete_locally(state: &mut AppState) {
+        let _ = crate::app::update::update(
+            state,
+            Message::Sidebar(crate::message::SidebarMsg::DeleteRequest {
+                id: REQ.into(),
+                collection_id: COL.into(),
+            }),
+        );
+    }
+
+    #[test]
+    fn deleting_a_request_keeps_its_draft_as_orphan() {
+        let mut e = env(true);
+        edit_body(&mut e.state, "mine");
+        let _ = crate::app::request_ops::save_request(&mut e.state);
+        delete_locally(&mut e.state);
+
+        assert!(e.state.drafts.get(REQ).unwrap().orphaned);
+        let stored = storage::drafts::get_drafts(e.state.db.as_ref().unwrap()).unwrap();
+        assert_eq!(stored.len(), 1);
+
+        // Ctrl+S must not resurrect the endpoint under its old id.
+        let _ = crate::app::request_ops::save_request(&mut e.state);
+        assert!(find_base(&e.state.requests, REQ).is_none());
+    }
+
+    #[test]
+    fn restore_as_new_reinserts_with_a_fresh_id() {
+        use crate::message::draft::DraftMsg;
+        let mut e = env(true);
+        edit_body(&mut e.state, "mine");
+        let _ = crate::app::request_ops::save_request(&mut e.state);
+        delete_locally(&mut e.state);
+        send(&mut e.state, DraftMsg::RestoreAsNew(REQ.into()));
+
+        assert!(e.state.drafts.get(REQ).is_none());
+        let reqs = &e.state.requests[COL];
+        assert_eq!(reqs.len(), 1);
+        let new = &reqs[0];
+        assert_ne!(new.id, REQ);
+        assert_eq!(new.body, "mine");
         let tab = e.state.tabs.active_tab();
-        assert_eq!(tab.body_editor.content(), "mine");
+        assert_eq!(tab.saved_as, Some((COL.to_owned(), new.id.clone())));
+        assert!(!tab.modified);
+        let db = e.state.db.as_ref().unwrap();
+        assert!(storage::drafts::get_drafts(db).unwrap().is_empty());
+        assert_eq!(storage::get_requests(db, COL).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn restore_refuses_a_draft_that_is_not_orphaned() {
+        let mut e = env(true);
+        edit_body(&mut e.state, "mine");
+        let _ = crate::app::request_ops::save_request(&mut e.state);
+        assert!(restore_as_new(&mut e.state, REQ).is_err());
+        assert!(e.state.drafts.get(REQ).is_some());
+    }
+
+    #[test]
+    fn restore_without_its_collection_opens_an_unsaved_tab() {
+        let mut e = env(true);
+        edit_body(&mut e.state, "mine");
+        sync(&mut e.state, Vec::new()); // collection removed upstream
+        assert!(restore_as_new(&mut e.state, REQ).is_ok());
+
+        assert!(e.state.drafts.get(REQ).is_none());
+        let tab = e.state.tabs.active_tab();
         assert!(tab.saved_as.is_none() && tab.modified);
+        assert_eq!(tab.body_editor.content(), "mine");
     }
 
     #[test]

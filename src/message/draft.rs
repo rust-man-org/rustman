@@ -10,6 +10,8 @@ pub enum DraftMsg {
     Discard(String),
     /// Settle one conflicting field of a request's draft.
     ResolveField(String, DraftField, Side),
+    /// Re-add an orphaned draft (endpoint deleted) as a new endpoint.
+    RestoreAsNew(String),
 }
 
 impl DraftMsg {
@@ -18,7 +20,7 @@ impl DraftMsg {
     pub fn marks_session_dirty(&self) -> bool {
         // Both rewrite open tabs, which are session state.
         match self {
-            Self::Discard(_) | Self::ResolveField(..) => true,
+            Self::Discard(_) | Self::ResolveField(..) | Self::RestoreAsNew(_) => true,
         }
     }
 }

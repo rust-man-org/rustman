@@ -15,6 +15,7 @@ pub(super) fn handle(state: &mut AppState, msg: DraftMsg) -> Task<Message> {
                 0 => "All conflicts resolved".to_owned(),
                 n => format!("{n} conflict(s) left"),
             }),
+        DraftMsg::RestoreAsNew(id) => drafts::restore_as_new(state, &id),
     };
     state.status_message = Some(match result {
         Ok(label) => label,

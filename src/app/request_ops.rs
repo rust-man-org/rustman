@@ -175,6 +175,14 @@ pub(crate) fn save_request(state: &mut AppState) -> Task<Message> {
     // Shared requests save to their local draft (01, C9); the base only
     // changes through sync, import or a merged review PR (C12).
     if let Some((col, id)) = state.tabs.active_tab().saved_as.clone() {
+        // Saving would silently re-create a deleted endpoint under its old
+        // id; the draft banner offers Restore as new / Discard instead.
+        if state.drafts.get(&id).is_some_and(|d| d.orphaned) {
+            state.status_message = Some(
+                "This endpoint was deleted. Restore it as new or discard the draft.".to_owned(),
+            );
+            return Task::none();
+        }
         let exists = state.requests.values().flatten().any(|r| r.id == id);
         if exists && crate::app::drafts::is_shared(state, &col) {
             let req = saved_request_from_tab(state.tabs.active_tab(), col, id);
