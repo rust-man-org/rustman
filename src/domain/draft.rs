@@ -80,6 +80,16 @@ impl DraftField {
     }
 }
 
+/// The review branch/PR a draft was sent to with **Save** (C12). The draft
+/// stays local until the PR merges and `main` is pulled; then it collapses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewRef {
+    pub branch: String,
+    /// `None` while the branch is pushed but the PR is not open yet.
+    #[serde(default)]
+    pub pr_number: Option<u64>,
+}
+
 /// Which side wins when the user resolves a conflicting field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
@@ -96,8 +106,10 @@ pub enum DraftState {
     Clean,
     /// The last rebase moved the base and merged it without conflicts.
     UpstreamChanged,
-    /// Fields edited both locally and upstream; resolve before Publish.
+    /// Fields edited both locally and upstream; resolve before Save.
     Conflict(Vec<DraftField>),
+    /// Sent for review and waiting for the PR to merge (C12).
+    InReview(ReviewRef),
     /// The endpoint no longer exists upstream.
     Orphaned,
 }
@@ -117,6 +129,10 @@ pub struct RequestDraft {
     /// restarts until the user resolves each one explicitly.
     #[serde(default)]
     pub conflicts: Vec<DraftField>,
+    /// Review branch/PR this draft was sent to (C12). Kept across edits, so
+    /// saving again updates the same branch and PR.
+    #[serde(default)]
+    pub review: Option<ReviewRef>,
     /// Set by the last [`rebase`](Self::rebase) when the base moved.
     /// Transient: not persisted, cleared on restart.
     #[serde(skip)]
@@ -136,6 +152,7 @@ impl RequestDraft {
             base: base.clone(),
             updated_at: now,
             conflicts: Vec::new(),
+            review: None,
             upstream_changed: false,
             orphaned: false,
         };
@@ -155,6 +172,8 @@ impl RequestDraft {
             DraftState::Orphaned
         } else if !self.conflicts.is_empty() {
             DraftState::Conflict(self.conflicts.clone())
+        } else if let Some(review) = &self.review {
+            DraftState::InReview(review.clone())
         } else if self.upstream_changed {
             DraftState::UpstreamChanged
         } else {
@@ -228,14 +247,15 @@ impl RequestDraft {
         self.conflicts.retain(|f| *f != field);
     }
 
-    /// Publish is allowed only with every conflict resolved and the
-    /// endpoint still present upstream (permission is checked by the caller).
+    /// **Save** (send for review, C12) is allowed only with every conflict
+    /// resolved and the endpoint still present upstream. Permission (C10) is
+    /// checked by the caller.
     pub fn can_publish(&self) -> bool {
         self.conflicts.is_empty() && !self.orphaned
     }
 
-    /// The request to write into the shared base on Publish: the draft's
-    /// data with the base's identity and structure.
+    /// The request committed to the review branch on Save: the draft's data
+    /// with the base's identity and structure.
     pub fn published_request(&self) -> SavedRequest {
         let mut out = self.data.clone();
         Self::copy_structure(&self.base, &mut out);
@@ -420,6 +440,42 @@ mod tests {
         assert!(!d.can_publish());
         assert_eq!(d.conflicts, vec![DraftField::Url]);
         assert!(!d.is_collapsed());
+    }
+
+    fn review() -> ReviewRef {
+        ReviewRef {
+            branch: "review/yosua/login".into(),
+            pr_number: Some(12),
+        }
+    }
+
+    #[test]
+    fn review_survives_edits_and_rebase() {
+        let mut d = draft_with(|r| r.body = "mine".into());
+        d.review = Some(review());
+        d.set_data(d.data.clone(), 2);
+        let d = d.rebase(&upstream(|r| r.url = "https://a.test/v2".into()));
+        assert_eq!(d.review, Some(review()));
+        assert_eq!(d.state(), DraftState::InReview(review()));
+    }
+
+    #[test]
+    fn merged_pr_collapses_the_draft_on_pull() {
+        let mut d = draft_with(|r| r.body = "mine".into());
+        d.review = Some(review());
+        // PR merged: `main` now carries exactly the draft's change.
+        let merged = upstream(|r| r.body = "mine".into());
+        assert!(d.rebase(&merged).is_collapsed());
+    }
+
+    #[test]
+    fn conflict_and_orphan_outrank_review_in_state() {
+        let mut d = draft_with(|r| r.url = "https://mine.test".into());
+        d.review = Some(review());
+        let mut d = d.rebase(&upstream(|r| r.url = "https://theirs.test".into()));
+        assert_eq!(d.state(), DraftState::Conflict(vec![DraftField::Url]));
+        d.orphaned = true;
+        assert_eq!(d.state(), DraftState::Orphaned);
     }
 
     #[test]

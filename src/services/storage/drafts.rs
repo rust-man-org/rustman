@@ -6,7 +6,7 @@
 
 use rusqlite::{Connection, params};
 
-use crate::domain::draft::{DraftField, RequestDraft};
+use crate::domain::draft::{DraftField, RequestDraft, ReviewRef};
 
 /// Additive DDL. Idempotent, like the rest of `storage::migrate`.
 pub(super) fn migrate(conn: &Connection) {
@@ -17,7 +17,8 @@ pub(super) fn migrate(conn: &Connection) {
              data          TEXT NOT NULL,
              base          TEXT NOT NULL,
              updated_at    INTEGER NOT NULL,
-             conflicts     TEXT NOT NULL DEFAULT '[]'
+             conflicts     TEXT NOT NULL DEFAULT '[]',
+             review        TEXT
          );",
     );
     // Older draft tables (if any) predate durable conflicts.
@@ -25,6 +26,8 @@ pub(super) fn migrate(conn: &Connection) {
         "ALTER TABLE request_drafts ADD COLUMN conflicts TEXT NOT NULL DEFAULT '[]'",
         [],
     );
+    // Review branch/PR (C12); NULL = not sent for review.
+    let _ = conn.execute("ALTER TABLE request_drafts ADD COLUMN review TEXT", []);
 }
 
 /// Insert or replace one draft, data + base + conflicts together.
@@ -32,22 +35,28 @@ pub fn upsert_draft(conn: &Connection, draft: &RequestDraft) -> Result<(), Strin
     let data = serde_json::to_string(&draft.data).map_err(|e| e.to_string())?;
     let base = serde_json::to_string(&draft.base).map_err(|e| e.to_string())?;
     let conflicts = serde_json::to_string(&draft.conflicts).map_err(|e| e.to_string())?;
+    let review = match &draft.review {
+        Some(r) => Some(serde_json::to_string(r).map_err(|e| e.to_string())?),
+        None => None,
+    };
     conn.execute(
-        "INSERT INTO request_drafts (request_id, collection_id, data, base, updated_at, conflicts)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "INSERT INTO request_drafts (request_id, collection_id, data, base, updated_at, conflicts, review)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
          ON CONFLICT(request_id) DO UPDATE SET
              collection_id = excluded.collection_id,
              data = excluded.data,
              base = excluded.base,
              updated_at = excluded.updated_at,
-             conflicts = excluded.conflicts",
+             conflicts = excluded.conflicts,
+             review = excluded.review",
         params![
             draft.request_id,
             draft.collection_id,
             data,
             base,
             draft.updated_at,
-            conflicts
+            conflicts,
+            review
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -69,7 +78,7 @@ pub fn delete_draft(conn: &Connection, request_id: &str) -> Result<(), String> {
 pub fn get_drafts(conn: &Connection) -> Result<Vec<RequestDraft>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT request_id, collection_id, data, base, updated_at, conflicts
+            "SELECT request_id, collection_id, data, base, updated_at, conflicts, review
              FROM request_drafts",
         )
         .map_err(|e| e.to_string())?;
@@ -82,13 +91,14 @@ pub fn get_drafts(conn: &Connection) -> Result<Vec<RequestDraft>, String> {
                 r.get::<_, String>(3)?,
                 r.get::<_, i64>(4)?,
                 r.get::<_, String>(5)?,
+                r.get::<_, Option<String>>(6)?,
             ))
         })
         .map_err(|e| e.to_string())?;
 
     let mut out = Vec::new();
     for row in rows {
-        let (request_id, collection_id, data, base, updated_at, conflicts) =
+        let (request_id, collection_id, data, base, updated_at, conflicts, review) =
             row.map_err(|e| e.to_string())?;
         let (Ok(data), Ok(base)) = (serde_json::from_str(&data), serde_json::from_str(&base))
         else {
@@ -110,6 +120,9 @@ pub fn get_drafts(conn: &Connection) -> Result<Vec<RequestDraft>, String> {
             base,
             updated_at,
             conflicts: fields,
+            // A review ref that no longer parses is dropped: the draft
+            // stays, it just shows as not sent for review.
+            review: review.and_then(|s| serde_json::from_str::<ReviewRef>(&s).ok()),
             upstream_changed: false,
             orphaned: false,
         });
@@ -175,6 +188,36 @@ mod tests {
 
         delete_draft(&c, "req-1").unwrap();
         assert!(get_drafts(&c).unwrap().is_empty());
+    }
+
+    #[test]
+    fn review_round_trips_and_clears() {
+        let c = conn();
+        let mut d = draft();
+        d.review = Some(ReviewRef {
+            branch: "review/yosua/login".into(),
+            pr_number: Some(3),
+        });
+        upsert_draft(&c, &d).unwrap();
+        assert_eq!(get_drafts(&c).unwrap()[0].review, d.review);
+
+        d.review = None;
+        upsert_draft(&c, &d).unwrap();
+        assert_eq!(get_drafts(&c).unwrap()[0].review, None);
+    }
+
+    #[test]
+    fn old_table_without_review_column_migrates() {
+        let c = Connection::open_in_memory().unwrap();
+        c.execute_batch(
+            "CREATE TABLE request_drafts (
+                 request_id TEXT PRIMARY KEY, collection_id TEXT NOT NULL,
+                 data TEXT NOT NULL, base TEXT NOT NULL, updated_at INTEGER NOT NULL);",
+        )
+        .unwrap();
+        migrate(&c);
+        upsert_draft(&c, &draft()).unwrap();
+        assert_eq!(get_drafts(&c).unwrap()[0].review, None);
     }
 
     #[test]

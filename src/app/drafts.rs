@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 use crate::app::AppState;
 use crate::domain::collection::SavedRequest;
-use crate::domain::draft::RequestDraft;
+use crate::domain::draft::{DraftField, RequestDraft, Side};
 use crate::services::repos::{GitRepo, LOCAL_ID};
 use crate::services::storage;
 
@@ -128,6 +128,79 @@ pub(crate) fn rebase_all_after_sync(state: &mut AppState) -> Result<(), String> 
         }
     }
     first_err.map_or(Ok(()), Err)
+}
+
+/// Throw away the draft of `request_id`, including unsaved edits in its open
+/// tabs, and show the shared version again. The row is deleted before memory
+/// changes. An orphaned draft has no shared version: its tabs keep the
+/// content but are detached, so closing them asks before losing it.
+pub(crate) fn discard_draft(state: &mut AppState, request_id: &str) -> Result<(), String> {
+    if let Some(db) = &state.db {
+        storage::drafts::delete_draft(db, request_id)?;
+    }
+    state.drafts.by_request.remove(request_id);
+    match find_base(&state.requests, request_id).cloned() {
+        Some(base) => {
+            for tab in tabs_of(state, request_id) {
+                let tab = &mut state.tabs.tabs[tab];
+                tab.apply_saved(&base);
+                tab.modified = false;
+            }
+        }
+        None => {
+            for tab in tabs_of(state, request_id) {
+                let tab = &mut state.tabs.tabs[tab];
+                tab.saved_as = None;
+                tab.modified = true;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Settle one conflicting field. Unsaved tab edits are captured first so the
+/// choice applies to what the user sees. Returns how many conflicts remain.
+pub(crate) fn resolve_field(
+    state: &mut AppState,
+    request_id: &str,
+    field: DraftField,
+    side: Side,
+) -> Result<usize, String> {
+    capture_tabs(state)?;
+    let mut draft = state
+        .drafts
+        .get(request_id)
+        .cloned()
+        .ok_or_else(|| "no local draft".to_owned())?;
+    if !draft.conflicts.contains(&field) {
+        return Err("field is not in conflict".to_owned());
+    }
+    draft.resolve(field, side);
+    let left = draft.conflicts.len();
+    persist(state, draft)?;
+    let shown = match state.drafts.get(request_id) {
+        Some(d) => d.data.clone(),
+        None => find_base(&state.requests, request_id)
+            .cloned()
+            .ok_or_else(|| "request not found".to_owned())?,
+    };
+    for tab in tabs_of(state, request_id) {
+        let tab = &mut state.tabs.tabs[tab];
+        tab.apply_saved(&shown);
+        tab.modified = false;
+    }
+    Ok(left)
+}
+
+fn tabs_of(state: &AppState, request_id: &str) -> Vec<usize> {
+    state
+        .tabs
+        .tabs
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| t.saved_as.as_ref().is_some_and(|(_, id)| id == request_id))
+        .map(|(i, _)| i)
+        .collect()
 }
 
 /// Refresh open tabs of saved requests from their effective request, in
@@ -364,6 +437,72 @@ mod flow_tests {
         let tab = e.state.tabs.active_tab();
         assert!(tab.modified, "edit still pending in the tab");
         assert_eq!(tab.body_editor.content(), "mine");
+    }
+
+    fn send(state: &mut AppState, msg: crate::message::draft::DraftMsg) {
+        let _ = crate::app::update::update(state, Message::Draft(msg));
+    }
+
+    #[test]
+    fn discard_restores_the_shared_version_everywhere() {
+        use crate::message::draft::DraftMsg;
+        let mut e = env(true);
+        edit_body(&mut e.state, "mine");
+        let _ = crate::app::request_ops::save_request(&mut e.state);
+        edit_body(&mut e.state, "mine, unsaved");
+
+        send(&mut e.state, DraftMsg::Discard(REQ.into()));
+        assert!(e.state.drafts.get(REQ).is_none());
+        let stored = storage::drafts::get_drafts(e.state.db.as_ref().unwrap()).unwrap();
+        assert!(stored.is_empty());
+        let tab = e.state.tabs.active_tab();
+        assert_eq!(tab.body_editor.content(), "base-body");
+        assert!(!tab.modified);
+    }
+
+    #[test]
+    fn discarding_an_orphan_keeps_the_tab_content_detached() {
+        use crate::message::draft::DraftMsg;
+        let mut e = env(true);
+        edit_body(&mut e.state, "mine");
+        sync(&mut e.state, Vec::new());
+        send(&mut e.state, DraftMsg::Discard(REQ.into()));
+
+        assert!(e.state.drafts.get(REQ).is_none());
+        let tab = e.state.tabs.active_tab();
+        assert_eq!(tab.body_editor.content(), "mine");
+        assert!(tab.saved_as.is_none() && tab.modified);
+    }
+
+    #[test]
+    fn resolving_conflicts_updates_draft_tab_and_row() {
+        use crate::message::draft::DraftMsg;
+        let mut e = env(true);
+        edit_body(&mut e.state, "mine");
+        sync(&mut e.state, vec![collection(base_req("https://a.test/v1", "theirs"))]);
+        assert_eq!(e.state.drafts.get(REQ).unwrap().conflicts, vec![DraftField::Body]);
+
+        // Taking upstream for the only changed field collapses the draft.
+        send(&mut e.state, DraftMsg::ResolveField(REQ.into(), DraftField::Body, Side::Upstream));
+        assert!(e.state.drafts.get(REQ).is_none());
+        assert_eq!(e.state.tabs.active_tab().body_editor.content(), "theirs");
+        let stored = storage::drafts::get_drafts(e.state.db.as_ref().unwrap()).unwrap();
+        assert!(stored.is_empty());
+    }
+
+    #[test]
+    fn keeping_mine_clears_the_conflict_and_allows_save() {
+        use crate::message::draft::DraftMsg;
+        let mut e = env(true);
+        edit_body(&mut e.state, "mine");
+        sync(&mut e.state, vec![collection(base_req("https://a.test/v1", "theirs"))]);
+        send(&mut e.state, DraftMsg::ResolveField(REQ.into(), DraftField::Body, Side::Mine));
+
+        let d = e.state.drafts.get(REQ).unwrap();
+        assert!(d.conflicts.is_empty() && d.can_publish());
+        assert_eq!(d.data.body, "mine");
+        let stored = storage::drafts::get_drafts(e.state.db.as_ref().unwrap()).unwrap();
+        assert!(stored[0].conflicts.is_empty());
     }
 
     #[test]

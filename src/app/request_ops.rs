@@ -173,7 +173,7 @@ pub(crate) fn send_request(state: &mut AppState) -> Task<Message> {
 
 pub(crate) fn save_request(state: &mut AppState) -> Task<Message> {
     // Shared requests save to their local draft (01, C9); the base only
-    // changes through sync, import or Publish.
+    // changes through sync, import or a merged review PR (C12).
     if let Some((col, id)) = state.tabs.active_tab().saved_as.clone() {
         let exists = state.requests.values().flatten().any(|r| r.id == id);
         if exists && crate::app::drafts::is_shared(state, &col) {
