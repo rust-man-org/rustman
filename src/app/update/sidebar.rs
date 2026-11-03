@@ -24,6 +24,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
         }
         SidebarMsg::RequestOpened(req) => {
             state.sidebar.selected_request = Some(req.id.clone());
+            let req = crate::app::drafts::effective_request(state, &req);
             state.tabs.open_request(&req);
         }
         SidebarMsg::HistoryEntryOpened(entry) => {
@@ -390,6 +391,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
                     .find(|r| r.id == id)
                     .cloned();
                 if let Some(req) = opened {
+                    let req = crate::app::drafts::effective_request(state, &req);
                     state.sidebar.selected_request = Some(req.id.clone());
                     state.sidebar.dragging_item = Some(id.clone());
                     state.tabs.open_request(&req);

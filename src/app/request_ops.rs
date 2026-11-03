@@ -172,6 +172,23 @@ pub(crate) fn send_request(state: &mut AppState) -> Task<Message> {
 }
 
 pub(crate) fn save_request(state: &mut AppState) -> Task<Message> {
+    // Shared requests save to their local draft (01, C9); the base only
+    // changes through sync, import or Publish.
+    if let Some((col, id)) = state.tabs.active_tab().saved_as.clone() {
+        let exists = state.requests.values().flatten().any(|r| r.id == id);
+        if exists && crate::app::drafts::is_shared(state, &col) {
+            let req = saved_request_from_tab(state.tabs.active_tab(), col, id);
+            match crate::app::drafts::save_draft(state, req) {
+                Ok(()) => {
+                    state.tabs.active_tab_mut().modified = false;
+                    state.status_message = Some("Saved as local draft (only you see it)".to_owned());
+                }
+                Err(e) => state.status_message = Some(format!("Could not save draft: {e}")),
+            }
+            return Task::none();
+        }
+    }
+
     let tab = state.tabs.active_tab();
     let req_id = tab
         .saved_as
@@ -359,11 +376,21 @@ pub(crate) fn saved_request_from_tab(
 }
 
 pub(crate) fn flush_modified_tabs(state: &mut AppState) {
+    // Shared requests go to drafts and must never reach the base rows that
+    // the repo writer serializes (01, C9).
+    if let Err(e) = crate::app::drafts::capture_tabs(state) {
+        state.status_message = Some(format!("Could not save draft: {e}"));
+    }
+    let is_local = |state: &AppState, t: &RequestTabState| {
+        t.saved_as
+            .as_ref()
+            .is_some_and(|(col, _)| !crate::app::drafts::is_shared(state, col))
+    };
     let pending: Vec<SavedRequest> = state
         .tabs
         .tabs
         .iter()
-        .filter(|t| t.modified && t.saved_as.is_some())
+        .filter(|t| t.modified && is_local(state, t))
         .map(|t| {
             let (collection_id, req_id) = t.saved_as.clone().unwrap();
             saved_request_from_tab(t, collection_id, req_id)
@@ -382,8 +409,9 @@ pub(crate) fn flush_modified_tabs(state: &mut AppState) {
         }
     }
 
-    for tab in state.tabs.tabs.iter_mut() {
-        if tab.saved_as.is_some() {
+    let local: Vec<bool> = state.tabs.tabs.iter().map(|t| is_local(state, t)).collect();
+    for (tab, local) in state.tabs.tabs.iter_mut().zip(local) {
+        if local {
             tab.modified = false;
         }
     }

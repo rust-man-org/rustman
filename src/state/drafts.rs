@@ -30,6 +30,7 @@ impl DraftsState {
         self.by_request.get(request_id)
     }
 
+    #[allow(dead_code)] // status-bar draft count (01 task 8)
     pub fn count(&self) -> usize {
         self.by_request.len()
     }
