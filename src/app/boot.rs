@@ -210,6 +210,11 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
         global_scripts_modal_open: false,
         tls_options,
         session_dirty: false,
+        drafts: Default::default(),
+        meta: Default::default(),
+        auth: Default::default(),
+        secrets: Default::default(),
+        review: Default::default(),
     };
 
     #[cfg(feature = "self-update")]

@@ -5,12 +5,17 @@ use crate::message::{LayoutMsg, Message};
 use super::AppState;
 
 mod app_msg;
+mod auth;
+mod drafts;
 mod git;
 mod import;
+mod meta;
 mod palette;
 mod request;
 mod response;
+mod review;
 mod save_dialog;
+mod secrets;
 mod settings;
 mod sidebar;
 #[cfg(feature = "self-update")]
@@ -36,6 +41,15 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
 /// Expanded editors DO dirty on content edits (their write-back mutates the
 /// snapshot); navigation/selection/search inside them does not.
 pub(crate) fn marks_session_dirty(message: &Message) -> bool {
+    // Company-edition messages decide for themselves (contract C11).
+    match message {
+        Message::Draft(m) => return m.marks_session_dirty(),
+        Message::Meta(m) => return m.marks_session_dirty(),
+        Message::Auth(m) => return m.marks_session_dirty(),
+        Message::Secrets(m) => return m.marks_session_dirty(),
+        Message::Review(m) => return m.marks_session_dirty(),
+        _ => {}
+    }
     if let Message::Request(crate::message::RequestMsg::FormValueEdited(_, editor_msg)) = message {
         return crate::state::tabs::editor_message_edits_content(editor_msg);
     }
@@ -87,6 +101,11 @@ fn dispatch(state: &mut AppState, message: Message) -> Task<Message> {
         Message::Layout(msg) => handle_layout(state, msg),
         #[cfg(feature = "self-update")]
         Message::Update(msg) => updater::handle(state, msg),
+        Message::Draft(msg) => drafts::handle(state, msg),
+        Message::Meta(msg) => meta::handle(state, msg),
+        Message::Auth(msg) => auth::handle(state, msg),
+        Message::Secrets(msg) => secrets::handle(state, msg),
+        Message::Review(msg) => review::handle(state, msg),
     }
 }
 

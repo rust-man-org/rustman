@@ -12,6 +12,11 @@ use crate::domain::{
 };
 use crate::state::session::AppSession;
 
+// Company-edition table owners (contract C11).
+mod drafts;
+mod meta;
+mod secrets;
+
 // ── DB init ───────────────────────────────────────────────────────────────────
 
 pub fn open(data_dir: &PathBuf) -> SqlResult<Connection> {
@@ -73,6 +78,11 @@ pub fn open(data_dir: &PathBuf) -> SqlResult<Connection> {
 /// statement is independent and its error ignored, so re-running against an
 /// already-migrated database is a no-op.
 fn migrate(conn: &Connection) {
+    // Company-edition tables (contract C11): each workstream owns its DDL.
+    drafts::migrate(conn);
+    meta::migrate(conn);
+    secrets::migrate(conn);
+
     // Issue #53: endpoints can live inside groups and carry a manual order.
     let _ = conn.execute("ALTER TABLE requests ADD COLUMN group_id TEXT", []);
     let _ = conn.execute(

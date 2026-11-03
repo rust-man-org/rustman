@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod command_palette;
 pub mod icons;
 pub mod layout;

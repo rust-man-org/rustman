@@ -1,3 +1,11 @@
+// Company-edition extension points (contract C11). Each sub-enum lives in
+// its own file, owned by its workstream; this file is not edited again.
+pub mod auth;
+pub mod draft;
+pub mod meta;
+pub mod review;
+pub mod secrets;
+
 use crate::domain::{collection::SavedRequest, group::ImportedCollection, history::HistoryEntry};
 use crate::services::http::HttpResult;
 use tokio::sync::mpsc;
@@ -17,6 +25,17 @@ pub enum Message {
     Layout(LayoutMsg),
     #[cfg(feature = "self-update")]
     Update(UpdateMsg),
+    // ── Company edition (C11) ── constructed once each workstream lands.
+    #[allow(dead_code)]
+    Draft(draft::DraftMsg),
+    #[allow(dead_code)]
+    Meta(meta::MetaMsg),
+    #[allow(dead_code)]
+    Auth(auth::AuthMsg),
+    #[allow(dead_code)]
+    Secrets(secrets::SecretsMsg),
+    #[allow(dead_code)]
+    Review(review::ReviewMsg),
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────

@@ -1,9 +1,13 @@
 pub mod cache;
 pub mod curl;
 pub mod format;
+pub mod github;
 pub mod http;
 pub mod import;
+pub mod keychain;
+pub mod repo_layout;
 pub mod repos;
+pub mod secrets;
 pub mod spreadsheet;
 pub mod storage;
 #[cfg(feature = "self-update")]

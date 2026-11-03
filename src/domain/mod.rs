@@ -1,4 +1,8 @@
+pub mod account;
 pub mod collection;
+pub mod discussion;
+pub mod draft;
+pub mod endpoint_meta;
 pub mod environment;
 pub mod group;
 pub mod history;

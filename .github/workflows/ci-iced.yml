@@ -20,6 +20,27 @@ on:
       - ".github/workflows/ci-iced.yml"
 
 jobs:
+  # Windows-only code paths (e.g. the updater's ZIP extraction) never compile
+  # on Linux, so a Linux-only CI let a Windows break reach master.
+  test-windows:
+    name: Test · Windows x86_64
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache build artefacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Test (default features)
+        run: cargo test
+
+      - name: Test (no default features)
+        run: cargo test --no-default-features
+
   build-linux:
     name: Build · Linux ${{ matrix.arch }}
     strategy:
@@ -61,6 +82,12 @@ jobs:
 
       - name: Check distro build (no self-update feature)
         run: cargo check --no-default-features --all-targets
+
+      - name: Test (default features)
+        run: cargo test
+
+      - name: Test (no default features)
+        run: cargo test --no-default-features
 
       - name: Upload binary artefact
         uses: actions/upload-artifact@v4

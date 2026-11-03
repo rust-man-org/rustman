@@ -16,6 +16,7 @@ use crate::{
 };
 
 mod boot;
+mod drafts;
 mod request_ops;
 mod scripting;
 mod session;
@@ -122,6 +123,19 @@ pub struct AppState {
     pub tls_options: crate::services::http::TlsOptions,
 
     pub session_dirty: bool,
+
+    // ── Company edition (contract C11) ── one field per workstream; each
+    // type grows in its own file, so this struct is not edited again.
+    #[allow(dead_code)] // filled by 01
+    pub drafts: crate::state::drafts::DraftsState,
+    #[allow(dead_code)] // filled by 03
+    pub meta: crate::state::meta::MetaState,
+    #[allow(dead_code)] // filled by 05
+    pub auth: crate::state::auth::AuthSession,
+    #[allow(dead_code)] // filled by 06
+    pub secrets: crate::state::secrets::SecretsState,
+    #[allow(dead_code)] // filled by 08
+    pub review: crate::state::review::ReviewState,
 }
 
 /// State machine for the self-update flow. Only compiled with the
