@@ -16,6 +16,12 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
     let data_dir = dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("rustman");
+    init_at(data_dir)
+}
+
+/// Boot from an explicit data directory. `init` passes the user's data dir;
+/// tests pass a throwaway one so they never touch real data.
+pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
 
     let db = storage::open(&data_dir).ok();
 

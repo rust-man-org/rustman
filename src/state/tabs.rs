@@ -504,32 +504,51 @@ impl RequestTabState {
 
     pub fn from_saved(req: &SavedRequest) -> Self {
         let mut tab = Self::new();
-        tab.title = req.name.clone();
-        tab.method = req.method.clone();
-        let (url, params) = crate::domain::request::reconcile_url_params(&req.url, &req.params);
-        tab.set_url(url);
-        tab.headers = req.headers.clone();
-        tab.params = params;
-        tab.body_type = req.body_type.clone();
-        tab.body_editor = make_code_editor(&req.body, body_syntax_for(&req.body_type, &req.body));
-        tab.graphql_variables_editor = make_code_editor(&req.graphql_variables, "json");
-        tab.form_fields = req.form_data_fields.clone();
-        tab.auth_type = req.auth_type.clone();
-        tab.bearer_token = req.bearer_token.clone();
-        tab.basic_user = req.basic_user.clone();
-        tab.basic_pass = req.basic_pass.clone();
-        tab.api_key_name = req.api_key_name.clone();
-        tab.api_key_value = req.api_key_value.clone();
-        tab.api_key_location = req.api_key_location.clone();
-        tab.cookie_string = req.cookie_string.clone();
-        tab.cookies = req.cookies.clone();
-        tab.jwt_secret = req.jwt_secret.clone();
-        tab.jwt_subject = req.jwt_subject.clone();
-        tab.jwt_algo = req.jwt_algo.clone();
-        tab.pre_request_editor = make_code_editor(&req.pre_request_script, "txt");
-        tab.test_editor = make_code_editor(&req.test_script, "txt");
-        tab.saved_as = Some((req.collection_id.clone(), req.id.clone()));
+        tab.apply_saved(req);
         tab
+    }
+
+    /// Load `req`'s request fields into this tab **in place**. Everything
+    /// else (tab id, response, running jobs, open sub-panel) is untouched,
+    /// and an editor is only rebuilt when its text actually changed, so the
+    /// cursor survives a sync that did not touch that field (01, C9).
+    pub fn apply_saved(&mut self, req: &SavedRequest) {
+        self.title = req.name.clone();
+        self.method = req.method.clone();
+        let (url, params) = crate::domain::request::reconcile_url_params(&req.url, &req.params);
+        if self.url != url {
+            self.set_url(url);
+        }
+        self.headers = req.headers.clone();
+        self.params = params;
+        if self.body_type != req.body_type || self.body_editor.content() != req.body {
+            self.body_editor =
+                make_code_editor(&req.body, body_syntax_for(&req.body_type, &req.body));
+        }
+        self.body_type = req.body_type.clone();
+        if self.graphql_variables_editor.content() != req.graphql_variables {
+            self.graphql_variables_editor = make_code_editor(&req.graphql_variables, "json");
+        }
+        self.form_fields = req.form_data_fields.clone();
+        self.auth_type = req.auth_type.clone();
+        self.bearer_token = req.bearer_token.clone();
+        self.basic_user = req.basic_user.clone();
+        self.basic_pass = req.basic_pass.clone();
+        self.api_key_name = req.api_key_name.clone();
+        self.api_key_value = req.api_key_value.clone();
+        self.api_key_location = req.api_key_location.clone();
+        self.cookie_string = req.cookie_string.clone();
+        self.cookies = req.cookies.clone();
+        self.jwt_secret = req.jwt_secret.clone();
+        self.jwt_subject = req.jwt_subject.clone();
+        self.jwt_algo = req.jwt_algo.clone();
+        if self.pre_request_editor.content() != req.pre_request_script {
+            self.pre_request_editor = make_code_editor(&req.pre_request_script, "txt");
+        }
+        if self.test_editor.content() != req.test_script {
+            self.test_editor = make_code_editor(&req.test_script, "txt");
+        }
+        self.saved_as = Some((req.collection_id.clone(), req.id.clone()));
     }
 }
 
