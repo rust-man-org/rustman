@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rustman Company — Requester Headers (Mockup)</title>
+<style>
+@font-face{font-family:'Inter';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/Inter-Regular-e764338977f38b2c.woff2') format('woff2');font-weight:400;font-style:normal}
+@font-face{font-family:'Inter';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/Inter-Medium-242d04bef81519ae.woff2') format('woff2');font-weight:500;font-style:normal}
+@font-face{font-family:'Inter';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/Inter-semibold-b87ad48fa4af1792.woff2') format('woff2');font-weight:600;font-style:normal}
+@font-face{font-family:'IBM Plex Mono';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/IBMPlexMono-Regular-efb009a648ec928c.woff2') format('woff2');font-weight:400;font-style:normal}
+@font-face{font-family:'IBM Plex Mono';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/IBMPlexMono-SemiBold-4ba0622e9a0ffe76.woff2') format('woff2');font-weight:600;font-style:normal}
+
+:root{
+  --bg-0:#FFFFFF;--bg-1:#F9F9F9;--bg-2:#F2F2F2;
+  --bd-1:#EDEDED;--bd-2:#E6E6E6;
+  --tx-1:#212121;--tx-2:#6B6B6B;--tx-3:#A6A6A6;
+  --accent:#FF6C37;--accent-h:#F05E28;--accent-tint:rgba(255,108,55,.10);
+  --success:#0CBB52;--success-tint:rgba(12,187,82,.10);
+  --danger:#EB2013;--danger-tint:rgba(235,32,19,.10);
+  --info:#097BED;--info-tint:rgba(9,123,237,.10);
+  --contrast-bg:#212121;--contrast-fg:#FFFFFF;
+  --studio:#EDEDED;
+  --shadow-1:0 1px 2px rgba(33,33,33,.06),0 1px 1px rgba(33,33,33,.04);
+  --font-ui:'Inter',system-ui,'Segoe UI',Helvetica,Arial,sans-serif;
+  --font-code:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+[data-theme=dark]{
+  --bg-0:#212121;--bg-1:#1A1A1A;--bg-2:#2B2B2B;
+  --bd-1:#303030;--bd-2:#3B3B3B;
+  --tx-1:#F2F2F2;--tx-2:#A6A6A6;--tx-3:#6B6B6B;
+  --accent-tint:rgba(255,108,55,.16);
+  --success-tint:rgba(12,187,82,.16);
+  --danger-tint:rgba(235,32,19,.18);
+  --info-tint:rgba(9,123,237,.18);
+  --contrast-bg:#F2F2F2;--contrast-fg:#212121;
+  --studio:#161616;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4),0 1px 1px rgba(0,0,0,.3);
+}
+html,body{margin:0;height:100%}
+body{background:var(--studio);font-family:var(--font-ui);color:var(--tx-1);display:flex;align-items:stretch;justify-content:center;min-width:996px}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input,textarea{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.theme-toggle{position:fixed;right:16px;bottom:16px;width:36px;height:36px;border-radius:100%;background:var(--bg-0);border:1px solid var(--bd-2);box-shadow:var(--shadow-1);display:flex;align-items:center;justify-content:center;color:var(--tx-2);z-index:99}
+.theme-toggle:hover{color:var(--tx-1)}
+
+.app{width:1240px;min-width:972px;max-width:100%;margin:auto;height:100%;max-height:860px;min-height:720px;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:10px;box-shadow:var(--shadow-1);display:flex;flex-direction:column;overflow:hidden}
+@media (max-height:760px){.app{border-radius:0;border-left:0;border-right:0}}
+
+.app-header{flex:0 0 48px;display:flex;align-items:center;gap:24px;border-bottom:1px solid var(--bd-1);padding:0 16px}
+.hdr-left{display:flex;align-items:center;gap:12px;flex:1 0 auto}
+.logo{width:24px;height:24px;border-radius:4px;background:var(--accent);color:#fff;font:600 13px/24px var(--font-ui);text-align:center}
+.ws{display:flex;align-items:center;gap:8px}
+.ws-name{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.branch{display:flex;align-items:center;gap:5px;font:600 11px var(--font-code);color:var(--tx-2);background:var(--bg-2);border-radius:100%;padding:3px 9px}
+.branch svg{opacity:.7}
+.hdr-center{flex:1 1 auto;display:flex;justify-content:center}
+.hdr-search{width:340px;height:32px;border:1px solid var(--bd-1);border-radius:8px;background:var(--bg-1);padding:0 10px 0 32px;font-size:12px;color:var(--tx-1)}
+.hdr-search::placeholder{color:var(--tx-3)}
+.hdr-search-wrap{position:relative}
+.hdr-search-wrap svg{position:absolute;left:9px;top:8px;color:var(--tx-3)}
+.hdr-right{flex:1 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.sync-chip{display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:8px;border:1px solid transparent;font-size:12px;font-weight:500;color:var(--tx-2)}
+.sync-chip .dot{width:8px;height:8px;border-radius:100%;background:var(--success);box-shadow:0 0 0 3px var(--success-tint)}
+.sync-chip:hover{background:var(--bg-2)}
+.sync-chip b{font-weight:600;color:var(--tx-1);font-variant-numeric:tabular-nums}
+.icon-btn{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--tx-2)}
+.icon-btn:hover{background:var(--bg-2);color:var(--tx-1)}
+.avatar{width:28px;height:28px;border-radius:100%;background:var(--contrast-bg);color:var(--contrast-fg);font:600 12px/28px var(--font-ui);text-align:center}
+
+.shell{flex:1;display:flex;min-height:0}
+
+.rail{flex:0 0 48px;background:var(--bg-1);border-right:1px solid var(--bd-1);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px}
+.rail-item{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--tx-3)}
+.rail-item:hover{background:var(--bg-2);color:var(--tx-2)}
+.rail-item.active{background:var(--accent-tint);color:var(--accent)}
+.rail-item.gap{margin-top:auto}
+
+.sidebar{flex:0 0 280px;background:var(--bg-1);border-right:1px solid var(--bd-1);display:flex;flex-direction:column;min-height:0}
+.side-top{padding:12px 12px 10px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--bd-1)}
+.side-search{position:relative}
+.side-search svg{position:absolute;left:8px;top:7px;color:var(--tx-3)}
+.side-search input{width:100%;height:28px;box-sizing:border-box;border:1px solid transparent;background:var(--bg-2);border-radius:4px;padding:0 8px 0 28px;font-size:12px}
+.side-search input:focus{background:var(--bg-0);border-color:var(--bd-2);outline:none}
+.tree{flex:1;overflow-y:auto;padding:8px 6px 12px}
+.col-row{display:flex;align-items:center;gap:6px;height:30px;padding:0 8px;border-radius:4px;font-size:12px;color:var(--tx-1);cursor:default}
+.col-row .chev{color:var(--tx-3);flex:0 0 auto}
+.col-row .c-name{font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.col-row .count{font:600 10px var(--font-code);color:var(--tx-3);font-variant-numeric:tabular-nums}
+.col-row:hover{background:var(--bg-2)}
+.folder-row{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px 0 22px;border-radius:4px;font-size:12px;color:var(--tx-1)}
+.folder-row:hover{background:var(--bg-2)}
+.folder-row .chev{color:var(--tx-3)}
+.folder-row .f-name{flex:1}
+.folder-row .f-mini{font-size:10px;color:var(--tx-3);font-variant-numeric:tabular-nums}
+.req-row{display:flex;align-items:center;gap:7px;height:28px;padding:0 8px 0 42px;border-radius:4px;font-size:12px}
+.req-row:hover{background:var(--bg-2)}
+.req-row .m{font:600 10px var(--font-code);flex:0 0 34px}
+.m.get{color:var(--success)}.m.post{color:var(--accent)}.m.put{color:var(--info)}.m.del{color:var(--danger)}
+.req-row .r-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx-2)}
+.req-row .st{flex:0 0 auto;display:flex}
+.req-row.selected{background:var(--accent-tint)}
+.req-row.selected .r-name{color:var(--tx-1);font-weight:500}
+.st-warning{color:var(--accent)}.st-ready{color:var(--success)}.st-draft{color:var(--tx-3)}
+.st-draft{width:12px;display:flex;justify-content:center}
+.st-draft::after{content:"";width:7px;height:7px;border-radius:100%;background:currentColor}
+.side-actions{display:flex;gap:6px}
+.side-actions .btn{flex:1;justify-content:center;min-width:0}
+.kv-note.tight{margin-top:8px}
+
+.main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.rightbar{flex:0 0 272px;border-left:1px solid var(--bd-1);background:var(--bg-0);display:flex;flex-direction:column;min-height:0;position:relative}
+@media (max-width:1180px){.rightbar{display:none}}
+.rb-toggle{position:absolute;opacity:0;pointer-events:none}
+.rb-splitter{position:absolute;left:0;top:0;bottom:0;width:6px;cursor:col-resize;z-index:4;display:flex;align-items:center;justify-content:center}
+.rb-splitter::after{content:"";width:2px;height:28px;border-radius:2px;background:var(--bd-2);opacity:0;transition:opacity 120ms ease}
+.rb-splitter:hover{background:var(--accent-tint)}
+.rb-splitter:hover::after{opacity:1;background:var(--accent)}
+.rb-reopen{display:none;flex:0 0 26px;border-left:1px solid var(--bd-1);background:var(--bg-1);align-items:center;justify-content:center;color:var(--tx-3);cursor:pointer}
+.rb-reopen:hover{color:var(--tx-1);background:var(--bg-2)}
+#rbhide:checked ~ .rightbar{display:none}
+#rbhide:checked ~ .rb-reopen{display:flex}
+.rb-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px}
+.rb-title{font-size:13px;font-weight:600;letter-spacing:-.01em}
+.rb-actions{display:flex;gap:2px}
+.rb-icon{width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3)}
+.rb-icon:hover{background:var(--bg-2);color:var(--tx-1)}
+.rb-lang{margin:0 14px 10px;position:relative}
+.rb-lang summary{list-style:none;display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border:1px solid var(--bd-1);border-radius:4px;font-size:12px;color:var(--tx-1);background:var(--bg-1);cursor:pointer}
+.rb-lang summary::-webkit-details-marker{display:none}
+.rb-lang summary:hover{border-color:var(--bd-2)}
+.rb-lang[open] summary{border-color:var(--accent);background:var(--bg-0)}
+.rb-lang summary .val{flex:1;text-align:left}
+.rb-menu{left:0;right:0;top:calc(100% + 4px);min-width:0;max-height:260px}
+.rb-menu .combo-item{font:400 12px var(--font-ui)}
+.rb-code{flex:1;overflow:auto;padding:2px 14px 16px;font:400 11px/18px var(--font-code);color:var(--tx-1)}
+.rb-line{display:flex;gap:10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.rb-line > span:last-child{min-width:0}
+.rb-line .ln{flex:0 0 14px;color:var(--tx-3);text-align:right;font-variant-numeric:tabular-nums;user-select:none}
+.rb-code .s{color:var(--success)}
+[data-theme=dark] .rb-code .s{color:#4ADE80}
+.tabsbar{flex:0 0 36px;display:flex;align-items:stretch;border-bottom:1px solid var(--bd-1);background:var(--bg-1);padding:0 6px}
+.tab{display:flex;align-items:center;gap:7px;padding:0 10px;border-right:1px solid var(--bd-1);font-size:12px;color:var(--tx-2);position:relative}
+.tab .m{font:600 10px var(--font-code)}
+.tab .dirty{width:7px;height:7px;border-radius:100%;background:var(--accent)}
+.tab.active{background:var(--bg-0);color:var(--tx-1)}
+.tab.active::after{content:"";position:absolute;left:0;right:0;top:-1px;height:2px;background:var(--accent)}
+.tab .x{color:var(--tx-3);width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center}
+.tab .x:hover{background:var(--bg-2);color:var(--tx-1)}
+.tab.new{padding:0 12px;color:var(--tx-3);border-right:0}
+.tab.new:hover{color:var(--tx-1)}
+
+.editor{flex:1;display:flex;flex-direction:column;min-height:0}
+.req-bar{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;padding:12px 16px 0}
+.meta-row{display:flex;align-items:center;gap:8px;min-height:24px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:24px;box-sizing:border-box;padding:0 10px;border:1px solid transparent;border-radius:24px;line-height:1;background:var(--bg-2);font-size:11px;font-weight:500;color:var(--tx-2);white-space:nowrap;transition:background-color 120ms ease,color 120ms ease,border-color 120ms ease}
+.chip .dot{width:7px;height:7px;border-radius:100%;background:var(--accent)}
+.chip.status{background:var(--accent-tint);color:var(--tx-1);font-weight:600}
+.chip.status:hover{background:rgba(255,108,55,.16)}
+.chip.status svg{color:var(--tx-3)}
+button.chip:hover{color:var(--tx-1);background:var(--bd-2)}
+button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
+.chip.owner{padding:0 10px 0 4px;color:var(--tx-1);font-weight:500}
+.chip.tag{font-weight:400}
+.chip.tag.add{background:transparent;border-color:var(--bd-2);border-style:dashed;color:var(--tx-3);font-weight:400}
+.chip.tag.add:hover{color:var(--tx-2);border-color:var(--tx-3)}
+.endpoint-id{font:400 11px var(--font-code);color:var(--tx-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;text-align:right;padding-left:14px;border-left:1px solid var(--bd-1);margin-left:6px}
+.meta-row .owner .mini-av{background:var(--contrast-bg);color:var(--contrast-fg)}
+.mini-av{width:16px;height:16px;border-radius:100%;font:600 9px/16px var(--font-ui);text-align:center}
+.url-row{display:flex;height:40px;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1)}
+.crumb-row{display:flex;align-items:center;gap:8px;min-height:32px}
+.crumb-proto{font:600 9px var(--font-code);color:var(--info);border:1px solid var(--bd-2);border-radius:3px;padding:1px 4px}
+.crumb-path{font-size:11px;color:var(--tx-3);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb-sep{color:var(--tx-3)}
+.crumb-name{font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.crumb-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.save-wrap{display:flex;align-items:stretch;height:28px;border-radius:4px;overflow:hidden}
+.save-btn{display:flex;align-items:center;gap:6px;padding:0 10px;background:var(--bg-2);font-size:12px;color:var(--tx-2);border-radius:4px 0 0 4px}
+.save-btn:hover{color:var(--tx-1);background:var(--bd-2)}
+.save-btn svg{color:var(--tx-3)}
+.savedd{position:relative;display:flex}
+.savedd summary{list-style:none;display:flex;align-items:center;justify-content:center;width:24px;background:var(--bg-2);border-left:1px solid var(--bd-1);color:var(--tx-3);cursor:pointer;border-radius:0 4px 4px 0}
+.savedd summary::-webkit-details-marker{display:none}
+.savedd summary:hover,.savedd[open] summary{background:var(--bd-2);color:var(--tx-1)}
+.save-menu{right:0;top:calc(100% + 6px);min-width:190px}
+.share-btn{display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--bd-2);border-radius:4px;font-size:12px;color:var(--tx-2)}
+.share-btn:hover{color:var(--tx-1);border-color:var(--tx-3)}
+.share-btn svg{color:var(--tx-3)}
+.meta-strip{display:flex;align-items:center;gap:6px;padding:6px 16px;border-bottom:1px solid var(--bd-1);min-height:34px}
+.methoddd{position:relative;flex:0 0 115px}
+.methoddd summary{list-style:none;height:100%;background:var(--bg-2);border-right:1px solid var(--bd-1);border-radius:4px 0 0 4px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px;cursor:pointer}
+.methoddd summary::-webkit-details-marker{display:none}
+.methoddd summary:hover{background:var(--bd-2)}
+.methoddd[open] summary{background:var(--bg-0);box-shadow:inset 0 0 0 1px var(--accent)}
+.methoddd summary svg{color:var(--tx-3)}
+.m-val{font:600 12px var(--font-code)}
+.method-menu{left:0;top:calc(100% + 6px);min-width:140px}
+.method-menu .combo-item{font:600 11px var(--font-code)}
+.url{flex:1;display:flex;align-items:center;padding:0 12px;font:400 13px var(--font-code);color:var(--tx-1);min-width:0;white-space:nowrap;overflow:hidden}
+.url .v{color:var(--info)}
+.send-wrap{display:flex;flex:0 0 auto;margin:4px;align-self:stretch}
+.send{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:0 16px;border-radius:4px 0 0 4px;background:var(--accent);color:#fff;font-size:13px;font-weight:600}
+.send:hover{background:var(--accent-h)}
+.senddd{position:relative;display:flex}
+.senddd summary{list-style:none;display:flex;align-items:center;justify-content:center;width:30px;background:var(--accent);color:#fff;border-left:1px solid rgba(255,255,255,.38);border-radius:0 4px 4px 0;cursor:pointer}
+.senddd summary::-webkit-details-marker{display:none}
+.senddd summary:hover,.senddd[open] summary{background:var(--accent-h)}
+.send-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:252px;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:5px}
+.send-item{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border-radius:5px;font-size:12px;font-weight:500;color:var(--tx-1);text-align:left}
+.send-item svg{color:var(--tx-2);flex:0 0 auto}
+.send-item:hover{background:var(--bg-1)}
+.send-item:hover svg{color:var(--tx-1)}
+.send-div{height:1px;background:var(--bd-1);margin:5px 4px}
+.ctx-menu{position:absolute;right:0;top:calc(100% + 2px);z-index:25;min-width:196px;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:5px;text-align:left}
+.ctx-item{display:flex;align-items:center;gap:9px;width:100%;padding:6px 9px;border-radius:5px;font-size:12px;color:var(--tx-1);text-align:left}
+.ctx-item svg{color:var(--tx-2);flex:0 0 auto}
+.ctx-item:hover{background:var(--bg-1)}
+.ctx-item.danger{color:var(--danger)}
+.ctx-item.danger svg{color:var(--danger)}
+.ctx-div{height:1px;background:var(--bd-1);margin:5px 4px}
+.req-row{position:relative}
+
+.req-tabs{flex:0 0 auto;display:flex;align-items:center;gap:2px;padding:6px 12px;border-bottom:1px solid var(--bd-1)}
+.rtab{height:26px;padding:0 10px;font-size:12px;color:var(--tx-2);border-radius:4px;display:flex;align-items:center;gap:6px}
+.rtab:hover{color:var(--tx-1);background:var(--bg-2)}
+.rtab.active{color:var(--tx-1);background:var(--bg-2);font-weight:500}
+.tab-radio{position:absolute;opacity:0;pointer-events:none}
+.rtab{cursor:pointer}
+.docs-tab{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;font-size:12px;color:var(--tx-3);border-radius:4px}
+.docs-tab:hover{background:var(--bg-2);color:var(--tx-1)}
+.cookies-link{margin-left:auto;display:flex;align-items:center;height:26px;padding:0 8px;border-radius:4px;font-size:12px;color:var(--tx-2)}
+.cookies-link:hover{background:var(--bg-2);color:var(--tx-1)}
+#rt-params:checked ~ .req-tabs [for="rt-params"],
+#rt-auth:checked ~ .req-tabs [for="rt-auth"],
+#rt-headers:checked ~ .req-tabs [for="rt-headers"],
+#rt-body:checked ~ .req-tabs [for="rt-body"],
+#rt-scripts:checked ~ .req-tabs [for="rt-scripts"],
+#rt-discussion:checked ~ .req-tabs [for="rt-discussion"]{color:var(--tx-1);background:var(--bg-2);font-weight:500}
+#rt-params:checked ~ .tpanel[data-panel="params"],
+#rt-auth:checked ~ .tpanel[data-panel="auth"],
+#rt-headers:checked ~ .tpanel[data-panel="headers"],
+#rt-body:checked ~ .tpanel[data-panel="body"],
+#rt-scripts:checked ~ .tpanel[data-panel="scripts"],
+#rt-discussion:checked ~ .tpanel[data-panel="discussion"]{display:block}
+.rtab .badge{font:600 10px var(--font-code);background:var(--accent-tint);color:var(--accent);border-radius:24px;padding:2px 6px}
+
+.tpanel{flex:1;min-height:0;overflow-y:auto;padding:14px 16px;display:none}
+.tpanel.active{display:block}
+.kv{border:1px solid var(--bd-1);border-radius:8px;overflow:hidden}
+.kv-head{display:grid;grid-template-columns:44px 1.1fr 1.6fr 1fr 24px;gap:12px;padding:9px 12px;font-size:11px;font-weight:600;color:var(--tx-3);border-bottom:1px solid var(--bd-1);background:var(--bg-1)}
+.kv-row{display:grid;grid-template-columns:44px 1.1fr 1.6fr 1fr 24px;gap:12px;align-items:center;padding:4px 12px;border-bottom:1px solid var(--bd-1)}
+.kv-row:last-child{border-bottom:0}
+.kv-row input{text-align:left;height:28px;width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;border-radius:4px;padding:0 8px;font:400 12px var(--font-code)}
+.kv-row input:hover{background:var(--bg-2)}
+.kv-row input:focus{outline:none;border-color:var(--bd-2);background:var(--bg-0)}
+.kv-row .desc{font-size:11px;color:var(--tx-3)}
+.combo{position:relative;min-width:0}
+[data-panel="headers"] .kv{overflow:visible}
+.combo summary{list-style:none;display:flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 8px;border:1px solid transparent;border-radius:4px;font:400 12px var(--font-code);color:var(--tx-1);cursor:pointer}
+.combo summary::-webkit-details-marker{display:none}
+.combo summary:hover{background:var(--bg-2)}
+.combo[open] summary{border-color:var(--accent);background:var(--bg-0)}
+.combo summary .val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.combo summary svg{color:var(--tx-3);flex:0 0 auto}
+.combo-menu{position:absolute;left:0;top:calc(100% + 3px);z-index:6;min-width:196px;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:4px;max-height:224px;overflow-y:auto}
+.combo-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:6px 8px;border-radius:4px;font:400 12px var(--font-code);color:var(--tx-1)}
+.combo-item:hover{background:var(--bg-1)}
+.combo-item .tick{margin-left:auto;color:var(--accent);display:flex}
+.kv-row.off{opacity:.45}
+.kv-add{display:flex;align-items:center;gap:6px;margin:10px 2px 0;padding:6px 10px;border-radius:4px;font-size:12px;color:var(--tx-2)}
+.kv-add:hover{background:var(--bg-2);color:var(--tx-1)}
+.kv-note{margin-top:10px;font-size:11px;color:var(--tx-3)}
+.hdr-toolbar{display:flex;align-items:center;gap:8px;padding-bottom:12px}
+.hdr-filter{position:relative;flex:1;max-width:320px}
+.hdr-filter svg{position:absolute;left:9px;top:8px;color:var(--tx-3)}
+.hdr-filter input{width:100%;height:30px;box-sizing:border-box;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);padding:0 10px 0 30px;font-size:12px;color:var(--tx-1)}
+.hdr-filter input::placeholder{color:var(--tx-3)}
+.hdr-filter input:focus{outline:none;border-color:var(--bd-2);background:var(--bg-0)}
+.dd{position:relative;margin-left:auto}
+.dd summary{list-style:none;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);font-size:12px;color:var(--tx-2);cursor:pointer}
+.dd summary::-webkit-details-marker{display:none}
+.dd summary:hover{color:var(--tx-1);border-color:var(--bd-2)}
+.dd summary .count{font:600 10px var(--font-code);background:var(--bg-2);border-radius:24px;padding:2px 6px;color:var(--tx-2);font-variant-numeric:tabular-nums}
+.dd[open] summary{color:var(--tx-1);border-color:var(--accent)}
+.dd-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:5;min-width:232px;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px}
+.dd-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:4px;font-size:12px;color:var(--tx-1);cursor:pointer}
+.dd-item:hover{background:var(--bg-1)}
+.hdr-bulk{height:30px;padding:0 10px;border-radius:4px;font-size:12px;color:var(--tx-2)}
+.hdr-bulk:hover{background:var(--bg-2);color:var(--tx-1)}
+.hidden-head{display:flex;align-items:center;gap:8px;margin:16px 2px 8px;font-size:11px;font-weight:600;color:var(--tx-3)}
+.hidden-head .pill{font:600 10px var(--font-code);background:var(--bg-2);color:var(--tx-2);border-radius:24px;padding:2px 7px}
+.hidden-head .n{font-weight:400;color:var(--tx-3);font-variant-numeric:tabular-nums;margin-left:auto}
+.kv-row.hidden input{color:var(--tx-3);cursor:default}
+.kv-row.hidden input:hover{background:transparent}
+.lock{display:flex;justify-content:center;color:var(--tx-3)}
+.seg{display:flex;gap:4px;padding-bottom:12px}
+.bmode{height:26px;padding:0 10px;border-radius:4px;font-size:12px;color:var(--tx-2);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.bmode:hover{color:var(--tx-1);background:var(--bg-2)}
+.bmode.active{background:var(--accent-tint);color:var(--accent);font-weight:500}
+.bodytoolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:10px}
+.bodypick{position:relative;margin:0}
+.bodypick summary{list-style:none;display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 10px;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);font:500 12px var(--font-ui);color:var(--tx-1);cursor:pointer}
+.bodypick summary::-webkit-details-marker{display:none}
+.bodypick summary:hover{border-color:var(--bd-2)}
+.bodypick[open] summary{border-color:var(--accent);background:var(--bg-0)}
+.bodypick .combo-menu{min-width:212px}
+.rawbar{display:flex;align-items:center;gap:8px;padding:0}
+.rawbar .combo summary{height:28px;padding:0 10px;border:1px solid var(--bd-1);background:var(--bg-1);border-radius:4px;font:500 12px var(--font-ui);gap:8px}
+.rawbar .combo summary:hover{border-color:var(--bd-2);background:var(--bg-1)}
+.rawbar .combo[open] summary{border-color:var(--accent);background:var(--bg-0)}
+.rawbar .hint{font-size:11px;color:var(--tx-3)}
+.code-editor{display:flex;flex-direction:column;min-height:0}
+.code-head{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bd-1);background:var(--bg-1)}
+.code-head .lang{font:600 11px var(--font-code);color:var(--tx-2);background:var(--bg-2);border-radius:4px;padding:2px 8px}
+.code-view{margin-left:auto;display:flex;gap:2px}
+.cview{font-size:11px;color:var(--tx-3);padding:3px 8px;border-radius:4px}
+.cview:hover{color:var(--tx-1);background:var(--bg-2)}
+.cview.active{color:var(--tx-1);background:var(--bg-2)}
+.code-body{padding:2px 0;font:400 12px/20px var(--font-code);color:var(--tx-1);overflow:auto}
+.codeline{display:flex;gap:14px;white-space:pre}
+.codeline .ln{flex:0 0 18px;color:var(--tx-3);text-align:right;user-select:none;font-variant-numeric:tabular-nums}
+.code-body .j-key{color:var(--tx-2)}
+.code-body .j-str{color:var(--success)}
+[data-theme=dark] .code-body .j-str{color:#4ADE80}
+.code-foot{display:flex;justify-content:space-between;gap:10px;padding:6px 0 0;font:400 11px var(--font-code);color:var(--tx-3)}
+.rsp-tools{display:flex;align-items:center;gap:8px;padding:8px 16px 0;flex:0 0 auto}
+.rsp-tools .spacer{flex:1}
+.sc-label{font-size:11px;color:var(--tx-3)}
+.dd-mini{position:relative}
+.dd-mini summary{list-style:none;display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);font-size:11px;color:var(--tx-2);cursor:pointer}
+.dd-mini summary::-webkit-details-marker{display:none}
+.dd-mini summary:hover{color:var(--tx-1);border-color:var(--bd-2)}
+.dd-mini[open] summary{border-color:var(--accent);color:var(--tx-1);background:var(--bg-0)}
+.dd-mini .combo-menu{top:calc(100% + 4px);left:auto;right:0;min-width:178px}
+.lang-glyph{font:600 9px var(--font-code);color:var(--tx-3);width:18px;text-align:center;flex:0 0 auto}
+.preview-btn{height:26px;padding:0 9px;border:1px solid transparent;border-radius:4px;font-size:11px;color:var(--tx-2)}
+.preview-btn:hover{background:var(--bg-2);color:var(--tx-1)}
+.resp-icons{margin-left:auto;display:flex;gap:2px}
+.resp-icon{width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3)}
+.resp-icon:hover{background:var(--bg-2);color:var(--tx-1)}
+.rsp-code{flex:1;overflow:auto;padding:10px 16px;font:400 12px/20px var(--font-code);color:var(--tx-1)}
+.rsp-code .j-key{color:var(--tx-2)}
+.rsp-code .j-str{color:var(--success)}
+[data-theme=dark] .rsp-code .j-str{color:#4ADE80}
+#rr-body:checked ~ .rsp-panel[data-rsp="body"]{display:flex;flex-direction:column}
+.auth-grid{display:grid;grid-template-columns:210px 1fr;gap:16px;align-items:start}
+.auth-grid > div{min-width:0}
+.auth-list{border-radius:6px}
+.auth-item{width:100%;display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 10px;border-radius:4px;font-size:12px;color:var(--tx-2);text-align:left}
+.auth-item:hover{background:var(--bg-2);color:var(--tx-1)}
+.auth-item.active{background:var(--accent-tint);color:var(--tx-1);font-weight:500}
+.auth-item .inh{font-size:10px;color:var(--tx-3)}
+.auth-field{max-width:420px}
+.auth-field label{display:block;font-size:11px;font-weight:500;color:var(--tx-3);margin-bottom:5px}
+.auth-field input{width:100%;height:32px;box-sizing:border-box;padding:0 10px;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);font:400 12px var(--font-code)}
+.auth-field input:focus{background:var(--bg-0);outline:none;border-color:var(--bd-2)}
+.comment{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--bd-1);position:relative}
+.comment:last-of-type{border-bottom:0}
+.c-av{width:26px;height:26px;border-radius:100%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font:600 11px/1 var(--font-ui);position:relative;margin-top:1px}
+.c-av::after{content:"";position:absolute;left:50%;top:calc(100% + 4px);bottom:-16px;width:1px;background:var(--bd-1)}
+.comment:last-of-type .c-av::after{display:none}
+.c-av.y{background:#DBE5F1;color:#274B6D}.c-av.k{background:#E8E3D9;color:#6C5B39}
+[data-theme=dark] .c-av.y{background:#2B3B4E;color:#BCCFE2}
+[data-theme=dark] .c-av.k{background:#443E2C;color:#D6C79A}
+.c-body{min-width:0;flex:1}
+.c-head{display:flex;align-items:center;gap:8px}
+.c-author{font-size:12px;font-weight:600}
+.c-time{font-size:11px;color:var(--tx-3);font-variant-numeric:tabular-nums}
+.c-reply{margin-left:auto;opacity:0;transition:opacity 120ms ease;font-size:11px;font-weight:500;color:var(--tx-3);padding:2px 7px;border-radius:4px}
+.comment:hover .c-reply,.c-reply:focus-visible{opacity:1}
+.c-reply:hover{color:var(--tx-1);background:var(--bg-2)}
+.c-text{margin:3px 0 0;font-size:12px;line-height:20px;color:var(--tx-1)}
+.c-text code{font:500 11px var(--font-code);background:var(--bg-2);border-radius:4px;padding:1px 5px}
+.composer{margin-top:12px;border:1px solid var(--bd-1);border-radius:8px;background:var(--bg-0);overflow:hidden;box-shadow:var(--shadow-1)}
+.composer textarea{display:block;width:100%;box-sizing:border-box;border:0;background:transparent;resize:none;height:58px;padding:10px 12px 4px;font-size:12px;line-height:20px}
+.composer textarea::placeholder{color:var(--tx-3)}
+.composer textarea:focus{outline:none}
+.composer-foot{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 8px 12px;background:var(--bg-1);border-top:1px solid var(--bd-1)}
+.composer-foot .hint{font-size:11px;color:var(--tx-3)}
+.btn{height:28px;padding:0 14px;border-radius:4px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-accent:hover{background:var(--accent-h)}
+.btn-ghost{border:1px solid var(--bd-2);color:var(--tx-2);background:var(--bg-0)}
+.btn-ghost:hover{color:var(--tx-1);border-color:var(--tx-3)}
+
+.splitter{flex:0 0 auto;height:1px;background:var(--bd-1);position:relative;cursor:row-resize;min-height:5px;margin-top:auto}
+.splitter::before{content:"";position:absolute;left:0;right:0;top:2px;height:3px}
+.splitter::after{content:"";position:absolute;left:50%;top:1px;width:44px;margin-left:-22px;height:3px;border-radius:100%;background:var(--bd-2)}
+
+.response{flex:0 0 212px;display:flex;flex-direction:column;min-height:0}
+.resp-head{flex:0 0 36px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--bd-1)}
+.resp-title{font-size:13px;font-weight:600;letter-spacing:-.01em}
+.resp-history{display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:4px;font-size:11px;color:var(--tx-3)}
+.resp-history:hover{background:var(--bg-2);color:var(--tx-1)}
+.resp-status{display:flex;align-items:center;gap:7px;font:600 12px var(--font-code);color:var(--danger)}
+.resp-status .dot{width:8px;height:8px;border-radius:100%;background:var(--danger);box-shadow:0 0 0 3px var(--danger-tint)}
+.resp-meta{font:400 11px var(--font-code);color:var(--tx-3);font-variant-numeric:tabular-nums}
+.resp-meta b{color:var(--tx-2);font-weight:400}
+.resp-spacer{flex:1}
+.resp-tabsbar{flex:0 0 32px;display:flex;align-items:center;gap:2px;padding:0 12px;border-bottom:1px solid var(--bd-1)}
+.rsp-tab{display:flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:4px;font-size:12px;color:var(--tx-2);cursor:pointer}
+.rsp-tab:hover{color:var(--tx-1);background:var(--bg-2)}
+.rsp-tab .n{font:600 10px var(--font-code);color:var(--tx-3)}
+.rsp-panel{display:none;flex:1;overflow:auto;min-height:0;font:400 12px/19px var(--font-code);color:var(--tx-1)}
+.rsp-panel.body-pad{padding:10px 16px;white-space:pre;background:var(--bg-1)}
+.rsp-panel .j-key{color:var(--tx-2)}
+.rsp-panel .j-str{color:var(--success)}
+[data-theme=dark] .rsp-panel .j-str{color:#4ADE80}
+.rsp-table{display:flex;flex-direction:column;padding:4px 8px}
+.rsp-row{display:grid;grid-template-columns:1.1fr 1.6fr 1.1fr .8fr .9fr;gap:10px;padding:6px 8px;border-bottom:1px solid var(--bd-1);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rsp-row.h{font-weight:600;color:var(--tx-3);font-family:var(--font-ui)}
+.rsp-row span{overflow:hidden;text-overflow:ellipsis}
+.rsp-tests{padding:10px 16px;display:flex;flex-direction:column;gap:2px}
+.rsp-assert{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:6px;font:400 12px/18px var(--font-ui)}
+.rsp-assert .st{flex:0 0 auto;margin-top:2px}
+.rsp-assert.fail .st{color:var(--danger)}
+.rsp-assert.pass .st{color:var(--success)}
+.rsp-assert .why{display:block;font:400 11px var(--font-code);color:var(--tx-3);margin-top:1px}
+#rr-body:checked ~ .resp-tabsbar [for="rr-body"],
+#rr-cookies:checked ~ .resp-tabsbar [for="rr-cookies"],
+#rr-headers:checked ~ .resp-tabsbar [for="rr-headers"],
+#rr-tests:checked ~ .resp-tabsbar [for="rr-tests"]{color:var(--tx-1);background:var(--bg-2);font-weight:500}
+#rr-body:checked ~ .rsp-panel[data-rsp="body"],
+#rr-cookies:checked ~ .rsp-panel[data-rsp="cookies"],
+#rr-headers:checked ~ .rsp-panel[data-rsp="headers"],
+#rr-tests:checked ~ .rsp-panel[data-rsp="tests"]{display:block}
+#rr-body:checked ~ .rsp-panel[data-rsp="body"]{display:flex;flex-direction:column}
+#rt-body:checked ~ .tpanel[data-panel="body"]{display:flex;flex-direction:column}
+[data-panel="body"] .bodytoolbar{flex:0 0 auto}
+[data-panel="body"] .code-editor{flex:1;min-height:0;display:flex;flex-direction:column}
+[data-panel="body"] .code-body{flex:1;overflow:auto}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="app-header">
+    <div class="hdr-left">
+      <div class="logo">R</div>
+      <div class="ws">
+        <span class="ws-name">Company APIs</span>
+        <span class="branch">
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="4" cy="3.5" r="1.7"/><circle cx="4" cy="12.5" r="1.7"/><circle cx="12" cy="3.5" r="1.7"/><path d="M4 5.2v5.6M12 5.2c0 3-3 3.6-5.4 3.9"/></svg>
+          main
+        </span>
+      </div>
+    </div>
+    <div class="hdr-center">
+      <div class="hdr-search-wrap">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.4"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+        <input class="hdr-search" placeholder="Cari request, environment, atau diskusi...">
+      </div>
+    </div>
+    <div class="hdr-right">
+      <button class="sync-chip"><span class="dot"></span>Synced · <b>10s</b> lalu</button>
+      <button class="icon-btn" aria-label="Pengaturan">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.7v2M8 12.3v2M1.7 8h2M12.3 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M12.5 3.5l-1.4 1.4M4.9 11.1l-1.4 1.4"/></svg>
+      </button>
+      <div class="avatar">Y</div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <input class="rb-toggle" type="checkbox" id="rbhide">
+    <nav class="rail" aria-label="Navigasi">
+      <button class="rail-item active" aria-label="Collections">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 4.2c0-1 .8-1.7 1.7-1.7h2.6c.5 0 1 .2 1.3.6l.8.9h4.9c1 0 1.7.8 1.7 1.7v6.1c0 1-.8 1.7-1.7 1.7H3.2c-1 0-1.7-.8-1.7-1.7V4.2Z"/></svg>
+      </button>
+      <button class="rail-item" aria-label="Environments">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.3"/><path d="M1.8 8h12.4M8 1.8c-4.6 4-4.6 8.4 0 12.4M8 1.8c4.6 4 4.6 8.4 0 12.4"/></svg>
+      </button>
+      <button class="rail-item" aria-label="History">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.6V8l2.5 1.6"/></svg>
+      </button>
+      <button class="rail-item" aria-label="Runner">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 2.8v10.4L12.8 8 4.5 2.8Z" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="rail-item gap" aria-label="Console">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.8" y="2.5" width="12.4" height="11" rx="1.4"/><path d="m4.5 6 2 2-2 2M8 10.5h3.5"/></svg>
+      </button>
+      <button class="rail-item" aria-label="Pengaturan">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4"/></svg>
+      </button>
+    </nav>
+
+    <aside class="sidebar">
+      <div class="side-top">
+        <div class="side-search">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.4"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+          <input placeholder="Cari request atau folder">
+        </div>
+        <div class="side-actions">
+          <button class="btn btn-ghost">Baru</button>
+          <button class="btn btn-ghost">Impor</button>
+        </div>
+      </div>
+      <div class="tree">
+        <div class="col-row">
+          <svg class="chev" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 6 4 4 4-4"/></svg>
+          <span class="c-name">Merchant API</span>
+          <span class="count">148</span>
+        </div>
+        <div class="folder-row">
+          <svg class="chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 6 4 4 4-4"/></svg>
+          <span class="f-name">auth</span>
+          <span class="f-mini">3</span>
+        </div>
+        <div class="req-row selected">
+          <span class="m post">POST</span>
+          <span class="r-name">Login</span>
+          <span class="st st-warning" title="Security Review">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.2 14.6 13H1.4L8 2.2Z" stroke-linejoin="round"/><path d="M8 6.6v3M8 11.2v.01"/></svg>
+          </span>
+        </div>
+        <div class="req-row">
+          <span class="m post">POST</span>
+          <span class="r-name">Logout</span>
+          <span class="st st-ready" title="Ready">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m3.5 8.5 3 3 6-6.5"/></svg>
+          </span>
+        </div>
+        <div class="req-row">
+          <span class="m get">GET</span>
+          <span class="r-name">Profile</span>
+          <span class="st st-draft" title="Draft"></span>
+        </div>
+        <div class="folder-row">
+          <svg class="chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 6 4 4 4-4"/></svg>
+          <span class="f-name">merchant</span>
+          <span class="f-mini">7</span>
+        </div>
+        <div class="req-row">
+          <span class="m get">GET</span>
+          <span class="r-name">Orders</span>
+          <span class="st st-ready">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m3.5 8.5 3 3 6-6.5"/></svg>
+          </span>
+        </div>
+        <div class="req-row">
+          <span class="m post">POST</span>
+          <span class="r-name">Create Order</span>
+          <span class="st st-draft"></span>
+        </div>
+        <div class="folder-row">
+          <svg class="chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 4 4 4-4 4"/></svg>
+          <span class="f-name">payment</span>
+          <span class="f-mini">12</span>
+        </div>
+        <div class="folder-row">
+          <svg class="chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 4 4 4-4 4"/></svg>
+          <span class="f-name">internal</span>
+          <span class="f-mini">5</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="tabsbar">
+        <div class="tab active">
+          <span class="m post">POST</span>
+          <span>Login</span>
+          <span class="dirty" title="Ada perubahan belum disimpan"></span>
+          <button class="x" aria-label="Tutup tab">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+          </button>
+        </div>
+        <div class="tab">
+          <span class="m get">GET</span>
+          <span>Profile</span>
+          <button class="x" aria-label="Tutup tab">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+          </button>
+        </div>
+        <button class="tab new" aria-label="Tab baru">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg>
+        </button>
+      </div>
+
+      <div class="editor">
+        <input class="tab-radio" type="radio" name="rtab" id="rt-params">
+        <input class="tab-radio" type="radio" name="rtab" id="rt-auth">
+        <input class="tab-radio" type="radio" name="rtab" id="rt-headers" checked>
+        <input class="tab-radio" type="radio" name="rtab" id="rt-body">
+        <input class="tab-radio" type="radio" name="rtab" id="rt-scripts">
+        <input class="tab-radio" type="radio" name="rtab" id="rt-discussion">
+        <div class="req-bar">
+          <div class="crumb-row">
+            <span class="crumb-proto">HTTP</span>
+            <span class="crumb-path">Merchant API › auth</span>
+            <span class="crumb-sep">›</span>
+            <span class="crumb-name">Login</span>
+            <span class="crumb-actions">
+              <div class="save-wrap">
+                <button class="save-btn">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12.5 13.5h-9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h7l3 3v7a1 1 0 0 1-1 1Z" stroke-linejoin="round"/><path d="M5 2.5v3h5M5.5 13.5v-4h5v4"/></svg>
+                  Save
+                </button>
+                <details class="savedd">
+                  <summary aria-label="Opsi simpan">
+                    <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                  </summary>
+                  <div class="send-menu save-menu">
+                    <button class="send-item">
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.3 2.5 13.5 4.7 6 12.2l-3 .8.8-3 7.5-7.5Z" stroke-linejoin="round"/></svg>
+                      Save as
+                    </button>
+                    <button class="send-item">
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 13.5v-9M4.5 8 8 4.5 11.5 8M2.5 2.5h11"/></svg>
+                      Commit &amp; sync
+                    </button>
+                    <div class="send-div"></div>
+                    <button class="send-item">
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.8 7.5a5.2 5.2 0 1 1 1.3 4.3M2.5 12.5V8.2h4.3"/></svg>
+                      Discard local changes
+                    </button>
+                  </div>
+                </details>
+              </div>
+              <button class="share-btn">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6.5 9.5a2.8 2.8 0 0 0 4 .2l2-2a2.8 2.8 0 0 0-4-4l-1 1"/><path d="M9.5 6.5a2.8 2.8 0 0 0-4-.2l-2 2a2.8 2.8 0 0 0 4 4l1-1"/></svg>
+                Share
+              </button>
+            </span>
+          </div>
+          <div class="url-row">
+            <details class="methoddd">
+              <summary>
+                <span class="m-val m post">POST</span>
+                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+              </summary>
+              <div class="combo-menu method-menu">
+                <button class="combo-item"><span class="m get">GET</span></button>
+                <button class="combo-item"><span class="m post">POST</span> <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                <button class="combo-item"><span class="m put">PUT</span></button>
+                <button class="combo-item"><span class="m put">PATCH</span></button>
+                <button class="combo-item"><span class="m del">DELETE</span></button>
+                <button class="combo-item"><span class="m">HEAD</span></button>
+                <button class="combo-item"><span class="m">OPTIONS</span></button>
+              </div>
+            </details>
+            <div class="url"><span class="v">{{base_url}}</span>/v1/login</div>
+            <div class="send-wrap">
+              <button class="send">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg>
+                Send</button>
+              <details class="senddd">
+                <summary aria-label="Opsi pengiriman">
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                </summary>
+                <div class="send-menu">
+                  <button class="send-item">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.6"/><path d="m5.5 8 1.8 1.8 3.3-3.7"/></svg>
+                    Get a successful response
+                  </button>
+                  <button class="send-item">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.4"/><path d="m4.5 10.5 2.5-2.5 2 2 2.5-3"/></svg>
+                    Visualize response
+                  </button>
+                  <button class="send-item">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.2 2v3.8L3.4 11.4A1.4 1.4 0 0 0 4.7 13.5h6.6a1.4 1.4 0 0 0 1.3-2.1L9.8 5.8V2" stroke-linejoin="round"/><path d="M5 2h6"/></svg>
+                    Write tests
+                  </button>
+                  <button class="send-item">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="6" height="7.5" rx="3"/><path d="M5 8H2.5M13.5 8H11M5.5 11l-2 2M10.5 11l2 2M8 5V2.5"/></svg>
+                    Debug request
+                  </button>
+                  <button class="send-item">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5 9.4 6.2 13 7.5 9.4 8.8 8 12.5 6.6 8.8 3 7.5 6.6 6.2 8 2.5Z" stroke-linejoin="round"/></svg>
+                    Explore API capabilities
+                  </button>
+                  <div class="send-div"></div>
+                  <button class="send-item">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M2.5 13.5h11"/></svg>
+                    Download response
+                  </button>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <div class="req-tabs">
+          <button class="docs-tab">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 4h11M2.5 8h11M2.5 12h7"/></svg>
+            Docs
+          </button>
+          <label class="rtab" for="rt-params">Params</label>
+          <label class="rtab" for="rt-auth">Authorization</label>
+          <label class="rtab" for="rt-headers">Headers</label>
+          <label class="rtab" for="rt-body">Body</label>
+          <label class="rtab" for="rt-scripts">Scripts</label>
+          <label class="rtab" for="rt-discussion">Diskusi <span class="badge">2</span></label>
+          <button class="cookies-link">Cookies</button>
+        </div>
+
+        <div class="meta-strip">
+          <button class="chip status"><span class="dot"></span>Security Review
+            <svg width="8" height="8" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+          </button>
+          <button class="chip owner"><span class="mini-av">Y</span>Yosua</button>
+          <span class="chip tag">authentication</span>
+          <span class="chip tag">critical</span>
+          <button class="chip tag add">
+            <svg width="8" height="8" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>
+            tag
+          </button>
+          <span class="endpoint-id">endpoint_id 01JBN8Z4H3HQ14X0MQSV7YQW8T · metadata, bukan collection</span>
+        </div>
+
+        <section class="tpanel" data-panel="params">
+          <div class="kv">
+            <div class="kv-head"><span></span><span>Key</span><span>Value</span><span>Deskripsi</span><span></span></div>
+            <div class="kv-row">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="page">
+              <input value="2">
+              <span class="desc">paginasi merchant</span>
+            </div>
+            <div class="kv-row">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="per_page">
+              <input value="50">
+              <span class="desc">maksimum services</span>
+            </div>
+            <div class="kv-row off">
+              <span class="check"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="debug">
+              <input value="1">
+              <span class="desc">nonaktif</span>
+            </div>
+          </div>
+          <button class="kv-add">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg>
+            Tambah parameter
+          </button>
+          <p class="kv-note">Query parameter aktif menjadi pendorong URL variabel; proses substitusi bisa dilihat di Console.</p>
+        </section>
+
+        <section class="tpanel" data-panel="auth">
+          <div class="auth-grid">
+            <div class="kv auth-list">
+              <button class="auth-item"><span>No Auth</span></button>
+              <button class="auth-item"><span>API Key</span></button>
+              <button class="auth-item active"><span>Bearer Token</span>
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="var(--accent)" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg>
+              </button>
+              <button class="auth-item"><span>Basic Auth</span></button>
+              <button class="auth-item"><span>OAuth 2.0</span></button>
+              <button class="auth-item"><span>Inherit dari collection</span><span class="inh">auth/index</span></button>
+            </div>
+            <div>
+              <div class="auth-field">
+                <label>Token</label>
+                <input value="{{SECRET_ACCESS_TOKEN}}">
+              </div>
+              <p class="kv-note">Nilai di-resolve dari Local secrets saat Send yaitu di mesin ini; placeholder {{...}} yang ikut di-commit ke repository, bukan tokennya. Untuk mode lain ubah dropdown di atas.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="tpanel" data-panel="headers">
+          <div class="hdr-toolbar">
+            <div class="hdr-filter">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.4"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+              <input placeholder="Filter header">
+            </div>
+            <details class="dd">
+              <summary>Hidden headers <span class="count">6</span>
+                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+              </summary>
+              <div class="dd-menu">
+                <label class="dd-item"><span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span> Tampilkan header otomatis</label>
+                <label class="dd-item"><span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span> Tampilkan nama header tersembunyi</label>
+                <label class="dd-item"><span class="check"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span> Tampilkan header warisan collection</label>
+              </div>
+            </details>
+            <button class="hdr-bulk">Bulk Edit</button>
+          </div>
+          <div class="kv">
+            <div class="kv-head"><span></span><span>Key</span><span>Value</span><span>Deskripsi</span><span></span></div>
+            <div class="kv-row">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <details class="combo">
+                <summary><span class="val">Content-Type</span>
+                  <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                </summary>
+                <div class="combo-menu">
+                  <button class="combo-item">Accept</button>
+                  <button class="combo-item">Authorization</button>
+                  <button class="combo-item">Cache-Control</button>
+                  <button class="combo-item">Content-Type <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                  <button class="combo-item">Origin</button>
+                  <button class="combo-item">X-Request-ID</button>
+                </div>
+              </details>
+              <input value="application/json">
+              <span class="desc">wajib untuk body raw JSON</span>
+            </div>
+            <div class="kv-row">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <details class="combo">
+                <summary><span class="val">X-Client-ID</span>
+                  <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                </summary>
+                <div class="combo-menu">
+                  <button class="combo-item">Accept</button>
+                  <button class="combo-item">Authorization</button>
+                  <button class="combo-item">Content-Type</button>
+                  <button class="combo-item">Origin</button>
+                  <button class="combo-item">X-Client-ID <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                  <button class="combo-item">X-Request-ID</button>
+                </div>
+              </details>
+              <input value="{{client_id}}">
+              <span class="desc">versi remote konflik</span>
+            </div>
+            <div class="kv-row off">
+              <span class="check"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <details class="combo">
+                <summary><span class="val">User-Agent</span>
+                  <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                </summary>
+                <div class="combo-menu">
+                  <button class="combo-item">Accept</button>
+                  <button class="combo-item">Connection</button>
+                  <button class="combo-item">Content-Type</button>
+                  <button class="combo-item">User-Agent <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                  <button class="combo-item">X-Request-ID</button>
+                </div>
+              </details>
+              <input value="rustman-company/0.1">
+              <span class="desc">nonaktif</span>
+            </div>
+          </div>
+          <button class="kv-add">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg>
+            Tambah header
+          </button>
+          <div class="hidden-head">
+            <span>Auto-generated saat Send</span>
+            <span class="pill">hidden</span>
+            <span class="n">6 header</span>
+          </div>
+          <div class="kv">
+            <div class="kv-head"><span></span><span>Key</span><span>Value</span><span>Deskripsi</span><span></span></div>
+            <div class="kv-row hidden">
+              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
+              <input value="Host" readonly>
+              <input value="staging.api.company.com" readonly>
+              <span class="desc">dari URL</span>
+            </div>
+            <div class="kv-row hidden">
+              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
+              <input value="Accept-Encoding" readonly>
+              <input value="gzip, deflate, br" readonly>
+              <span class="desc">runtime</span>
+            </div>
+            <div class="kv-row hidden">
+              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
+              <input value="Connection" readonly>
+              <input value="keep-alive" readonly>
+              <span class="desc">runtime</span>
+            </div>
+            <div class="kv-row hidden">
+              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
+              <input value="User-Agent" readonly>
+              <input value="RustmanRuntime/0.1" readonly>
+              <span class="desc">runtime</span>
+            </div>
+            <div class="kv-row hidden">
+              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
+              <input value="Authorization" readonly>
+              <input value="Bearer {{SECRET_ACCESS_TOKEN}}" readonly>
+              <span class="desc">dari tab Authorization</span>
+            </div>
+            <div class="kv-row hidden">
+              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
+              <input value="Rustman-Token" readonly>
+              <input value="01JBN9…7F" readonly>
+              <span class="desc">unik per request</span>
+            </div>
+          </div>
+          <p class="kv-note">Header tersembunyi dihitung saat Send dan tidak di-commit. Nilai secret tetap lokal; dropdown mengatur header mana yang ikut ditampilkan di tabel.</p>
+        </section>
+
+        <section class="tpanel" data-panel="body">
+          <div class="bodytoolbar">
+            <details class="bodypick">
+              <summary><span class="val">raw</span>
+                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+              </summary>
+              <div class="combo-menu">
+                <button class="combo-item">none</button>
+                <button class="combo-item">form-data</button>
+                <button class="combo-item">x-www-form-urlencoded</button>
+                <button class="combo-item">raw <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                <button class="combo-item">binary</button>
+                <button class="combo-item">GraphQL</button>
+              </div>
+            </details>
+            <div class="rawbar">
+              <details class="combo">
+                <summary><span class="val">JSON</span>
+                  <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                </summary>
+                <div class="combo-menu">
+                  <button class="combo-item">Text</button>
+                  <button class="combo-item">JavaScript</button>
+                  <button class="combo-item">JSON <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                  <button class="combo-item">HTML</button>
+                  <button class="combo-item">XML</button>
+                </div>
+              </details>
+              <span class="hint">raw body · Content-Type disesuaikan otomatis saat Send</span>
+            </div>
+          </div>
+          <div class="code-editor">
+            <div class="code-body">
+              <div class="codeline"><span class="ln">1</span><span>{</span></div>
+              <div class="codeline"><span class="ln">2</span><span>  <span class="j-key">"username"</span>: <span class="j-str">"{{username}}"</span>,</span></div>
+              <div class="codeline"><span class="ln">3</span><span>  <span class="j-key">"password"</span>: <span class="j-str">"{{SECRET_PASSWORD}}"</span>,</span></div>
+              <div class="codeline"><span class="ln">4</span><span>  <span class="j-key">"grant_type"</span>: <span class="j-str">"sso"</span></span></div>
+              <div class="codeline"><span class="ln">5</span><span>}</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tpanel" data-panel="scripts">
+          <input class="tab-radio" type="radio" name="sseg" id="sc-pre" checked>
+          <input class="tab-radio" type="radio" name="sseg" id="sc-tests">
+          <div class="seg">
+            <label class="bmode" for="sc-pre">Pre-request</label>
+            <label class="bmode" for="sc-tests">Tests <span class="sub">2</span></label>
+          </div>
+          <div class="code-editor" data-script="pre">
+            <div class="code-head">
+              <span class="lang">JavaScript</span>
+            </div>
+            <div class="code-body">const nonce = pm.variables.replaceIn('{{$guid}}');
+pm.environment.set('nonce', nonce);
+
+pm.request.headers.add({ key: 'X-Nonce', value: nonce });</div>
+            <div class="code-foot"><span>4 baris</span><span>dieksekusi di sandbox sebelum Send</span></div>
+          </div>
+          <div class="code-editor" data-script="tests">
+            <div class="code-head">
+              <span class="lang">JavaScript</span>
+            </div>
+            <div class="code-body">pm.test('Status adalah 201', () =&gt; pm.response.to.have.status(201));
+pm.test('Response time di bawah 300ms', () =&gt; pm.expect(pm.response.responseTime).to.be.below(300));</div>
+            <div class="code-foot"><span>2 baris · 2 test</span><span>hasilnya muncul di tab Test Results pada response</span></div>
+          </div>
+          <p class="kv-note tight">Script test di endpoint ini ditandai "perlu tinjau" di import report — sumber mentah tetap tersimpan, tidak dibuang.</p>
+        </section>
+
+        <section class="tpanel" data-panel="discussion">
+          <article class="comment">
+            <span class="c-av y">Y</span>
+            <div class="c-body">
+              <div class="c-head"><span class="c-author">Yosua</span><span class="c-time">10:00 · main</span><button class="c-reply">Balas</button></div>
+              <p class="c-text">Response <code>401</code> perlu dicek setelah perubahan SSO.</p>
+            </div>
+          </article>
+          <article class="comment">
+            <span class="c-av k">K</span>
+            <div class="c-body">
+              <div class="c-head"><span class="c-author">Kevin</span><span class="c-time">11:24</span><button class="c-reply">Balas</button></div>
+              <p class="c-text">Sudah diperbaiki di staging.</p>
+            </div>
+          </article>
+          <div class="composer">
+            <textarea placeholder="Tulis komentar untuk endpoint ini..."></textarea>
+            <div class="composer-foot">
+              <span class="hint">Terkirim ke diskusi saat Send ditekan, bukan per karakter</span>
+              <button class="btn btn-accent">Kirim</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="splitter" title="Geser untuk mengatur ruang response"></div>
+
+        <section class="response">
+          <input class="tab-radio" type="radio" name="rtabr" id="rr-body" checked>
+          <input class="tab-radio" type="radio" name="rtabr" id="rr-cookies">
+          <input class="tab-radio" type="radio" name="rtabr" id="rr-headers">
+          <input class="tab-radio" type="radio" name="rtabr" id="rr-tests">
+          <div class="resp-head">
+            <span class="resp-title">Response</span>
+            <button class="resp-history">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.8"/><path d="M8 5v3l2 1.3"/></svg>
+              History
+            </button>
+            <span class="resp-spacer"></span>
+            <span class="resp-status"><span class="dot"></span>401 Unauthorized</span>
+            <span class="resp-meta"><b>212 ms</b> · <b>1.2 KB</b> · env <b>staging</b></span>
+          </div>
+          <div class="resp-tabsbar">
+            <label class="rsp-tab" for="rr-body">Body</label>
+            <label class="rsp-tab" for="rr-cookies">Cookies</label>
+            <label class="rsp-tab" for="rr-headers">Headers</label>
+            <label class="rsp-tab" for="rr-tests">Test Results <span class="n">2</span></label>
+          </div>
+          <div class="rsp-panel" data-rsp="body">
+            <div class="rsp-tools">
+              <details class="dd-mini">
+                <summary>Raw
+                  <svg width="8" height="8" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                </summary>
+                <div class="combo-menu">
+                  <button class="combo-item"><span class="lang-glyph">{ }</span>JSON <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                  <button class="combo-item"><span class="lang-glyph">&lt; &gt;</span>XML</button>
+                  <button class="combo-item"><span class="lang-glyph">&lt;/&gt;</span>HTML</button>
+                  <button class="combo-item"><span class="lang-glyph">&lt;/&gt;</span>YAML</button>
+                  <button class="combo-item"><span class="lang-glyph">JS</span>JavaScript</button>
+                </div>
+              </details>
+              <button class="preview-btn">Preview</button>
+              <span class="resp-icons">
+                <button class="resp-icon" aria-label="Wrap">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 4h11M2.5 8h8.5a2 2 0 1 1 0 4H8M2.5 12h3M8 12l-1.6-1.6M8 12l-1.6 1.6"/></svg>
+                </button>
+                <button class="resp-icon" aria-label="Cari">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.2"/><path d="m13.2 13.2-3-3"/></svg>
+                </button>
+                <button class="resp-icon" aria-label="Salin">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3"/><path d="M10.5 5.5v-2a1.3 1.3 0 0 0-1.3-1.3H3.8A1.3 1.3 0 0 0 2.5 3.5v5.4a1.3 1.3 0 0 0 1.3 1.3h1.7"/></svg>
+                </button>
+              </span>
+              <span class="spacer"></span>
+              <span class="sc-label">Status Code</span>
+              <details class="dd-mini">
+                <summary>401 Unauthorized
+                  <svg width="8" height="8" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                </summary>
+                <div class="combo-menu">
+                  <button class="combo-item">200 OK</button>
+                  <button class="combo-item">401 Unauthorized <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                  <button class="combo-item">422 Unprocessable Entity</button>
+                  <button class="combo-item">500 Internal Server Error</button>
+                </div>
+              </details>
+            </div>
+            <div class="rsp-code">
+              <div class="codeline"><span class="ln">1</span><span>{</span></div>
+              <div class="codeline"><span class="ln">2</span><span>  <span class="j-key">"error"</span>: <span class="j-str">"invalid_credentials"</span>,</span></div>
+              <div class="codeline"><span class="ln">3</span><span>  <span class="j-key">"message"</span>: <span class="j-str">"SSO token rejected by identity provider"</span>,</span></div>
+              <div class="codeline"><span class="ln">4</span><span>  <span class="j-key">"request_id"</span>: <span class="j-str">"req_01JBN9..."</span></span></div>
+              <div class="codeline"><span class="ln">5</span><span>}</span></div>
+            </div>
+          </div>
+          <div class="rsp-panel" data-rsp="cookies">
+            <div class="rsp-table">
+              <div class="rsp-row h"><span>Cookie</span><span>Value</span><span>Domain</span><span>Path</span><span>Expires</span></div>
+              <div class="rsp-row"><span>session_id</span><span>8f2c…a91d</span><span>api.company.com</span><span>/</span><span>Session</span></div>
+              <div class="rsp-row"><span>csrf_token</span><span>01JBN8…Q8T</span><span>.company.com</span><span>/</span><span>2 jam</span></div>
+              <div class="rsp-row"><span>feature_flags</span><span>sso_v2</span><span>api.company.com</span><span>/v1</span><span>30 hari</span></div>
+            </div>
+          </div>
+          <div class="rsp-panel" data-rsp="headers">
+            <div class="rsp-table">
+              <div class="rsp-row h"><span>Key</span><span>Value</span><span></span><span></span><span></span></div>
+              <div class="rsp-row"><span>Content-Type</span><span>application/json; charset=utf-8</span><span></span><span></span><span></span></div>
+              <div class="rsp-row"><span>Cache-Control</span><span>no-store</span><span></span><span></span><span></span></div>
+              <div class="rsp-row"><span>X-Request-ID</span><span>req_01JBN9…7F</span><span></span><span></span><span></span></div>
+              <div class="rsp-row"><span>Content-Length</span><span>214</span><span></span><span></span><span></span></div>
+              <div class="rsp-row"><span>Date</span><span>Mon, 03 Nov 2026 03:52:11 GMT</span><span></span><span></span><span></span></div>
+            </div>
+          </div>
+          <div class="rsp-panel" data-rsp="tests">
+            <div class="rsp-tests">
+              <div class="rsp-assert fail">
+                <span class="st"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/></svg></span>
+                <span>Status adalah 200 <span class="why">expected 200, received 401</span></span>
+              </div>
+              <div class="rsp-assert pass">
+                <span class="st"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+                <span>Response time di bawah 300 ms <span class="why">212 ms</span></span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <aside class="rightbar">
+      <span class="rb-splitter" title="Geser untuk mengubah lebar panel"></span>
+      <div class="rb-head">
+        <span class="rb-title">Code snippet</span>
+        <span class="rb-actions">
+          <label class="rb-icon" for="rbhide" title="Sembunyikan panel" aria-label="Sembunyikan panel">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 4 4 4-4 4"/></svg>
+          </label>
+          <button class="rb-icon" aria-label="Pengaturan snippet">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4"/></svg>
+          </button>
+          <button class="rb-icon" aria-label="Salin snippet">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3"/><path d="M10.5 5.5v-2a1.3 1.3 0 0 0-1.3-1.3H3.8A1.3 1.3 0 0 0 2.5 3.5v5.4a1.3 1.3 0 0 0 1.3 1.3h1.7"/></svg>
+          </button>
+        </span>
+      </div>
+      <details class="rb-lang">
+        <summary><span class="val">cURL</span>
+          <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+        </summary>
+        <div class="combo-menu rb-menu">
+          <button class="combo-item">C - libcurl</button>
+          <button class="combo-item">C# - HttpClient</button>
+          <button class="combo-item">C# - RestSharp</button>
+          <button class="combo-item">cURL <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+          <button class="combo-item">Dart - dio</button>
+          <button class="combo-item">Dart - http</button>
+          <button class="combo-item">Go - Native</button>
+          <button class="combo-item">HTTP</button>
+          <button class="combo-item">Java - OkHttp</button>
+          <button class="combo-item">Java - Unirest</button>
+          <button class="combo-item">JavaScript - Fetch</button>
+          <button class="combo-item">JavaScript - XHR</button>
+          <button class="combo-item">Node - Axios</button>
+          <button class="combo-item">Python - requests</button>
+          <button class="combo-item">Ruby - Net::HTTP</button>
+          <button class="combo-item">Shell - wget</button>
+        </div>
+      </details>
+      <div class="rb-code">
+        <div class="rb-line"><span class="ln">1</span><span>curl --location \</span></div>
+        <div class="rb-line"><span class="ln">2</span><span class="s">'{{base_url}}/v1/login' \</span></div>
+        <div class="rb-line"><span class="ln">3</span><span>--header <span class="s">'Authorization: Bearer {{SECRET_ACCESS_TOKEN}}'</span> \</span></div>
+        <div class="rb-line"><span class="ln">4</span><span>--header <span class="s">'Content-Type: application/json'</span> \</span></div>
+        <div class="rb-line"><span class="ln">5</span><span>--data-raw <span class="s">'{</span></span></div>
+        <div class="rb-line"><span class="ln">6</span><span class="s">  "username": "{{username}}",</span></div>
+        <div class="rb-line"><span class="ln">7</span><span class="s">  "password": "{{SECRET_PASSWORD}}"</span></div>
+        <div class="rb-line"><span class="ln">8</span><span class="s">}'</span></div>
+      </div>
+    </aside>
+    <label class="rb-reopen" for="rbhide" aria-label="Tampilkan Code snippet" title="Tampilkan Code snippet">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m5.5 5.5-2.7 2.7L5.5 11M10.5 5.5l2.7 2.7-2.7 2.7"/></svg>
+    </label>
+  </div>
+</div>
+
+<button class="theme-toggle" onclick="const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'" aria-label="Ganti tema">
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.2 9.8A5.5 5.5 0 0 1 6.2 2.8a5.5 5.5 0 1 0 7 7Z" stroke-linejoin="round"/></svg>
+</button>
+
+</body>
+</html>

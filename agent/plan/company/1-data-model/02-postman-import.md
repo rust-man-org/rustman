@@ -1,4 +1,4 @@
-# 01 — Postman Import & Compatibility
+# 02 — Postman Import & Compatibility
 
 **Master doc:** §3, §4, §5, §23, §24, §25 · Phases 0–4.
 **Owner files:** `src/services/import/postman.rs`, `src/app/update/import.rs`,
@@ -73,7 +73,7 @@ while preserving metadata, comments, flags, owner and status.
    provenance), prompt Update/New/Cancel. On **Update**: match each incoming
    request to an existing endpoint (by `endpoint_id`, else C1a fingerprint),
    update the request body while keeping `endpoint_id`, comments (C4), metadata
-   (C3), so §4's "endpoint_id tetap sama" holds.
+   (C3), so §4's rule "endpoint_id stays the same" holds.
 7. **Export parity.** Teach `export()`/`export_request()` to emit the fields now
    imported, so an export → import round-trip is lossless for supported fields.
 8. **Tests.** Fixture-based tests under `tests/fixtures/` for: folder tree,
@@ -82,10 +82,22 @@ while preserving metadata, comments, flags, owner and status.
 
 ## Out of scope
 
-- The repository on-disk layout (02), git sync (03), anything GitHub (04/06).
+- The repository on-disk layout (03), git sync (04), anything GitHub (05/08).
+- Local drafts (01) — re-import only replaces the shared base; existing drafts
+  are rebased by 01's merge, never deleted by the importer.
 - OpenAPI/HTTPie importers beyond keeping the fallback chain working.
 
+C9 update: apply incoming base only after capturing current tab edits; use
+01's capture → rebase → merged-tab refresh sequence. Preserve durable conflict
+markers across repeat operations/restart, and invalidate stale debounce writes.
+
 ## Verification
+
+Binding gates: [core tests and existing flows](../core-testing-rules.md) and
+[design references and acceptance checks](../design-rules.md). Apply this
+workstream's regression-matrix row and cite the relevant mockup pair for UI
+changes. Add core unit tests with implementation; run the full default and
+no-default-features test gate before merge.
 
 - `cargo test` green; new fixtures covered.
 - Manual: import a Postman v2.1 export, see the report, re-import the same file

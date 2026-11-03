@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rustman Company — Import Report (Mockup)</title>
+<style>
+@font-face{font-family:'Inter';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/Inter-Regular-e764338977f38b2c.woff2') format('woff2');font-weight:400;font-style:normal}
+@font-face{font-family:'Inter';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/Inter-Medium-242d04bef81519ae.woff2') format('woff2');font-weight:500;font-style:normal}
+@font-face{font-family:'Inter';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/Inter-semibold-b87ad48fa4af1792.woff2') format('woff2');font-weight:600;font-style:normal}
+@font-face{font-family:'IBM Plex Mono';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/IBMPlexMono-Regular-efb009a648ec928c.woff2') format('woff2');font-weight:400;font-style:normal}
+@font-face{font-family:'IBM Plex Mono';src:url('../docs/postman-evidence/04-assets/files/fonts/asar/js/fonts/IBMPlexMono-SemiBold-4ba0622e9a0ffe76.woff2') format('woff2');font-weight:600;font-style:normal}
+
+:root{
+  --bg-0:#FFFFFF;--bg-1:#F9F9F9;--bg-2:#F2F2F2;
+  --bd-1:#EDEDED;--bd-2:#E6E6E6;
+  --tx-1:#212121;--tx-2:#6B6B6B;--tx-3:#A6A6A6;
+  --accent:#FF6C37;--accent-h:#F05E28;--accent-tint:rgba(255,108,55,.10);
+  --success:#0CBB52;--success-tint:rgba(12,187,82,.10);
+  --danger:#EB2013;--danger-tint:rgba(235,32,19,.10);
+  --info:#097BED;
+  --studio:#F2F2F2;
+  --shadow-card:0 1px 2px rgba(33,33,33,.05),0 8px 24px rgba(33,33,33,.06),0 2px 6px rgba(33,33,33,.04);
+}
+[data-theme=dark]{
+  --bg-0:#262626;--bg-1:#212121;--bg-2:#2B2B2B;
+  --bd-1:#303030;--bd-2:#3B3B3B;
+  --tx-1:#F2F2F2;--tx-2:#A6A6A6;--tx-3:#6B6B6B;
+  --accent-tint:rgba(255,108,55,.16);
+  --success-tint:rgba(12,187,82,.16);
+  --danger-tint:rgba(235,32,19,.18);
+  --studio:#161616;
+  --shadow-card:0 1px 2px rgba(0,0,0,.35),0 10px 32px rgba(0,0,0,.4);
+}
+html,body{margin:0;min-height:100%}
+body{background:var(--studio);font-family:'Inter',system-ui,'Segoe UI',Helvetica,Arial,sans-serif;color:var(--tx-1);display:flex;align-items:flex-start;justify-content:center;padding:40px 24px;box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.theme-toggle{position:fixed;right:16px;bottom:16px;width:36px;height:36px;border-radius:100%;background:var(--bg-0);border:1px solid var(--bd-2);display:flex;align-items:center;justify-content:center;color:var(--tx-2);z-index:99}
+.theme-toggle:hover{color:var(--tx-1)}
+
+.sheet{width:720px;max-width:100%;background:var(--bg-0);border:1px solid var(--bd-1);border-radius:10px;box-shadow:var(--shadow-card);display:flex;flex-direction:column;min-height:0}
+.sheet-head{display:flex;align-items:flex-start;justify-content:space-between;padding:24px 28px 0}
+.sheet-head h1{margin:0;font-size:18px;font-weight:600;letter-spacing:-.01em}
+.sheet-head .sub{margin:4px 0 0;font-size:12px;color:var(--tx-2)}
+.file-chip{display:flex;align-items:center;gap:10px;margin:16px 28px 0;padding:10px 14px;background:var(--bg-1);border:1px solid var(--bd-1);border-radius:8px;font:400 12px 'IBM Plex Mono',ui-monospace,monospace}
+.file-chip .ico{width:28px;height:28px;border-radius:6px;background:var(--accent-tint);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.file-chip b{font-weight:600;color:var(--tx-1)}
+.file-chip .meta{margin-left:auto;color:var(--tx-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.sum{margin:20px 28px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--bd-1);border:1px solid var(--bd-1);border-radius:8px;overflow:hidden}
+.sum div{background:var(--bg-0);padding:12px 14px}
+.sum .n{font:600 20px/24px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sum .l{font-size:11px;color:var(--tx-3);margin-top:2px}
+.sum .n.ok{color:var(--tx-1)}
+.sum div.left{background:var(--accent-tint)}
+.sum div.left .n{color:var(--accent)}
+
+.verdict{margin:0 28px;padding:18px 0 14px;display:flex;align-items:center;gap:16px}
+.tag{display:inline-flex;align-items:center;gap:7px;height:28px;box-sizing:border-box;padding:0 12px 0 10px;border:1px solid transparent;border-radius:14px;line-height:1;font-size:12px;font-weight:500;white-space:nowrap}
+.tag .big{font:600 13px/1 'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.tag svg{flex:0 0 auto}
+.tag.ok{background:var(--success-tint);color:var(--success)}
+.tag.warn{background:var(--accent-tint);color:var(--accent)}
+
+.notes{margin:0 28px;border-top:1px solid var(--bd-1)}
+.notes-title{padding:14px 0 8px;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--tx-3)}
+.note{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--bd-1);border-radius:8px;margin-bottom:8px;background:var(--bg-1)}
+.note .ico{width:26px;height:26px;border-radius:100%;background:var(--accent-tint);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.note .what{font-size:12px;font-weight:500}
+.note .where{font:400 11px 'IBM Plex Mono',monospace;color:var(--tx-3);margin-top:1px}
+.note .act{margin-left:auto}
+.review{font-size:12px;font-weight:500;color:var(--accent);padding:6px 10px;border-radius:4px}
+.review:hover{background:var(--accent-tint)}
+
+.result-dest{margin:8px 28px 0;padding:12px 14px;border:1px solid var(--bd-1);border-radius:8px;display:flex;align-items:center;gap:10px;background:var(--bg-0)}
+.result-dest .l{font-size:12px;color:var(--tx-2)}
+.result-dest .p{font:400 12px 'IBM Plex Mono',monospace;color:var(--tx-1)}
+.result-dest .chg{font-size:12px;color:var(--accent);margin-left:auto;white-space:nowrap}
+.hintline{margin:6px 28px 0;font-size:11px;color:var(--tx-3);line-height:17px}
+
+.sheet-foot{display:flex;align-items:center;gap:10px;padding:20px 28px 24px;border-top:1px solid var(--bd-1);margin-top:20px}
+.sheet-foot .hint{font-size:12px;color:var(--tx-3);margin-right:auto}
+.btn{height:34px;padding:0 16px;border-radius:4px;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:7px}
+.btn-ghost{border:1px solid var(--bd-2);color:var(--tx-2)}
+.btn-ghost:hover{color:var(--tx-1)}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-accent:hover{background:var(--accent-h)}
+.btn-accent svg{opacity:.9}
+</style>
+</head>
+<body>
+
+<main class="sheet">
+  <div class="sheet-head">
+    <div>
+      <h1>Impor koleksi Postman</h1>
+      <p class="sub">Import report semuanya divalidasi sebelum commit ke repository perusahaan.</p>
+    </div>
+    <button style="color:var(--tx-3)" aria-label="Tutup">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+    </button>
+  </div>
+
+  <div class="file-chip">
+    <span class="ico">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.8V14M11 4 8 1.7 5 4M2.5 8.5h11M5.5 11.3 2.4 8.5l3.1-2.8M10.5 5.7l3.1 2.8-3.1 2.8" stroke-linejoin="round"/></svg>
+    </span>
+    <span><b>merchant-api.postman_collection.json</b> · Postman v2.1</span>
+    <span class="meta">412 KB · sha256 4372…8652</span>
+  </div>
+
+  <div class="sum">
+    <div><div class="n ok">12</div><div class="l">Folder</div></div>
+    <div><div class="n ok">148</div><div class="l">Request</div></div>
+    <div><div class="n ok">23</div><div class="l">Variabel</div></div>
+    <div class="left"><div class="n">4</div><div class="l">Environment</div></div>
+  </div>
+
+  <div class="verdict">
+    <span class="tag ok">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m3.5 8.5 3 3 6-6.5"/></svg>
+      <span class="big">143</span> fully supported
+    </span>
+    <span class="tag warn">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.2 14.6 13H1.4L8 2.2Z" stroke-linejoin="round"/><path d="M8 6.6v3M8 11.2v.01"/></svg>
+      <span class="big">5</span> perlu ditinjau
+    </span>
+  </div>
+
+  <div class="notes">
+    <p class="notes-title">PERLU DITINJAU — TIDAK ADA DATA YANG DIBUANG SENYAP</p>
+    <div class="note">
+      <span class="ico">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.3 2.5 13.5 4.7 6 12.2l-3 .8.8-3 7.5-7.5Z" stroke-linejoin="round"/></svg>
+      </span>
+      <span style="min-width:0">
+        <span class="what">2 pre-request script tidak didukung</span>
+        <div class="where">auth/Login · payment/Refund — sumber mentah disimpan, ditandai needs-review</div>
+      </span>
+      <button class="act review">Tinjau</button>
+    </div>
+    <div class="note">
+      <span class="ico">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/><circle cx="11.5" cy="8" r="1.6"/></svg>
+      </span>
+      <span style="min-width:0">
+        <span class="what">1 custom authentication perlu mapping manual</span>
+        <div class="where">internal/admin-sync — auth helper kustom Postman</div>
+      </span>
+      <button class="act review">Tinjau</button>
+    </div>
+    <div class="note">
+      <span class="ico">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m5.5 5.5-2.7 2.7L5.5 11M10.5 5.5l2.7 2.7-2.7 2.7"/></svg>
+      </span>
+      <span style="min-width:0">
+        <span class="what">2 test script tidak didukung</span>
+        <div class="where">merchant/Orders · merchant/Create Order</div>
+      </span>
+      <button class="act review">Tinjau</button>
+    </div>
+  </div>
+
+  <div class="result-dest">
+    <span class="l">Tujuan rekonstruksi</span>
+    <span class="p">rustman-company/collections/merchant/</span>
+    <button class="chg">Stable endpoint ID akan dibuat</button>
+  </div>
+  <p class="hintline">Setelah commit, re-import file yang sama akan mendeteksi collection ini dan menawarkan Update Existing, tanpa menggandakan endpoint maupun menghapus metadata.</p>
+
+  <div class="sheet-foot">
+    <span class="hint">environment ikut diimpor dari file collections; secret tetap lokal</span>
+    <button class="btn btn-ghost">Batal</button>
+    <button class="btn btn-accent">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg>
+      Commit &amp; push
+    </button>
+  </div>
+</main>
+
+<button class="theme-toggle" onclick="const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'" aria-label="Ganti tema">
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.2 9.8A5.5 5.5 0 0 1 6.2 2.8a5.5 5.5 0 1 0 7 7Z" stroke-linejoin="round"/></svg>
+</button>
+
+</body>
+</html>

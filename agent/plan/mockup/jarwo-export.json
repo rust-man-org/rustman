@@ -1,0 +1,169 @@
+{
+  "boards": [
+    {
+      "file": "mockups/rustman-import-dark.html",
+      "h": 800,
+      "page": "pages/rustman-import-dark.html",
+      "png": "png/01-rustman-import-dark.png",
+      "w": 1280,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "file": "mockups/rustman-import.html",
+      "h": 800,
+      "page": "pages/rustman-import.html",
+      "png": "png/02-rustman-import.png",
+      "w": 1280,
+      "x": 1400.0,
+      "y": 0.0
+    },
+    {
+      "file": "mockups/rustman-login-dark.html",
+      "h": 800,
+      "page": "pages/rustman-login-dark.html",
+      "png": "png/03-rustman-login-dark.png",
+      "w": 1280,
+      "x": 2800.0,
+      "y": 0.0
+    },
+    {
+      "file": "mockups/rustman-login.html",
+      "h": 800,
+      "page": "pages/rustman-login.html",
+      "png": "png/04-rustman-login.png",
+      "w": 1280,
+      "x": 0.0,
+      "y": 980.0
+    },
+    {
+      "file": "mockups/rustman-requester-dark.html",
+      "h": 800,
+      "page": "pages/rustman-requester-dark.html",
+      "png": "png/05-rustman-requester-dark.png",
+      "w": 1280,
+      "x": 1400.0,
+      "y": 980.0
+    },
+    {
+      "file": "mockups/rustman-requester.html",
+      "h": 800,
+      "page": "pages/rustman-requester.html",
+      "png": "png/06-rustman-requester.png",
+      "w": 1280,
+      "x": 2800.0,
+      "y": 980.0
+    },
+    {
+      "file": "mockups/rustman-runner-dark.html",
+      "h": 800,
+      "page": "pages/rustman-runner-dark.html",
+      "png": "png/07-rustman-runner-dark.png",
+      "w": 1280,
+      "x": 0.0,
+      "y": 1960.0
+    },
+    {
+      "file": "mockups/rustman-runner.html",
+      "h": 800,
+      "page": "pages/rustman-runner.html",
+      "png": "png/08-rustman-runner.png",
+      "w": 1280,
+      "x": 1400.0,
+      "y": 1960.0
+    },
+    {
+      "file": "mockups/rustman-variables-dark.html",
+      "h": 800,
+      "page": "pages/rustman-variables-dark.html",
+      "png": "png/09-rustman-variables-dark.png",
+      "w": 1280,
+      "x": 2800.0,
+      "y": 1960.0
+    },
+    {
+      "file": "mockups/rustman-variables.html",
+      "h": 800,
+      "page": "pages/rustman-variables.html",
+      "png": "png/10-rustman-variables.png",
+      "w": 1280,
+      "x": 0.0,
+      "y": 2940.0
+    },
+    {
+      "file": "mockups/rustman-requester-headers-dark.html",
+      "h": 800,
+      "page": "pages/rustman-requester-headers-dark.html",
+      "png": "png/11-rustman-requester-headers-dark.png",
+      "w": 1280,
+      "x": 1400.0,
+      "y": 2940.0
+    },
+    {
+      "file": "mockups/rustman-requester-headers.html",
+      "h": 800,
+      "page": "pages/rustman-requester-headers.html",
+      "png": "png/12-rustman-requester-headers.png",
+      "w": 1280,
+      "x": 2800.0,
+      "y": 2940.0
+    },
+    {
+      "file": "mockups/rustman-requester-body-dark.html",
+      "h": 800,
+      "page": "pages/rustman-requester-body-dark.html",
+      "png": "png/13-rustman-requester-body-dark.png",
+      "w": 1280,
+      "x": 0.0,
+      "y": 3920.0
+    },
+    {
+      "file": "mockups/rustman-requester-body.html",
+      "h": 800,
+      "page": "pages/rustman-requester-body.html",
+      "png": "png/14-rustman-requester-body.png",
+      "w": 1280,
+      "x": 1400.0,
+      "y": 3920.0
+    },
+    {
+      "file": "mockups/rustman-requester-context-dark.html",
+      "h": 800,
+      "page": "pages/rustman-requester-context-dark.html",
+      "png": "png/15-rustman-requester-context-dark.png",
+      "w": 1280,
+      "x": 2800.0,
+      "y": 3920.0
+    },
+    {
+      "file": "mockups/rustman-requester-context.html",
+      "h": 800,
+      "page": "pages/rustman-requester-context.html",
+      "png": "png/16-rustman-requester-context.png",
+      "w": 1280,
+      "x": 0.0,
+      "y": 4900.0
+    },
+    {
+      "file": "mockups/rustman-requester-snippet-dark.html",
+      "h": 800,
+      "page": "pages/rustman-requester-snippet-dark.html",
+      "png": "png/17-rustman-requester-snippet-dark.png",
+      "w": 1280,
+      "x": 1400.0,
+      "y": 4900.0
+    },
+    {
+      "file": "mockups/rustman-requester-snippet.html",
+      "h": 800,
+      "page": "pages/rustman-requester-snippet.html",
+      "png": "png/18-rustman-requester-snippet.png",
+      "w": 1280,
+      "x": 2800.0,
+      "y": 4900.0
+    }
+  ],
+  "exported": "2026-11-03_192334",
+  "title": "postman-clone",
+  "workspace": "postman-clone"
+}
