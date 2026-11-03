@@ -344,7 +344,10 @@ fn extract_binary(bytes: &[u8], out: &std::path::Path) -> Result<(), String> {
     let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).map_err(|e| e.to_string())?;
     for i in 0..zip.len() {
         let mut f = zip.by_index(i).map_err(|e| e.to_string())?;
-        if f.name().rsplit(['/', '\\']).next() == Some(BIN_NAME) {
+        // zip 9: `name()` is fallible (non-UTF-8 entry names).
+        let is_bin =
+            f.name().map_err(|e| e.to_string())?.rsplit(['/', '\\']).next() == Some(BIN_NAME);
+        if is_bin {
             let mut buf = Vec::new();
             f.read_to_end(&mut buf).map_err(|e| e.to_string())?;
             std::fs::write(out, &buf).map_err(|e| e.to_string())?;
