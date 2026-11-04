@@ -61,11 +61,16 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
 
 fn left_panel(state: &AppState) -> Element<'_, Message> {
     if state.sidebar.collapsed {
-        return container(icon_rail(state))
-            .style(sidebar_style)
-            .width(48)
-            .height(Length::Fill)
-            .into();
+        // No splitter here, so draw the hairline against the main area.
+        return row![
+            container(icon_rail(state))
+                .style(sidebar_style)
+                .width(48)
+                .height(Length::Fill),
+            iced::widget::rule::vertical(1.0).style(crate::ui::styles::divider),
+        ]
+        .height(Length::Fill)
+        .into();
     }
 
     let panel_content: Element<Message> = match state.sidebar.panel {

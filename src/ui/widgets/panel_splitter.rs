@@ -89,17 +89,25 @@ where
 
     fn draw(
         &self,
-        _tree: &Tree,
-        _renderer: &mut Renderer,
+        tree: &Tree,
+        renderer: &mut Renderer,
         _theme: &Theme,
         _style: &renderer::Style,
-        _layout: Layout<'_>,
-        _cursor: mouse::Cursor,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        // No visible handle: panels carry their own borders, and a drawn
-        // bar always looked bolted-on across themes. The area stays
-        // draggable (mouse_interaction below) — just invisible.
+        // Fill the drag area with the panel surface (an undrawn area showed
+        // the window background as a thick gap) and draw one hairline.
+        let state = tree.state.downcast_ref::<State>();
+        let active = state.dragging || cursor.is_over(layout.bounds());
+        crate::ui::widgets::seam::draw(
+            renderer,
+            layout.bounds(),
+            self.orientation == Orientation::Vertical,
+            crate::ui::widgets::seam::LineAt::Center,
+            active,
+        );
     }
     fn mouse_interaction(
         &self,

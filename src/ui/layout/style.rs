@@ -14,14 +14,13 @@ pub fn method_color(method: &crate::domain::request::HttpMethod) -> Color {
     }
 }
 
+// Panels carry no border of their own: iced borders draw on all four sides,
+// so neighbouring panels doubled up into thick seams. Dividers come from the
+// splitters (`widgets::seam`) and explicit rules instead (mockup: hairlines).
+
 pub fn icon_rail_style(_theme: &iced::Theme) -> iced::widget::container::Style {
     iced::widget::container::Style {
         background: Some(Background::Color(Palette::chrome())),
-        border: Border {
-            color: Palette::border_subtle(),
-            width: 1.0,
-            radius: 0.0.into(),
-        },
         ..Default::default()
     }
 }
@@ -59,11 +58,6 @@ pub fn icon_btn_style(
 pub fn sidebar_style(_theme: &iced::Theme) -> iced::widget::container::Style {
     iced::widget::container::Style {
         background: Some(Background::Color(Palette::surface())),
-        border: Border {
-            color: Palette::border(),
-            width: 1.0,
-            radius: 0.0.into(),
-        },
         ..Default::default()
     }
 }
@@ -71,11 +65,6 @@ pub fn sidebar_style(_theme: &iced::Theme) -> iced::widget::container::Style {
 pub fn surface_style(_theme: &iced::Theme) -> iced::widget::container::Style {
     iced::widget::container::Style {
         background: Some(Background::Color(Palette::surface())),
-        border: Border {
-            color: Palette::border(),
-            width: 1.0,
-            radius: 0.0.into(),
-        },
         shadow: Shadow::default(),
         ..Default::default()
     }
