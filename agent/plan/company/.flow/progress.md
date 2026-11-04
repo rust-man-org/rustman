@@ -4,14 +4,18 @@ Updated: 2026-11-03 (Asia/Jakarta).
 
 ## Resume checkpoint
 
-- Current scope: planning and workflow documentation.
-- Active implementation task: none.
-- Completed: core testing rules, design mapping, selective-read workflow,
-  compact progress tracker, API catalog, status/ownership and API reuse rules.
-- Next default task: review 00's contracts and record unresolved decisions;
-  verify readiness before starting 01. A specific user request takes priority.
-- Blockers: none for documentation. Contract freeze and implementation
-  completion have not been verified.
+- Current scope: wave 0 of `../parallel-work-rules.md`.
+- Active task: none.
+- Completed: baseline green on Windows (zip 9 fix in `update.rs`), app
+  launches; parallel-work rules and 09 design-tokens plan written.
+- Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
+  committed locally as `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
+- Decisions 2026-11-03 (user): Ctrl+S = local draft; Save = review branch +
+  PR to `main` (C12, never push `main`); metadata/flags/notes on unprotected
+  branch `rustman/meta` pushed directly; comments on an endpoint with an open
+  PR go to that PR (C4); one PR per endpoint.
+- Next: wave 1 is open — 01, 09, 02 t1–5/7, 03 t1–2, 05 t1–4, 07.
+- Blockers: none.
 - Working tree already contains unrelated source/workflow edits. Preserve them;
   do not infer company-plan completion from modified files alone.
 
@@ -33,8 +37,8 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 
 | Status | ID | Area | Owner | Next action |
 |---|---|---|---|---|
-| [ ] | 00 | Shared contracts | — | Resolve decisions; verify freeze. |
-| [ ] | 01 | Local drafts | — | Audit C9 save/rebase/Publish and tests. |
+| [X] | 00 | Shared contracts + scaffold + CI gate | — | Done locally (`65115de`); CI gate unproven until pushed by user. |
+| [~] | 01 | Local drafts | Claude, 2026-11-03 | Branch `ws/01-local-drafts/t1-merge`, tasks 1–7 done (`042ba57`…`578b265`, 43 draft tests; full suite 182/174 green). t7: `mark_orphans` after sidebar deletes, `restore_as_new` (fresh id, Write-gated; collection gone → unsaved tab), Ctrl+S refuses orphans, orphan Discard closes its tabs. New ids use v4 like the rest of the app (D1 v7 needs the uuid `v7` feature, owner 02). t6: `discard_draft`, `resolve_field`, `DraftMsg::{Discard, ResolveField}`, `ReviewRef` + `review` column, `DraftState::InReview`. Clearing `review` on a closed PR is 08's call (set `draft.review = None` + persist). t8 UI done (`6b950e6`, mockup `../../mockup/pages/rustman-requester-draft.html` approved 2026-11-04): banner (5 states, diff, conflict table, secrets masked), tree badges, All/Drafts filter + flat list (orphans reachable), tab dot, status count; full suite 185/177, app launches. Save for review button disabled until 08. Screenshots vs mockup taken 2026-11-04 (fixes `2c0d977`); atomic components `src/ui/components/` (`9e6e173`, see design-rules) now back the draft views; 188/180 green. Remaining: decide on draft-UI polish (orphan rows in tree, per-state icons, diff highlight) vs layout-parity workstream 10, then mark 01 `[X]`. Debounced autosave deferred (capture on Ctrl+S/flush/sync instead). |
 | [ ] | 02 | Postman import | — | Audit importer/report/re-import. |
 | [ ] | 03 | Schema / metadata / comments | — | Audit layout, persistence and guards. |
 | [ ] | 04 | Git sync / conflict | — | Audit transitions and draft preservation. |
@@ -42,10 +46,12 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 | [ ] | 06 | Secrets / scanner | — | Audit redaction, re-merge and write guards. |
 | [ ] | 07 | Self-update integrity | — | Audit existing verification and tests. |
 | [ ] | 08 | PR / company CI | — | Audit review flow and validator. |
+| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header done (`a488b7f`, merged). Next: t2 request header + URL row on `ws/10-layout/t2-request-header`. |
+| [X] | 09 | Design tokens | — | `4289b76` on `ws/09-design-tokens/t1-tokens`: Rustman Light/Dark appended, fresh-install default, 5 tests. Fonts deferred; status colors kept global (36 call sites). |
 
 ## Active task details
 
-No active implementation task. When work starts, replace this paragraph with:
+No active task. For the next task, replace this template with its claim:
 
 - Task: `[~]` + workstream ID + ordered-task number + one-sentence scope.
 - Owner: unique worker/session identifier; claimed/updated time with timezone.
@@ -57,13 +63,19 @@ No active implementation task. When work starts, replace this paragraph with:
 
 ## Verification checkpoint
 
-- Documentation: index/rule links and 18 mockup HTML/PNG pairs validated during
-  the prior planning update; Markdown files passed the 600-line limit.
-- Current update: draft review fixes propagated to C9, 01, consumers 02/04,
-  core test requirements and API catalog; links/size/consistency validated.
-- Rust suites: not run during these documentation-only updates.
-- App CI test gate: planned in `../core-testing-rules.md`; adding the gate and
-  proving both feature configurations pass remain implementation work.
+Windows MSVC via `cmd.exe /c`, rustc/cargo 1.99.0, branch
+`feat/company-foundation` at `14f2d73` plus existing working-tree changes.
+
+Re-run 2026-11-03 after fixing `extract_binary` (`src/services/update.rs:347`,
+zip 9 `name()` returns `Result`; Windows-only code, so Linux CI missed it):
+
+- `cargo build`: PASS.
+- `cargo test`: PASS, 139 passed, 0 failed, 3 ignored (live network).
+- `cargo test --no-default-features`: PASS, 131 passed, 0 failed, 3 ignored.
+- App launch: `target\debug\rustman.exe` opens the "Rustman" window, UI
+  renders (empty Collections, New Request tab, response pane), stays running.
+  Manual request/sync flows not exercised.
+- Gap: CI builds Linux only and runs no tests; scaffold PR adds the gate.
 
 ## Compact completion record
 
@@ -72,11 +84,10 @@ outcome/evidence line; use git history or linked PRs for detailed chronology.
 
 | Status | Date | Completed scope | Evidence / limitation |
 |---|---|---|---|
-| [X] | 2026-11-03 | Core test requirements and mockup design mapping | `../core-testing-rules.md`, `../design-rules.md`; documentation only. |
-| [X] | 2026-11-03 | Selective reading and compact progress workflow | `../index.md`, this file; implementation statuses remain unverified. |
-| [X] | 2026-11-03 | Existing/planned API map and maintenance rule | `../api/index.md`; source inventory only, Rust tests not run. |
-| [X] | 2026-11-03 | Centralized API reuse policy and index references | `../api-reuse-rules.md`; links/size/whitespace validated; docs only. |
+| [X] | 2026-11-03 | Planning docs: selective reading, API map, reuse policy | `../index.md`, `../api/index.md`, `../api-reuse-rules.md`; docs only. |
 | [X] | 2026-11-03 | Draft review fixes: durable conflicts and merged-tab refresh | `../0-foundation/01-local-drafts.md`, C9; required regressions specified, runtime not implemented. |
+| [X] | 2026-11-03 | Baseline fixed and green; app launches | `src/services/update.rs` zip 9 fix; results above. |
+| [X] | 2026-11-03 | Parallel-work rules + 09 design-tokens plan | `../parallel-work-rules.md`, `../0-foundation/09-design-tokens.md`; docs only. |
 
 ## Claim and handoff rules
 

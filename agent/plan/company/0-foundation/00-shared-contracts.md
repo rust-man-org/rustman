@@ -48,8 +48,6 @@ Replaces today's flat `<repo>/<collection_id>.json` + `global.json`
 ```text
 api-collections/
 ├── collections/   <path>.json        # Rustman/Postman collection (NO secrets)
-├── metadata/      <path>.json        # endpoint metadata (C3)
-├── discussions/   <path>.json        # comments (C4)
 ├── environments/  *.example.json     # shared vars, {{SECRET_*}} placeholders only
 ├── schemas/                          # JSON schema files (section 6)
 └── rustman.json                      # manifest
@@ -63,6 +61,12 @@ manifest:
   "default_branch": "main" }
 ```
 
+- **Two branches, one repo** (user decision 2026-11-03):
+  - `main` (protected, PR-only, C12): `collections/`, `environments/`,
+    `schemas/`, `rustman.json`, `global.json`.
+  - `rustman/meta` (unprotected, pushed directly): `metadata/<path>.json`
+    (C3) and `discussions/<path>.json` (C4), same `<path>` rule. Never merged
+    into `main`; `main` never contains these folders.
 - `rustman.json.version` drives schema migration; readers must reject a
   `version` they do not understand.
 - `global.json` (global scripts) is retained at the repo root.
@@ -82,6 +86,10 @@ manifest:
 Initial statuses (master doc §8): `Draft`, `Ready`, `In Review`, `Broken`,
 `Deprecated`, `Security Review`. Keyed by `endpoint_id`, not by URL.
 
+Lives on branch `rustman/meta` (C2): status, flag, owner and tags are team
+workflow state, saved and pushed directly **without a PR**. The metadata
+status `Draft` is unrelated to a local draft (C9).
+
 ---
 
 ## C4 — Discussion (comment) schema
@@ -97,8 +105,17 @@ Initial statuses (master doc §8): `Draft`, `Ready`, `In Review`, `Broken`,
       "body": "Check the 401 response after the SSO change." } ] }
 ```
 
-Comments are committed **only** when the user presses **Send** (master doc §9),
-never per keystroke.
+Comments are sent **only** when the user presses **Send** (master doc §9),
+never per keystroke. Where a comment goes depends on the endpoint:
+
+| Endpoint state | Send writes to | PR? |
+|---|---|---|
+| Has an open review PR (C12) | a comment **on that PR** (GitHub API, Pull requests R/W) | no new PR |
+| No open review PR | `discussions/<path>.json` on `rustman/meta`, pushed directly | no |
+
+The Discussion tab shows both: "Review · PR #N" (PR comments, read live from
+GitHub) and "Endpoint notes" (this schema). PR comments are not copied into
+`rustman/meta`; they stay with the PR as the merge record.
 
 ---
 
@@ -170,10 +187,10 @@ SYNCED | LOCAL_CHANGES | REMOTE_CHANGES | SYNCING | CONFLICT | OFFLINE
 
 Master doc §14. Rendered in the Source Control panel (`src/ui/sidebar/git.rs`).
 
-`LOCAL_CHANGES` means **base** changes waiting to be committed (publish,
-import, metadata, comments, structure edits). Local drafts (C9) never count
-and never make the workspace dirty. Sync state stays separate from auth
-state (C10).
+`LOCAL_CHANGES` means changes waiting to go out as a review branch (C12).
+Local drafts (C9) never count and never make the workspace dirty. Sync never
+pushes `main`; it fetches and fast-forwards it. Sync state stays separate from
+auth state (C10).
 
 ---
 
@@ -197,8 +214,9 @@ gate), 06 (scan on publish).
   and at most one **local draft** (`request_drafts` table, never leaves the
   machine).
 - Effective request shown and sent = draft if present, else base.
-- Only sync, import and **Publish** write the base. Editing a synced request
-  writes the draft.
+- The base mirrors `main` and is written only by sync and import. Editing a
+  synced request writes the draft (Ctrl+S = local save). The **Save** button
+  sends the draft for review (C12); it does not touch the base.
 - Before base replacement, capture affected tabs' latest edits against their
   pre-sync effective request; abort application if capture persistence fails.
   After replacement (sync, pull, branch switch, re-import), call
@@ -211,7 +229,9 @@ gate), 06 (scan on publish).
   differences or unresolved conflicts remain. Never discard a draft merely
   because base rows were replaced.
 - `state.requests`, `collection_from_state` and the repo writer see base data
-  only. Draft data reaches git only through Publish.
+  only. Draft data reaches git only through a review branch (C12). When the
+  PR merges and `main` is pulled, the draft equals its new base and collapses
+  (is deleted) through the normal rebase.
 - Key: request `id` now, `endpoint_id` (C1) once 02 mints it.
 
 ---
@@ -234,8 +254,73 @@ pub enum Permission { Read, Write } // GitHub maintain/admin map to Write in the
 - Re-check repository access on every app start. Never trust a cached
   permission.
 - `Read`: view, run, pull, local drafts (C9, SQLite only, never committed or
-  pushed). `Write`: also Publish, edit structure, comment, flag, push, sync.
+  pushed). `Write`: also Save for review (C12), edit structure, comment,
+  flag, push review branches. Nobody pushes `main` from the app.
 - Auth state is separate from sync state (C7).
+
+---
+
+## C12 — Review publishing (Save → branch → PR → main)
+
+**Owner:** 08 (flow), with 01 (draft payload/state) and 04 (branch commit +
+push). **Decided by the user 2026-11-03.**
+
+- **Ctrl+S** = local save (draft, C9). **Save button** = publish for review.
+- Save builds a commit from `origin/main` + the draft's request, on branch
+  `review/<github-login>/<endpoint-slug>`, **without checking it out** (the
+  user's working copy stays on `main`), pushes that branch, then opens a PR
+  to `main`. Re-saving the same draft updates the same branch/PR.
+- The draft is kept with `review: { branch, pr_number }`; UI shows
+  `In review · PR #N`. Merge on GitHub + next pull → draft collapses.
+  PR closed unmerged → draft stays, can be edited and saved again.
+- **Never push `main` from the app.** Required repo setting: branch
+  protection on `main` ("Require a pull request before merging"), so the rule
+  also holds outside Rustman.
+- Gates: Write permission (C10), no unresolved draft conflicts (C9), secret
+  scan passes (06).
+- Structure edits (new/rename/move/delete endpoint) also go out through a
+  review branch.
+- **Not** through a PR: metadata/flags/status and endpoint notes go to
+  `rustman/meta` (C3, C4); comments on an endpoint with an open PR go to
+  that PR (C4). Branch protection applies to `main` only.
+- One PR per endpoint (default). Later: "Save all drafts of this collection"
+  bundles them into one branch/PR.
+
+---
+
+## C11 — Scaffold extension points (frozen 2026-11-03)
+
+**Owner:** 00. Added once by the scaffold (`../parallel-work-rules.md` §2);
+after that each row's files belong to the listed workstream.
+
+| WS | Message (own file) | Handler | State field → type | Storage submodule |
+|---|---|---|---|---|
+| 01 | `Message::Draft(DraftMsg)` `src/message/draft.rs` | `src/app/update/drafts.rs` | `drafts` → `state::drafts::DraftsState` | `services/storage/drafts.rs` |
+| 03 | `Message::Meta(MetaMsg)` `src/message/meta.rs` | `src/app/update/meta.rs` | `meta` → `state::meta::MetaState` | `services/storage/meta.rs` |
+| 05 | `Message::Auth(AuthMsg)` `src/message/auth.rs` | `src/app/update/auth.rs` | `auth` → `state::auth::AuthSession` | — (token in OS keychain) |
+| 06 | `Message::Secrets(SecretsMsg)` `src/message/secrets.rs` | `src/app/update/secrets.rs` | `secrets` → `state::secrets::SecretsState` | `services/storage/secrets.rs` |
+| 08 | `Message::Review(ReviewMsg)` `src/message/review.rs` | `src/app/update/review.rs` | `review` → `state::review::ReviewState` | — |
+
+- Each sub-enum implements `fn marks_session_dirty(&self) -> bool`;
+  `update::marks_session_dirty` delegates, so nobody edits that function again.
+- Each storage submodule has `pub(super) fn migrate(conn)`; `storage::migrate`
+  calls them in order. The owner writes its own DDL there.
+- Empty modules reserved: `services::{repo_layout, github, keychain, secrets}`,
+  `domain::{draft, endpoint_meta, discussion, account}`, `app::drafts`,
+  `ui::auth`, `ui::request::{draft_banner, meta_bar}`.
+- C10 stub: `AuthSession::can_write(&self) -> bool` returns `true` until 05
+  wave 2 replaces the body. Every shared write path calls it from day one.
+- `AuthSession` (UI/session state) holds the C10 `AuthState` enum; the names
+  differ on purpose.
+
+### Frozen decisions
+
+- **D1 endpoint ID (C1):** UUID v7 via the existing `uuid` crate (`v7`
+  feature); time-sortable, no new dependency. The ULID example above is
+  illustrative only.
+- **D2 source of truth (03):** SQLite is authoritative; repo files are the
+  serialized view written by `repo_layout` (same direction as today).
+- **D3 draft key (C9):** request `id` until 02 lands `endpoint_id`.
 
 ---
 

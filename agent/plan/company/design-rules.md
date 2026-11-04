@@ -44,6 +44,27 @@ checked-in assets.
   explicit. Preserve keyboard focus and provide explanations for disabled
   actions. Translate mockup Indonesian UI copy to English for this plan.
 
+## Reusable components (atomic design)
+
+Shared visuals live in `src/ui/components/` (owner 09). Feature views
+compose them and carry no styling of their own.
+
+| Level | Path | Contents |
+|---|---|---|
+| Foundation | `components/tone.rs` | `Tone` (Accent, Info, Success, Warning, Danger, Neutral, Subtle) → theme color, opaque `tint()` |
+| Atoms | `components/atoms/` | `Button` (primary/secondary/ghost, disabled + tooltip), `badge` + `Mark`, `chip`, `tooltip`, `text::{title, body, muted, caption, meta, code}` |
+| Molecules | `components/molecules/` | `Banner` (tone, mark, title, detail, actions, body), `DataTable` |
+| Organisms | feature files | e.g. `ui/request/draft_banner.rs`, `ui/sidebar/drafts.rs` |
+
+Rules:
+
+- Components take a `Tone`, never a raw color; restyle by changing `Tone`.
+- Generic over the message type; no `AppState`, no feature logic.
+- A visual needed by two features moves into `components/` first, in its
+  own small PR; then both features use it.
+- Existing ad-hoc `button::Style` blocks (≈18 files) migrate as each area is
+  touched, mainly in the layout-parity work, never as one big refactor.
+
 ## Contract precedence and missing states
 
 Mockups guide appearance; shared contracts and auth rules define behavior.

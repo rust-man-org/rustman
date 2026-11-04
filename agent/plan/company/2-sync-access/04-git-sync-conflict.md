@@ -34,6 +34,16 @@ source of truth (master doc §13).
 - **Consumes:** C2/C8 (`repo_layout` for reading/writing the tree), C5 (never
   push a secret), C1 (identity preserved across sync), C9 (drafts are never
   committed and are rebased after every pull), C10 (Read users pull only).
+- **C12 (user decision 2026-11-03):** Sync = fetch + fast-forward `main`
+  only; **never push `main`**. Add `vcs::commit_to_branch(repo, base_ref,
+  branch, files)` (build tree from `base_ref` + changed files with git2, no
+  checkout, no touch of the working copy) and `vcs::push_branch`. These are
+  the only write-to-remote calls; 08 orchestrates them.
+- Sync also fetches `rustman/meta` (metadata + endpoint notes, C2) and loads
+  it via `repo_layout`. Pushes to `rustman/meta` go directly (03 triggers
+  them); on a non-fast-forward, refetch, re-apply the append and retry —
+  comments and metadata are appended/replaced per endpoint file, so this
+  rarely conflicts.
 - **Hard prerequisite:** 01 (local drafts) must be merged before auto-sync
   (Phase 16). Without it a background pull overwrites the open tab.
 
