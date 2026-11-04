@@ -14,7 +14,7 @@ pub mod tooltip;
 pub use badge::{Mark, badge};
 pub use button::Button;
 pub use chip::chip;
-pub use icon_button::{icon_button, row_action};
+pub use icon_button::{compact_icon_button, icon_button, row_action};
 pub use pill::pill;
 pub use search_field::search_field;
 pub use search_input::search_input;

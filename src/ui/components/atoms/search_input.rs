@@ -1,5 +1,5 @@
-//! Search input atom: a real text input with a leading search icon
-//! (sidebar filter, Postman-style bordered box).
+//! Search input atom: a real text input with a leading filter icon
+//! (mockup `.side-search`: 28px bordered box, accent border on focus).
 //! For a field that only *opens* a search surface, see `search_field`.
 
 use iced::{
@@ -12,8 +12,8 @@ use crate::ui::{
     theme::{Palette, TEXT_SM},
 };
 
-/// Lucide `search` glyph (same as `icons::search`).
-const SEARCH_GLYPH: char = '\u{e151}';
+/// Lucide `list-filter` glyph (same as `icons::filter`).
+const FILTER_GLYPH: char = '\u{e460}';
 
 pub fn search_input<'a, M: Clone + 'a>(
     placeholder: &str,
@@ -24,28 +24,27 @@ pub fn search_input<'a, M: Clone + 'a>(
         .on_input(on_input)
         .icon(Icon {
             font: ICON_FONT,
-            code_point: SEARCH_GLYPH,
+            code_point: FILTER_GLYPH,
             size: Some(13.0.into()),
             spacing: 8.0,
             side: Side::Left,
         })
         .size(TEXT_SM)
-        // 32px tall: lines up with `icon_button` beside it.
-        .padding([8, 8])
+        // 28px tall (mockup).
+        .padding([6, 8])
         .width(Length::Fill)
         .style(|_t, status| {
             let focused = matches!(status, Status::Focused { .. });
             text_input::Style {
-                // Postman: a quiet bordered box that firms up on focus.
                 background: Background::Color(Palette::background()),
                 border: Border {
                     color: if focused {
-                        Palette::border()
+                        Palette::accent()
                     } else {
                         Palette::border_subtle()
                     },
                     width: 1.0,
-                    radius: 6.0.into(),
+                    radius: 4.0.into(),
                 },
                 icon: Palette::text_subtle(),
                 placeholder: Palette::text_subtle(),

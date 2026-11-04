@@ -1,7 +1,8 @@
-//! Collections panel, laid out like Postman's sidebar so it feels familiar:
+//! Collections panel (mockup `.sidebar`, Postman-like so it feels familiar):
 //! filter box + `+` / import / `⋯` on top, a COLLECTIONS section, then the
-//! collection → folder → request tree. Hovering a row shows `+` / `⋯`
-//! (Postman); the same actions are in the `+` and right-click menus.
+//! collection → folder → request tree with counts and status icons.
+//! Hovering a row shows `+` / `⋯`; the same actions are in the `+` and
+//! right-click menus.
 
 use iced::{
     Element, Length, Padding,
@@ -16,38 +17,40 @@ use crate::{
     message::{ImportMsg, Message, RequestMsg, SidebarMsg},
     ui::{
         components::{
-            atoms::{icon_button, row_action, search_input, text as t},
+            atoms::{compact_icon_button, row_action, search_input, text as t},
             molecules::{
                 menu, menu_divider, menu_item, tree_row,
-                tree_row::ROW_H,
+                tree_row::{COLLECTION_ROW_H, ROW_H, RowFill},
             },
         },
         icons,
-        theme::{MONO, Palette, TEXT_XS},
-        tree_label::tree_label,
+        theme::{MONO, Palette, TEXT_XS, UI_FONT_MEDIUM},
+        tree_label::{tree_label_styled, tree_label_weighted},
         widgets::kv_table,
     },
 };
 
-/// Horizontal padding of the tree body.
+/// Horizontal padding of the tree body (mockup `.tree{padding:4px 6px 12px}`).
 const TREE_PAD_X: f32 = 6.0;
-/// Left padding of the `COLLECTIONS` section label.
+/// Left padding of the section label and collection rows (aligned).
 const SECTION_INDENT: f32 = 8.0;
-/// Left padding of a collection row (nested under the section label like
-/// Postman); each further nesting level adds `STEP`.
-const BASE_INDENT: f32 = 22.0;
+const BASE_INDENT: f32 = 8.0;
+/// Each nesting level: folder rows sit at 22px under a collection.
 const STEP: f32 = 14.0;
-/// Requests sit a little right of folders so the method lines up under
-/// the folder name rather than its chevron.
-const REQ_EXTRA: f32 = 6.0;
-const METHOD_W: f32 = 30.0;
+/// Requests start this far right of their parent folder's indent
+/// (mockup: folder 22px, its requests 44px).
+const REQ_EXTRA: f32 = 22.0;
+const METHOD_W: f32 = 34.0;
+const COUNT_W: f32 = 28.0;
+/// Folder row chrome before the name: chevron, gap, folder icon, gap.
+const FOLDER_LEAD: f32 = 9.0 + 6.0 + 12.0 + 6.0;
 
 fn folder_indent(depth: usize) -> f32 {
     BASE_INDENT + STEP * depth as f32
 }
 
 fn request_indent(depth: usize) -> f32 {
-    folder_indent(depth) + REQ_EXTRA
+    folder_indent(depth.saturating_sub(1)) + REQ_EXTRA
 }
 
 /// `context_menu` slot id of the `+` dropdown (row ids are UUIDs, so it
@@ -117,7 +120,7 @@ fn panel(state: &AppState) -> Element<'_, Message> {
         tree = tree.push(empty_state("No requests or folders match.", 0));
     }
     col = col.push(container(tree).padding(Padding {
-        top: 2.0,
+        top: 4.0,
         right: TREE_PAD_X,
         bottom: 12.0,
         left: TREE_PAD_X,
@@ -136,17 +139,17 @@ fn panel(state: &AppState) -> Element<'_, Message> {
     .into()
 }
 
-/// Postman `COLLECTIONS` section label above the tree.
+/// Mockup `.side-section`: the `COLLECTIONS` label above the tree.
 fn section_header(label: &str) -> Element<'static, Message> {
     container(
         row![
             icons::chevron_down().size(10).color(Palette::text_subtle()),
             text(label.to_uppercase())
-                .size(TEXT_XS)
-                .font(crate::ui::theme::UI_FONT_MEDIUM)
+                .size(11)
+                .font(UI_FONT_MEDIUM)
                 .color(Palette::text_muted()),
         ]
-        .spacing(8)
+        .spacing(6)
         .align_y(iced::Alignment::Center),
     )
     .height(28)
@@ -165,7 +168,7 @@ fn more_menu() -> Element<'static, Message> {
     menu(
         vec![
             menu_item(
-                Some(icons::import()),
+                Some(icons::import_box()),
                 "Import…",
                 Some(Message::Import(ImportMsg::OpenPostmanDialog)),
                 false,
@@ -181,30 +184,33 @@ fn more_menu() -> Element<'static, Message> {
     )
 }
 
-/// Postman-style top bar: filter box, `+` (new …), import, `⋯` (more);
-/// then the draft filter chips.
+/// Mockup `.side-top`: filter box, `+` (new …), import, `⋯` (more); then
+/// the draft filter chips while there are drafts.
 fn top_bar(state: &AppState) -> Element<'_, Message> {
     let first = row![
         search_input("Search", &state.sidebar.filter, |s| {
             Message::Sidebar(SidebarMsg::FilterChanged(s))
         }),
-        icon_button(
+        compact_icon_button(
             icons::plus(),
             "New…",
             Message::Sidebar(SidebarMsg::ContextMenuOpened(ADD_MENU.to_owned())),
+            26.0,
         ),
-        icon_button(
-            icons::import(),
+        compact_icon_button(
+            icons::import_box(),
             "Import Postman / OpenAPI / HTTPie / JSON",
             Message::Import(ImportMsg::OpenPostmanDialog),
+            26.0,
         ),
-        icon_button(
+        compact_icon_button(
             icons::more(),
             "More actions",
             Message::Sidebar(SidebarMsg::ContextMenuOpened(MORE_MENU.to_owned())),
+            26.0,
         ),
     ]
-    .spacing(2)
+    .spacing(6)
     .align_y(iced::Alignment::Center);
 
     let body = column![first]
@@ -214,8 +220,8 @@ fn top_bar(state: &AppState) -> Element<'_, Message> {
     container(body)
         .padding(Padding {
             top: 10.0,
-            right: 8.0,
-            bottom: 6.0,
+            right: 10.0,
+            bottom: 4.0,
             left: 10.0,
         })
         .into()
@@ -257,18 +263,20 @@ fn collection_view<'a>(
                 parent_is_collection: true,
             })),
         );
-        // Label room: sidebar minus tree padding, row padding, chevron, actions.
-        let avail = state.sidebar_width
-            - 2.0 * TREE_PAD_X
-            - BASE_INDENT
-            - 8.0
-            - 16.0
-            - actions_w;
+        let (trailing, trailing_w) = count_or_actions(actions, actions_w, index.count(&collection.id), true);
+        // Label room: sidebar minus tree padding, row padding, chevron, trailing.
+        let avail = state.sidebar_width - 2.0 * TREE_PAD_X - BASE_INDENT - 8.0 - 16.0 - trailing_w;
         let content = row![
             chevron(expanded, 10.0),
-            tree_label(collection.name.clone(), 12.0, avail),
+            tree_label_weighted(
+                collection.name.clone(),
+                12.0,
+                avail,
+                UI_FONT_MEDIUM,
+                Palette::text()
+            ),
+            trailing,
         ]
-        .push(actions)
         .spacing(6)
         .align_y(iced::Alignment::Center);
         // Press both opens the folder and begins tracking for reorder —
@@ -279,8 +287,8 @@ fn collection_view<'a>(
             tree_row(
                 content,
                 BASE_INDENT,
-                ROW_H,
-                dragging,
+                COLLECTION_ROW_H,
+                drag_fill(dragging),
                 Message::Sidebar(SidebarMsg::ItemDragStart(collection.id.clone())),
             ),
             &collection.id,
@@ -391,17 +399,15 @@ fn group_view<'a>(
                 parent_is_collection: false,
             })),
         );
-        let avail = state.sidebar_width
-            - 2.0 * TREE_PAD_X
-            - indent
-            - 8.0
-            - 15.0
-            - actions_w;
+        let (trailing, trailing_w) = count_or_actions(actions, actions_w, index.count(&group.id), false);
+        let avail = state.sidebar_width - 2.0 * TREE_PAD_X - indent - 8.0 - FOLDER_LEAD - trailing_w;
+        // Mockup `.folder-row`: chevron, folder icon, secondary-text name.
         let content = row![
             chevron(expanded, 9.0),
-            tree_label(group.name.clone(), 12.0, avail),
+            icons::folder().size(12).color(Palette::text_subtle()),
+            tree_label_styled(group.name.clone(), 12.0, avail, None, Palette::text_muted()),
+            trailing,
         ]
-        .push(actions)
         .spacing(6)
         .align_y(iced::Alignment::Center);
         draggable(
@@ -409,7 +415,7 @@ fn group_view<'a>(
                 content,
                 indent,
                 ROW_H,
-                dragging,
+                drag_fill(dragging),
                 Message::Sidebar(SidebarMsg::ItemDragStart(group.id.clone())),
             ),
             &group.id,
@@ -471,29 +477,41 @@ fn request_view<'a>(
             - indent
             - 8.0
             - METHOD_W
-            - 6.0
+            - 7.0
             - mark_w
             - actions_w;
+        // Mockup `.req-row`: names are secondary text; the selected one
+        // reads as primary, medium weight, on the accent tint.
+        let name = if selected {
+            tree_label_weighted(req.name.clone(), 12.0, avail, UI_FONT_MEDIUM, Palette::text())
+        } else {
+            tree_label_styled(req.name.clone(), 12.0, avail, None, Palette::text_muted())
+        };
         let content = row![
             container(
                 text(method_label(req.method.as_str()))
-                    .size(9)
+                    .size(TEXT_XS)
                     .font(MONO)
                     .color(super::drafts::method_color(req.method.as_str())),
             )
             .width(METHOD_W),
-            tree_label(req.name.clone(), 12.0, avail),
+            name,
         ]
         .push(mark)
         .push(actions)
-        .spacing(6)
+        .spacing(7)
         .align_y(iced::Alignment::Center);
+        let fill = if selected {
+            RowFill::Selected
+        } else {
+            drag_fill(dragging)
+        };
         draggable(
             tree_row(
                 content,
                 indent,
                 ROW_H,
-                selected || dragging,
+                fill,
                 Message::Sidebar(SidebarMsg::ItemDragStart(req.id.clone())),
             ),
             &req.id,
@@ -521,6 +539,34 @@ fn draggable<'a>(row_el: Element<'a, Message>, id: &str) -> Element<'a, Message>
 }
 
 const ACTION_W: f32 = 22.0;
+
+fn drag_fill(dragging: bool) -> RowFill {
+    if dragging { RowFill::Hover } else { RowFill::None }
+}
+
+/// Trailing slot of collection / folder rows: the request count (mockup
+/// `.count` mono / `.f-mini`), swapped for the hover actions while shown.
+fn count_or_actions(
+    actions: Option<Element<'static, Message>>,
+    actions_w: f32,
+    n: usize,
+    mono: bool,
+) -> (Element<'static, Message>, f32) {
+    if let Some(a) = actions {
+        return (a, actions_w);
+    }
+    let mut label = text(n.to_string()).size(TEXT_XS).color(Palette::text_subtle());
+    if mono {
+        label = label.font(MONO);
+    }
+    (
+        container(label)
+            .width(COUNT_W)
+            .align_x(iced::alignment::Horizontal::Right)
+            .into(),
+        COUNT_W + 6.0,
+    )
+}
 
 /// Postman's inline row actions, shown while the row is hovered or its
 /// menu is open: optional `+` (add request), then `⋯` (the row's menu).
@@ -615,6 +661,7 @@ fn collection_menu(col_id: &str) -> Element<'_, Message> {
                 }),
                 false,
             ),
+            menu_divider(),
             ctx_item(
                 "Rename",
                 Message::Sidebar(SidebarMsg::ToggleRenameCollection(col_id.to_owned())),
@@ -625,6 +672,7 @@ fn collection_menu(col_id: &str) -> Element<'_, Message> {
                 Message::Import(ImportMsg::OpenExportDialog(col_id.to_owned())),
                 false,
             ),
+            menu_divider(),
             ctx_item(
                 "Delete",
                 Message::Sidebar(SidebarMsg::DeleteCollection(col_id.to_owned())),
@@ -655,11 +703,13 @@ fn group_menu(group_id: &str, indent: f32) -> Element<'_, Message> {
                 }),
                 false,
             ),
+            menu_divider(),
             ctx_item(
                 "Rename",
                 Message::Sidebar(SidebarMsg::ToggleRenameGroup(group_id.to_owned())),
                 false,
             ),
+            menu_divider(),
             ctx_item(
                 "Delete",
                 Message::Sidebar(SidebarMsg::DeleteGroup(group_id.to_owned())),
@@ -682,11 +732,13 @@ fn request_menu(req: &SavedRequest, indent: f32) -> Element<'_, Message> {
                 }),
                 false,
             ),
+            menu_divider(),
             ctx_item(
                 "Rename",
                 Message::Sidebar(SidebarMsg::ToggleRenameRequest(req.id.clone())),
                 false,
             ),
+            menu_divider(),
             ctx_item(
                 "Delete",
                 Message::Sidebar(SidebarMsg::DeleteRequest {
@@ -770,18 +822,29 @@ fn add_target(state: &AppState) -> Option<(String, bool)> {
 }
 
 /// Right-click menu card, indented under its row.
+/// Mockup `.ctx-menu`: a 196px card under its row, right-aligned.
 fn context_menu(items: Vec<Element<'static, Message>>, indent: f32) -> Element<'static, Message> {
-    container(menu(items, Length::Fill))
+    container(menu(items, Length::Fixed(196.0)))
         .padding(Padding {
             top: 2.0,
-            right: 8.0,
-            bottom: 2.0,
+            right: 0.0,
+            bottom: 4.0,
             left: indent,
         })
         .width(Length::Fill)
+        .align_x(iced::alignment::Horizontal::Right)
         .into()
 }
 
+/// Mockup `.ctx-item`: every entry carries its icon.
 fn ctx_item(label: &'static str, msg: Message, danger: bool) -> Element<'static, Message> {
-    menu_item(None, label, Some(msg), danger)
+    let icon = match label {
+        "New request" => icons::plus(),
+        "New folder" => icons::folder_plus(),
+        "Rename" => icons::edit(),
+        "Export…" => icons::export(),
+        "Duplicate" => icons::copy(),
+        _ => icons::trash(),
+    };
+    menu_item(Some(icon), label, Some(msg), danger)
 }

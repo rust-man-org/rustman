@@ -43,11 +43,21 @@ pub fn import() -> Text<'static> {
 pub fn export() -> Text<'static> {
     glyph('\u{e19e}')
 } // upload
-/// "More actions" (⋯). Drawn with UI-font middle dots: the embedded icon
-/// font's ellipsis code point is not mapped here.
 pub fn more() -> Text<'static> {
-    text("···").font(crate::ui::theme::UI_FONT_MEDIUM).size(DEFAULT_SIZE)
-}
+    glyph('\u{e0b6}')
+} // ellipsis
+pub fn import_box() -> Text<'static> {
+    glyph('\u{e427}')
+} // arrow-down-square
+pub fn folder() -> Text<'static> {
+    glyph('\u{e0d7}')
+} // folder
+pub fn trash() -> Text<'static> {
+    glyph('\u{e18e}')
+} // trash-2
+pub fn alert() -> Text<'static> {
+    glyph('\u{e193}')
+} // alert-triangle
 pub fn folder_plus() -> Text<'static> {
     glyph('\u{e0d9}')
 } // folder-plus

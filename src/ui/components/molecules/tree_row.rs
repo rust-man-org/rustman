@@ -1,6 +1,7 @@
-//! Tree row molecule: a fixed-height, indented, full-width pressable row
-//! (Postman-style). Hover and selection share one neutral fill; no
-//! borders, so rows never shift.
+//! Tree row molecule (mockup `.col-row` / `.folder-row` / `.req-row`): a
+//! fixed-height, indented, full-width pressable row. Hover fills it
+//! neutrally, selection tints it with the accent; no borders, so rows
+//! never shift.
 
 use iced::{
     Background, Border, Element, Length, Padding,
@@ -9,14 +10,25 @@ use iced::{
 
 use crate::ui::theme::Palette;
 
-/// Postman's compact tree rhythm.
+/// Collection rows are a touch taller than folder and request rows.
+pub const COLLECTION_ROW_H: f32 = 28.0;
 pub const ROW_H: f32 = 26.0;
+
+/// Fill a row keeps regardless of the cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowFill {
+    None,
+    /// Neutral, as if hovered (e.g. the row being dragged).
+    Hover,
+    /// Accent tint (`.req-row.selected`).
+    Selected,
+}
 
 pub fn tree_row<'a, M: Clone + 'a>(
     content: impl Into<Element<'a, M>>,
     indent: f32,
     height: f32,
-    selected: bool,
+    fill: RowFill,
     on_press: M,
 ) -> Element<'a, M> {
     // A fixed-height button top-aligns its content; center it explicitly.
@@ -30,16 +42,22 @@ pub fn tree_row<'a, M: Clone + 'a>(
             bottom: 0.0,
             left: indent,
         })
-        .style(move |_t, status| button::Style {
-            background: (selected
-                || matches!(status, button::Status::Hovered | button::Status::Pressed))
-            .then(|| Background::Color(Palette::hover())),
-            text_color: Palette::text(),
-            border: Border {
-                radius: 4.0.into(),
+        .style(move |_t, status| {
+            let hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+            button::Style {
+                background: match fill {
+                    RowFill::Selected => Some(Palette::accent_soft()),
+                    RowFill::Hover => Some(Palette::hover()),
+                    RowFill::None => hovered.then(Palette::hover),
+                }
+                .map(Background::Color),
+                text_color: Palette::text(),
+                border: Border {
+                    radius: 4.0.into(),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
+            }
         })
         .into()
 }

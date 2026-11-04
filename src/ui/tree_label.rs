@@ -159,7 +159,30 @@ pub fn tree_label_styled(
     font: Option<iced::Font>,
     color: iced::Color,
 ) -> Element<'static, Message> {
-    let mono = font.is_some();
+    label_impl(name, size, avail_px, font, font.is_some(), color)
+}
+
+/// Like [`tree_label`] in a heavier UI-font weight (e.g. semibold collection
+/// names). Measured with the regular face, so the budget is shrunk a little
+/// to cover the wider bold glyphs.
+pub fn tree_label_weighted(
+    name: String,
+    size: f32,
+    avail_px: f32,
+    font: iced::Font,
+    color: iced::Color,
+) -> Element<'static, Message> {
+    label_impl(name, size, avail_px * 0.94, Some(font), false, color)
+}
+
+fn label_impl(
+    name: String,
+    size: f32,
+    avail_px: f32,
+    font: Option<iced::Font>,
+    mono: bool,
+    color: iced::Color,
+) -> Element<'static, Message> {
     // Labels are measured on every frame: names past the render limit skip
     // measuring and go straight to truncation, so a pathological name can
     // never cost megabytes of font lookups per frame.
