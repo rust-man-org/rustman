@@ -2,8 +2,8 @@
 //! sync state in the header. Text always accompanies the dot.
 
 use iced::{
-    Alignment, Background, Border, Element,
-    widget::{button, row, text},
+    Alignment, Background, Border, Element, Length,
+    widget::{button, container, row, text},
 };
 
 use crate::ui::{
@@ -29,7 +29,8 @@ pub fn status_chip<'a, M: Clone + 'a>(
     if let Some(detail) = detail {
         content = content.push(text(format!("· {detail}")).size(TEXT_SM).color(Palette::text_muted()));
     }
-    button(content)
+    // A fixed-height button top-aligns its content; center it explicitly.
+    button(container(content).center_y(Length::Fill))
         .on_press(msg)
         .height(32)
         .padding([0, 12])
