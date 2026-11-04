@@ -140,6 +140,18 @@ pub fn dot<'a, M: 'a>(color: Color) -> Element<'a, M> {
         })
         .into()
 }
+pub fn bookmark() -> Text<'static> {
+    glyph('\u{e060}')
+}
+pub fn check() -> Text<'static> {
+    glyph('\u{e06c}')
+}
+pub fn user() -> Text<'static> {
+    glyph('\u{e19f}')
+}
+pub fn layout_grid() -> Text<'static> {
+    glyph('\u{e0ff}')
+}
 pub fn panel_right_close() -> Text<'static> {
     glyph('\u{e432}')
 }

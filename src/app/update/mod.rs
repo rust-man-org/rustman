@@ -56,6 +56,7 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
                     crate::message::SidebarMsg::ItemDragOver(_)
                         | crate::message::SidebarMsg::RowHoverEnd(_)
                         | crate::message::SidebarMsg::FilterChanged(_)
+                        | crate::message::SidebarMsg::WorkspaceFilterChanged(_)
                         | crate::message::SidebarMsg::ContextMenuOpened(_)
                         | crate::message::SidebarMsg::ContextMenuClosed
                         | crate::message::SidebarMsg::EnvironmentVariableHover(..)
@@ -144,6 +145,7 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
         // The tree search box is view state; nothing persisted changes.
         | Message::Sidebar(
             crate::message::SidebarMsg::FilterChanged(_)
+                | crate::message::SidebarMsg::WorkspaceFilterChanged(_)
                 | crate::message::SidebarMsg::CollectionsSectionToggled
                 | crate::message::SidebarMsg::EnvironmentsSectionToggled
                 | crate::message::SidebarMsg::CollectionDeleteTextChanged(_)

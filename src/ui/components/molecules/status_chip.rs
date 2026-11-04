@@ -17,17 +17,41 @@ pub fn status_chip<'a, M: Clone + 'a>(
     detail: Option<String>,
     msg: M,
 ) -> Element<'a, M> {
+    // Mockup `.sync-chip .dot`: 8px dot inside a 3px tinted ring.
+    let ring = iced::Color {
+        a: 0.22,
+        ..tone.color()
+    };
+    let dot = container(Mark::Dot.view(tone, 8.0))
+        .width(14)
+        .height(14)
+        .center_x(14)
+        .center_y(14)
+        .style(move |_| container::Style {
+            background: Some(Background::Color(ring)),
+            border: Border {
+                radius: 7.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
     let mut content = row![
-        Mark::Dot.view(tone, 8.0),
+        dot,
         text(label.into())
             .size(TEXT_SM)
-            .color(Palette::text())
+            .color(Palette::text_muted())
             .font(UI_FONT_MEDIUM),
     ]
     .spacing(6)
     .align_y(Alignment::Center);
     if let Some(detail) = detail {
-        content = content.push(text(format!("· {detail}")).size(TEXT_SM).color(Palette::text_muted()));
+        content = content.push(text("·").size(TEXT_SM).color(Palette::text_muted()));
+        content = content.push(
+            text(detail)
+                .size(TEXT_SM)
+                .color(Palette::text())
+                .font(UI_FONT_MEDIUM),
+        );
     }
     // A fixed-height button top-aligns its content; center it explicitly.
     button(container(content).center_y(Length::Fill))

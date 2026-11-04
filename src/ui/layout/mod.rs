@@ -11,7 +11,7 @@ use crate::{
 
 mod console;
 mod dialogs;
-mod header;
+pub mod header;
 mod status_bar;
 mod style;
 mod tab_bar;

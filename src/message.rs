@@ -138,6 +138,8 @@ pub enum SidebarMsg {
     ToggleCollapsed,
     /// Collection tree search box.
     FilterChanged(String),
+    /// Header workspace switcher search box.
+    WorkspaceFilterChanged(String),
     SearchMove(isize),
     SearchConfirm,
     SearchPick(usize),

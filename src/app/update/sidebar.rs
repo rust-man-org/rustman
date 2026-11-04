@@ -545,7 +545,13 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             } else {
                 Some(id)
             };
+            if state.sidebar.context_menu.as_deref() == Some(crate::ui::layout::header::WORKSPACE_MENU)
+            {
+                state.sidebar.workspace_filter.clear();
+                return iced::widget::operation::focus(crate::ui::layout::header::WORKSPACE_SEARCH_ID);
+            }
         }
+        SidebarMsg::WorkspaceFilterChanged(q) => state.sidebar.workspace_filter = q,
         SidebarMsg::ContextMenuClosed => {
             state.sidebar.context_menu = None;
         }
