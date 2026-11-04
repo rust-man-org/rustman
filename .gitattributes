@@ -1,0 +1,2 @@
+# Shell scripts must use LF in Windows, macOS and Linux checkouts.
+*.sh text eol=lf

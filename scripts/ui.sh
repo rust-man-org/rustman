@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
-# Build Rustman and launch it to try the current UI.
+# Build Rustman and start the app. The default renderer uses the GPU.
 #
 #   scripts/ui.sh                 build (debug) + run with your normal data
-#   scripts/ui.sh -t              run both test suites first, stop if red
+#   scripts/ui.sh -t              run tests and checks first; stop on failure
 #   scripts/ui.sh -r              release build (slower build, faster app)
 #   scripts/ui.sh -d DIR          use DIR as the data folder instead of your
 #                                 real one (created if missing)
@@ -13,10 +13,14 @@
 #                                 working requests + a "Sample" environment.
 #                                 Delete that folder to get a fresh one.
 #
-# Flags combine: scripts/ui.sh -t -x
+# Combine flags: sh scripts/ui.sh -t -r -x
 # Works in Git Bash (Windows), Linux and macOS.
 
 set -eu
+
+# Use the GPU first. Keep software rendering as a fallback.
+# Respect an explicit choice, for example ICED_BACKEND=tiny-skia.
+export ICED_BACKEND="${ICED_BACKEND:-wgpu,tiny-skia}"
 
 cd "$(dirname "$0")/.."
 
@@ -48,17 +52,19 @@ if [ -n "${RUSTMAN_TMP:-}" ]; then
 fi
 
 if [ "$run_tests" = 1 ]; then
-    echo "==> cargo test"
-    cargo test
-    echo "==> cargo test --no-default-features"
-    cargo test --no-default-features
+    echo "==> cargo test --locked --all-targets"
+    cargo test --locked --all-targets
+    echo "==> cargo test --locked --no-default-features --all-targets"
+    cargo test --locked --no-default-features --all-targets
+    echo "==> cargo check --locked --no-default-features --all-targets"
+    cargo check --locked --no-default-features --all-targets
 fi
 
 echo "==> cargo build ($profile)"
 if [ "$profile" = release ]; then
-    cargo build --release
+    cargo build --release --locked
 else
-    cargo build
+    cargo build --locked
 fi
 
 exe="target/$profile/rustman"

@@ -5,7 +5,7 @@ Updated: 2026-11-04 (Asia/Jakarta).
 ## Resume checkpoint
 
 - Current scope: local sidebar/RAM fixes on `fix/import-folders-sidebar-hover`; local development integration authorized.
-- Active task: memory optimization complete; sidebar visual follow-up pending.
+- Active task: sidebar visual follow-up pending; GPU-default launcher/docs verified.
 - Completed: Windows baseline/launch green (zip 9 fix); parallel rules and 09 plan written.
 - Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
   Local scaffold/CI commit: `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
@@ -52,23 +52,23 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 - Owner: Codex, 2026-11-04 (Asia/Jakarta); branch fix/import-folders-sidebar-hover.
 - Integration: user authorized local commit and merge into development; no push.
 - Plans: ../0-foundation/{memory-optimization,sidebar-fuzzy-search}.md; readme.md now covers platform builds.
-- Memory: Windows defaults to tiny-skia,wgpu; explicit renderer/GPU preferences
-  respected. src/main.rs; docs/DEVELOPMENT.md. Other platforms unchanged.
-- Final release: 18.46 MiB private / 40.36 MiB total working set; CPU idle 0%;
+- User correction: GPU is the default on all platforms. Use scripts/ui.sh for
+  build/run. Software rendering is opt-in through ICED_BACKEND; see readme.md.
+- Previous software release: 18.46 MiB private / 40.36 MiB total working set; CPU 0%;
   9 requests, one restored JSON tab (39 bytes), five stable samples, no GPU modules.
 - Earlier controlled GPU/software baseline: ~162 / 12 MiB private; software JSON
   editing reached 14 MiB. Final simultaneous GPU rerun exited before sampling;
   use the earlier controlled baseline. Larger workloads remain unmeasured.
 - Evidence: target/memory-{backend-comparison,software-editor,optimized-release}.json;
   target/memory-{tests,tests-no-default,check,release-build}.log.
-- Release: target/release/rustman.exe runs with target/memory-final-default.
+- Current launcher gate/build evidence: target/gpu-default-script.log; example data target/ui-example.
 - Remaining: sidebar light/dark/Playwright visual checks (earlier physical Escape
   interruptions); Postman comparison under equivalent load. Global plans not Done.
 
 ## Verification checkpoint
 
-- Latest pre-merge Windows gate: 228 default / 220 no-default tests passed; 3 live-network
-  tests ignored each; locked no-default all-target check and release build pass.
+- Latest Windows gate: 225 default / 217 no-default tests passed; 3 live-network
+  tests ignored each; locked no-default all-target check, release build/launch and 4 launcher tests pass.
 - Historical 2026-11-03 baseline: zip 9 Windows extraction fixed; build and launch
   passed, tests 139 default / 131 no-default; manual request/sync not exhaustive.
 - CI execution is not proven by local tests; wave 0 scaffold added the test gate.
@@ -79,7 +79,7 @@ Keep five recent entries; compact older outcomes and use git history for detail.
 
 | Status | Date | Completed scope | Evidence / limitation |
 |---|---|---|---|
-| [X] | 2026-11-04 | Windows renderer memory default | ../0-foundation/memory-optimization.md; local release measured; integration authorized; workload limits above. |
+| [X] | 2026-11-04 | Renderer memory comparison and opt-in software mode | ../0-foundation/memory-optimization.md; local release measured; integration authorized; workload limits above. |
 | [X] | 2026-11-03 | Planning docs: selective reading, API map, reuse policy | `../index.md`, `../api/index.md`, `../api-reuse-rules.md`; docs only. |
 | [X] | 2026-11-03 | Draft review fixes: durable conflicts and merged-tab refresh | `../0-foundation/01-local-drafts.md`, C9; required regressions specified, runtime not implemented. |
 | [X] | 2026-11-03 | Baseline fixed and green; app launches | `src/services/update.rs` zip 9 fix; results above. |

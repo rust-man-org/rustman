@@ -42,3 +42,13 @@ JSON editing. The final simultaneous GPU rerun exited before sampling, so the
 reported baseline comes from the earlier controlled run. Do not treat this as
 an exhaustive workload benchmark. Software repaint can cost more CPU; explicit
 GPU selection is preserved. User authorized local commit/integration after measurement; no remote push.
+
+## User correction (2026-11-04)
+
+The user selected GPU as the default on all platforms. Remove the Windows
+software-startup override. Keep software rendering as an opt-in choice.
+Use the existing scripts/ui.sh launcher for build/run. The launcher selects
+wgpu,tiny-skia unless ICED_BACKEND has a value. The measurements above describe
+the earlier software configuration. They are not GPU-default RAM measurements.
+The README uses short instructions in a Simplified Technical English style;
+full ASD-STE100 dictionary compliance has not been certified.

@@ -106,62 +106,68 @@ rather than a rendered page, and PDFs show a binary-response summary.
 
 ## Build from source
 
-Use the current stable [Rust toolchain](https://rust-lang.org/tools/install/)
-installed through rustup, plus Git. The project uses Rust edition 2024; the
-locked dependencies may require a newer compiler than the edition's minimum.
-Two dependencies are fetched directly from GitHub by Cargo, so the first build
-needs network access. C/C++ tools and CMake are needed for native dependencies.
-On Unix, [vendored OpenSSL](https://docs.rs/openssl/latest/openssl/#vendored)
-also needs Perl and Make.
+Use the existing launcher: `scripts/ui.sh`. The script builds the app and starts it.
+The default renderer uses the GPU. The script uses `Cargo.lock` for all builds.
 
-Clone the repository, or use your team's fork URL for a shared branch:
+### Prepare the source
+
+1. Install the current stable [Rust toolchain](https://rust-lang.org/tools/install/).
+2. Install Git.
+3. Clone this repository. Use your team's fork URL if necessary.
+4. Open the repository folder in a terminal.
 
 ```sh
 git clone https://github.com/rust-man-org/rustman.git
 cd rustman
 ```
 
-Run the following build commands from the repository root, on the branch you
-want to build. `--locked` keeps the versions recorded in `Cargo.lock`.
+Cargo gets the editor and script engine from GitHub. The first build needs an
+internet connection. Select the branch that you want to build before you start.
 
-### Windows (x86_64, PowerShell)
+### Windows (x86_64)
 
-Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-with **Desktop development with C++**, the MSVC compiler and a Windows SDK.
-Install CMake, or include **C++ CMake tools for Windows** in that workload.
-Use Developer PowerShell for Visual Studio if `cl.exe` or `link.exe` cannot be
-found in a regular shell. See the [official MSVC setup guide](https://rust-lang.github.io/rustup/installation/windows-msvc.html).
+1. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
+2. Select **Desktop development with C++**. Include the MSVC compiler and a Windows SDK.
+3. Install CMake. You can use the **C++ CMake tools for Windows** component.
+4. Open [Git Bash](https://gitforwindows.org/) in the repository folder.
+5. Select the MSVC Rust toolchain for this folder.
+6. Start the release build.
 
-```powershell
+```sh
 rustup toolchain install stable-x86_64-pc-windows-msvc
-cargo +stable-x86_64-pc-windows-msvc build --release --locked
-.\target\release\rustman.exe
+rustup override set stable-x86_64-pc-windows-msvc
+sh scripts/ui.sh -r
 ```
 
-Output: `target/release/rustman.exe`. Close a running copy of that executable
-before rebuilding it; Windows cannot replace the executable while it is open.
-No WSL, Node.js or browser runtime is required.
+If the compiler or linker is missing, open Git Bash from a Visual Studio developer terminal.
+See the [MSVC setup guide](https://rust-lang.github.io/rustup/installation/windows-msvc.html).
+
+Output: `target/release/rustman.exe`. Close this executable before you build it again.
+Windows cannot replace an executable while it is open. WSL and Node.js are not necessary.
 
 ### macOS (Apple Silicon or Intel)
 
-Install Xcode Command Line Tools, then CMake and the native build helpers
-(the example uses [Homebrew](https://brew.sh/)):
+1. Install Xcode Command Line Tools.
+2. Install CMake and Perl. The example uses [Homebrew](https://brew.sh/).
+3. Select the stable Rust toolchain for this folder.
+4. Start the release build.
 
 ```sh
 xcode-select --install
 brew install cmake pkg-config perl
 rustup toolchain install stable
-cargo +stable build --release --locked
-./target/release/rustman
+rustup override set stable
+sh scripts/ui.sh -r
 ```
 
-Output: `target/release/rustman`, built for the Mac's native architecture.
-A source build produces the executable; the universal `.dmg` is produced by
-the release workflow, not by `cargo build` alone.
+Output: `target/release/rustman`. The executable uses the Mac's native architecture.
+Use the release workflow to make a universal `.dmg` package.
 
 ### Linux (Ubuntu, Debian or Mint; x86_64 or ARM64)
 
-Install the system libraries used by the Linux CI build:
+1. Install the system packages.
+2. Select the stable Rust toolchain for this folder.
+3. Start the release build.
 
 ```sh
 sudo apt-get update
@@ -170,70 +176,66 @@ sudo apt-get install -y \
   libxkbcommon-dev libxkbcommon-x11-dev libxi-dev libx11-dev \
   libxcb1-dev libxcb-xkb-dev libdbus-1-dev
 rustup toolchain install stable
-cargo +stable build --release --locked
-./target/release/rustman
+rustup override set stable
+sh scripts/ui.sh -r
 ```
 
-Output: `target/release/rustman`, built for the host architecture. On other
-Linux distributions, install equivalent compiler, CMake, Perl, pkg-config,
-X11/XCB, xkbcommon and D-Bus development packages through the distro's package
-manager. There is no WebKitGTK, GTK or pdfium build dependency.
+Output: `target/release/rustman`. The executable uses the host's architecture.
+For another Linux distribution, install the equivalent development packages.
+The Linux package list is the same as the CI package list, with Git, curl and Perl added.
+WebKitGTK, GTK and pdfium are not necessary.
 
-### Renderer and RAM usage (all platforms)
+### Launcher options (all platforms)
 
-Windows defaults to the `tiny-skia` software renderer, with `wgpu` as a fallback,
-to reduce GPU driver/device memory for the API-client UI. Linux and macOS retain
-their existing defaults. Software rendering is available there too; enable it
-for one launch with:
+Use Git Bash on Windows. Use a terminal with `sh` on macOS or Linux.
+
+| Command | Result |
+|---|---|
+| `sh scripts/ui.sh` | Build and start the debug app with your normal data. |
+| `sh scripts/ui.sh -r` | Build and start the release app with your normal data. |
+| `sh scripts/ui.sh -t -r` | Run both test configurations and the check. Then build and start the release app. |
+| `sh scripts/ui.sh -r -x` | Build and start the release app with the example workspace. |
+| `sh scripts/ui.sh -r -s` | Build and start the release app with a copy of your local data. |
+| `sh scripts/ui.sh -r -d "target/my-data"` | Use a separate data folder. |
+| `sh scripts/ui.sh -h` | Show the launcher options. |
+
+The example workspace uses `target/ui-example/`. Your normal collections stay in their original folder.
+The sample-copy option uses `target/ui-data/`. Changes to that copy stay in the copy.
+
+### Renderer and RAM
+
+GPU rendering is the default on all platforms. The launcher can use software rendering if the GPU cannot start.
+An explicit `ICED_BACKEND` value has priority over the launcher default.
+Linux keeps its existing integrated-GPU preference.
+
+To select the software renderer for one launch, use this command:
 
 ```sh
-# Linux / macOS
-ICED_BACKEND="tiny-skia,wgpu" ./target/release/rustman
+ICED_BACKEND=tiny-skia sh scripts/ui.sh -r
 ```
 
-To explicitly choose the GPU renderer:
-
-```powershell
-# Windows, for this PowerShell session
-$env:ICED_BACKEND = 'wgpu'
-.\target\release\rustman.exe
-# Return to the app's default for future launches from this shell:
-Remove-Item Env:ICED_BACKEND
-```
+To select only the GPU renderer for one launch, use this command:
 
 ```sh
-# Linux / macOS, for this launch only
-ICED_BACKEND=wgpu ./target/release/rustman
+ICED_BACKEND=wgpu sh scripts/ui.sh -r
 ```
 
-Explicit `ICED_BACKEND`, `WGPU_BACKEND`, `WGPU_ADAPTER_NAME` and `WGPU_POWER_PREF`
-settings are respected. Lower software-renderer memory can come with more CPU
-work during repaint. The savings measured on Windows are not a guarantee for
-other platforms or workloads. Compare release builds with the same data, tabs
-and window size; private working set and total working set are different metrics.
+Software rendering can use less RAM. It can use more CPU time when the screen changes.
+The measured Windows RAM values do not apply to all platforms or workloads.
+Use the same data, tabs and window size when you compare memory use.
+Private working set and total working set are different measurements.
 
-### Package-manager builds (all platforms)
+### Test the launcher
+
+This test uses a fake Cargo command and fake app executables. It does not start Rustman.
 
 ```sh
-cargo +stable build --release --locked --no-default-features
+sh tests/ui-script.sh
 ```
 
-This removes the in-app updater, its settings/banner, and binary replacement
-code so the package manager owns updates. The normal build includes the updater;
-automatic update checking remains opt-in.
-
-### Development and checks
-
-```sh
-cargo run --locked
-cargo test --locked --all-targets
-cargo test --locked --no-default-features --all-targets
-cargo check --locked --no-default-features --all-targets
-```
-
-Development builds go to `target/debug/`; use `target/debug/rustman.exe` on
-Windows and `target/debug/rustman` on macOS/Linux. Release optimization (including
-LTO) makes the first release build slower. More details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+For package-manager builds without the updater, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The launcher builds the normal app with the updater. Automatic update checks are off by default.
+Release optimization can make a build slow, especially the first build.
 
 ## Tech stack
 

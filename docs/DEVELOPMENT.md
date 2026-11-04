@@ -77,25 +77,35 @@ A multi megabyte JSON response should not crash the UI, blow up memory, or freez
 
 I ship one small binary. The release profile uses `opt-level = 'z'`, `lto = true`, `codegen-units = 1`, `strip = true`, and `panic = "abort"`. The catch with `panic = "abort"` is that there is no per task isolation, a panic kills the whole process. That makes every stray `.unwrap()` matter more, so the fallible ones (the git2 `workdir().unwrap()` sites, the LRU double lookup, `build_client().expect()`) are worth converting to `?` over time.
 
-### Windows renderer and memory
+### Renderer and memory
 
-Windows defaults to iced's software renderer (`tiny-skia`), with `wgpu` as a
-fallback. This avoids GPU driver/device allocations for the normal API-client
-UI. The tradeoff is CPU work during repaint; graphics-heavy workloads can
-prefer the GPU explicitly. Linux keeps its existing integrated-GPU preference.
+Use `sh scripts/ui.sh -r` to build and start the release app on every platform.
+On Windows, use Git Bash with the MSVC build tools available.
+Add `-t` to run both test configurations and the check before the build.
 
-An explicit `ICED_BACKEND`, `WGPU_BACKEND`, `WGPU_ADAPTER_NAME`, or
-`WGPU_POWER_PREF` is respected. To opt into the GPU for one PowerShell session:
+GPU rendering is the default. The launcher selects `wgpu,tiny-skia` unless
+`ICED_BACKEND` has a value. This selects the GPU first and keeps software as a
+fallback. The executable also keeps iced's normal GPU-first behavior.
+The earlier Windows-only software default was removed at the user's request.
+Linux keeps its existing integrated-GPU preference.
 
-```powershell
-$env:ICED_BACKEND = 'wgpu'
-.\target\release\rustman.exe
+To use software rendering for one launch:
+
+```sh
+ICED_BACKEND=tiny-skia sh scripts/ui.sh -r
 ```
 
-Compare memory using the same window size, tabs, collection and warmup time.
-Windows private working set (physical private RAM), total working set, and
-private commit are different counters; do not compare one to another. Release
-profile measurements are tracked in the company progress checkpoint.
+To use only the GPU renderer for one launch:
+
+```sh
+ICED_BACKEND=wgpu sh scripts/ui.sh -r
+```
+
+Software rendering can use less RAM and more CPU time during repaint.
+Compare memory with the same window size, tabs, collection and warmup time.
+Private working set, total working set and private commit are different counters.
+The previous low-RAM measurements used software rendering. They do not describe
+GPU-default launches. See the company progress checkpoint for measurement details.
 
 ### Not leaking the URL in errors
 
