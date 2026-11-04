@@ -110,6 +110,20 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
   working), with recent requests/collections/environments from local data.
   Typing `>` switches to commands, reusing the command palette. Show only
   filters Rustman can back (Type, In); no visibility/org filters.
+- Pending (user request 2026-11-05, Postman reference): two controls at the
+  right end of the tab bar, after `+`.
+  - Tab list chevron (`⌄`): a popup (about 300px) with a "Search tabs" input
+    (hint Ctrl+Shift+A) and every open tab as a row: method in its colour, the
+    name ellipsized, and an orange dot when the tab is unsaved. Clicking a row
+    switches to that tab. A collapsible "Recently closed" section sits at the
+    bottom (needs a small closed-tabs history).
+  - Environment selector: a bg-2 pill with the active environment name and a
+    chevron, then an icon button for the environment quick look. The dropdown
+    (about 450px) has a "Search" input, "No Environment" (muted), the
+    environments with a tick on the active one (row bg-2), a hairline, and
+    "+ Create new environment".
+  Rustman version: reuse the existing environment state and tab state; keep
+  Ctrl+Shift+A for the tab search.
 - Committed on feat/endpoint-examples at the user's request (for a PR); not pushed.
 
 ## Verification checkpoint
