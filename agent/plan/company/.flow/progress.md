@@ -95,6 +95,21 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
   sync → Git panel, Discard local changes when a draft exists); Share is an
   outlined link button. Resolved-URL line under the URL bar removed (not in
   the mockup, per user). Gates 263/255.
+- Pending (user request 2026-11-05, Postman reference): header search like
+  Postman's. The field reads "Search (Ctrl+K)" with the shortcut inside the
+  label and a hover state. Opening it shows a large popup anchored under the
+  top bar (about 1080px wide) with:
+  - a search input with a filter icon on the right;
+  - filter chips (Type, In, By, …) and "Clear all";
+  - command rows with key caps: "Show and run commands >" (Ctrl+Shift+P) and
+    "Find in workspace <NAME>" (Ctrl+Alt+K);
+  - a hairline, then a recently viewed list: a type icon (collection or
+    workspace), a bold name, a muted "workspace · owner" line and a relative
+    time on the right ("1m RECENTLY VIEWED", "12h", "3mo").
+  Rustman version: Ctrl+K opens it from the header field (keep Ctrl+P
+  working), with recent requests/collections/environments from local data.
+  Typing `>` switches to commands, reusing the command palette. Show only
+  filters Rustman can back (Type, In); no visibility/org filters.
 - Committed on feat/endpoint-examples at the user's request (for a PR); not pushed.
 
 ## Verification checkpoint
