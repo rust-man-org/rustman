@@ -175,9 +175,9 @@ pub fn view(state: &AppState) -> Option<Element<'_, Message>> {
                 .padding([8, 12])
                 .width(Length::Fill)
                 .style(move |_| container::Style {
-                    background: Some(Background::Color(Color { a: 0.10, ..tone })),
+                    background: Some(Background::Color(tint(tone, 0.10))),
                     border: Border {
-                        color: Color { a: 0.45, ..tone },
+                        color: tint(tone, 0.45),
                         width: 1.0,
                         radius: 6.0.into(),
                     },
@@ -186,8 +186,20 @@ pub fn view(state: &AppState) -> Option<Element<'_, Message>> {
         )
         .padding([6, 12])
         .width(Length::Fill)
+        .style(|_| container::Style {
+            background: Some(Background::Color(Palette::surface())),
+            ..Default::default()
+        })
         .into(),
     )
+}
+
+/// `tone` mixed into the surface color, opaque, so the banner reads the
+/// same whatever is drawn beneath it.
+fn tint(tone: Color, amount: f32) -> Color {
+    let s = Palette::surface();
+    let mix = |a: f32, b: f32| a * (1.0 - amount) + b * amount;
+    Color::from_rgb(mix(s.r, tone.r), mix(s.g, tone.g), mix(s.b, tone.b))
 }
 
 fn plural(n: usize) -> &'static str {

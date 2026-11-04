@@ -19,7 +19,8 @@ use crate::{
 };
 
 /// Room the badge takes in a tree row; callers shrink the label by this.
-pub const BADGE_WIDTH: f32 = 84.0;
+/// Labels stay one short word so names keep room in a 200px sidebar.
+pub const BADGE_WIDTH: f32 = 58.0;
 
 /// `All | Drafts · n` chips. Hidden while there are no drafts and the
 /// filter is off.
@@ -157,19 +158,19 @@ fn badge_for(d: &RequestDraft) -> Element<'static, Message> {
             "Deleted".to_owned(),
             Palette::text_subtle(),
         ),
-        DraftState::Conflict(f) => (
+        DraftState::Conflict(_) => (
             icons::dot(Palette::ERROR),
-            format!("{} conflict{}", f.len(), if f.len() == 1 { "" } else { "s" }),
+            "Conflict".to_owned(),
             Palette::ERROR,
         ),
         DraftState::InReview(r) => (
             icons::git_branch().size(10).color(Palette::text_muted()).into(),
-            r.pr_number.map_or("In review".to_owned(), |n| format!("#{n}")),
+            r.pr_number.map_or("Review".to_owned(), |n| format!("#{n}")),
             Palette::text_muted(),
         ),
         DraftState::UpstreamChanged => (
             icons::dot(Palette::PUT),
-            "Main changed".to_owned(),
+            "Merged".to_owned(),
             Palette::PUT,
         ),
         DraftState::Clean => (
