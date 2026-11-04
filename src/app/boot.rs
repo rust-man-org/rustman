@@ -13,10 +13,19 @@ use crate::{
 use super::AppState;
 
 pub(crate) fn init() -> (AppState, Task<Message>) {
-    let data_dir = dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("rustman");
-    init_at(data_dir)
+    init_at(data_dir_from(std::env::var_os("RUSTMAN_DATA_DIR")))
+}
+
+/// `RUSTMAN_DATA_DIR` points the app at another data folder (UI testing
+/// with sample data, see `scripts/ui.sh`); unset or empty means the user's
+/// normal data dir.
+fn data_dir_from(env: Option<std::ffi::OsString>) -> PathBuf {
+    match env {
+        Some(dir) if !dir.is_empty() => PathBuf::from(dir),
+        _ => dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("rustman"),
+    }
 }
 
 /// Boot from an explicit data directory. `init` passes the user's data dir;
@@ -261,5 +270,21 @@ fn parse_sidebar_panel(s: &str) -> crate::message::SidebarPanel {
         "Git" => SidebarPanel::Git,
         "Settings" => SidebarPanel::Settings,
         _ => SidebarPanel::Collections,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn data_dir_env_overrides_only_when_set() {
+        assert_eq!(
+            data_dir_from(Some("D:/sample".into())),
+            PathBuf::from("D:/sample")
+        );
+        let default = data_dir_from(None);
+        assert!(default.ends_with("rustman"));
+        assert_eq!(data_dir_from(Some("".into())), default);
     }
 }
