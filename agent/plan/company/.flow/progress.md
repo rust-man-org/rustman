@@ -75,6 +75,13 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
   holds Import cURL… / Export as cURL, replacing the loose import icon.
   Section headers: label centred in the 24px band, 10px text, 10px inset.
   Unused accent `RowFill::Selected` removed. Gates 252/244.
+- Follow-up: method menu restyled per `.combo-menu` (bg-0, bd-2, 6px radius,
+  current item on bg-2, no iced cyan); open picker uses bg-0 without a ring.
+  Tab bar rebuilt per `.tabsbar`/`.tab`: 36px, flat tabs with hairlines,
+  active bg-0 + 2px accent top, plain mono method text, 16px close.
+- Deletion: collection delete is two layers (warning + Delete, then type
+  "delete"), enforced in the handler; request delete asks first (Enter/Esc).
+  Gates 254/246. Visual check of tab bar/menu still pending in the real app.
 - Committed on feat/endpoint-examples at the user's request (for a PR); not pushed.
 
 ## Verification checkpoint
