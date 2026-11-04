@@ -45,7 +45,11 @@ pub fn view<'a>(
     })
     .width(METHOD_W)
     .text_size(11)
-    .padding([10, 10])
+    // Exactly the pill's inner height (40 − 2×1px border = 14 + 2×12), so
+    // the bg-2 column fills it edge to edge instead of leaving bands of the
+    // pill colour above and below.
+    .text_line_height(iced::Pixels(14.0))
+    .padding([12, 10])
     .font(crate::ui::theme::MONO)
     .handle(iced::widget::pick_list::Handle::Static(
         iced::widget::pick_list::Icon {
