@@ -250,6 +250,9 @@ pub enum RequestMsg {
     Undo,
     Redo,
     SaveRequest,
+    /// Save menu "Save as…": the save dialog even for a saved request, so
+    /// the tab is stored as a new request.
+    SaveRequestAs,
     ImportCurl(String),
     ImportHttpie(String),
     /// A command parsed off the UI thread (clipboard/file import, or a large

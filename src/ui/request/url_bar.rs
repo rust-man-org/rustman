@@ -9,7 +9,7 @@ use crate::{
     state::tabs::RequestTabState,
     ui::{
         icons,
-        theme::{Palette, TEXT_MD, TEXT_SM, TEXT_XS},
+        theme::{Palette, TEXT_MD, TEXT_SM},
     },
 };
 
@@ -23,7 +23,6 @@ pub const SEND_MENU: &str = "request:send";
 
 pub fn view<'a>(
     tab: &'a RequestTabState,
-    env: Option<&'a crate::domain::environment::AppEnvironment>,
     send_menu_open: bool,
 ) -> Element<'a, Message> {
     // A ws:// or wss:// URL is not an HTTP request: there is no method, no
@@ -155,41 +154,9 @@ pub fn view<'a>(
 
     let bar = row![url_pill].align_y(Alignment::Center);
 
-    // Same resolution the send path uses, so the preview can't claim a different
-    // URL than the one that goes out — the mismatch between this line and the
-    // wire is how the double-scheme bug hid.
-    let mut expanded = (!ws_mode && env.is_some() && tab.url.contains("{{"))
-        .then(|| crate::services::http::resolve_url(&tab.url, env));
-    if let Some(e) = expanded.as_mut() {
-        if e.len() > 256 {
-            let head = crate::services::format::head_capped(e.as_str(), 200);
-            *e = format!("{head}…");
-        }
-    }
-
-    let mut outer = iced::widget::Column::new().push(container(bar).width(Length::Fill));
-
-    // A quiet hint under the URL text, not a band: the mockup has no strip
-    // here, and an accent-coloured line read as an error. Left edge = pill
-    // border + method picker + divider + the editor's own padding.
-    if let Some(exp) = expanded {
-        outer = outer.push(
-            row![
-                Space::new().width(1.0 + METHOD_W + 1.0 + URL_PAD_X),
-                text(exp)
-                    .size(TEXT_XS)
-                    .color(Palette::text_subtle())
-                    .font(crate::ui::theme::MONO)
-                    .wrapping(iced_core::text::Wrapping::None),
-            ]
-            .padding(iced::Padding {
-                top: 4.0,
-                ..iced::Padding::ZERO
-            }),
-        );
-    }
-
-    outer.into()
+    // No resolved-URL line under the bar: the mockup has none, and the
+    // `{{var}}` highlight already marks what gets substituted on Send.
+    container(bar).width(Length::Fill).into()
 }
 
 /// Mockup `.send-wrap`: "→ Send" plus a 30px chevron, split by a faint white

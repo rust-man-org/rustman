@@ -557,6 +557,20 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             }
             return save_request(state);
         }
+        RequestMsg::SaveRequestAs => {
+            // The dialog's Confirm always stores a new request, so the open
+            // one stays as it was. Default to the tab's current collection.
+            let tab = state.tabs.active_tab();
+            state.save_dialog_name = tab.title.clone();
+            state.save_dialog_collection_id = tab
+                .saved_as
+                .as_ref()
+                .map(|(c, _)| c.clone())
+                .or_else(|| state.collections.first().map(|c| c.id.clone()));
+            state.save_dialog_group_id = None;
+            state.save_dialog_open = true;
+            return Task::none();
+        }
         RequestMsg::FormatBody => {
             let text = tab.body_editor.content();
             return format_body(tab, text, FormatTarget::RequestBody);

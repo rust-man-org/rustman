@@ -146,6 +146,18 @@ pub fn bookmark() -> Text<'static> {
 pub fn check() -> Text<'static> {
     glyph('\u{e06c}')
 }
+pub fn save() -> Text<'static> {
+    glyph('\u{e14d}')
+}
+pub fn link() -> Text<'static> {
+    glyph('\u{e102}')
+}
+pub fn rotate_ccw() -> Text<'static> {
+    glyph('\u{e148}')
+}
+pub fn arrow_up_to_line() -> Text<'static> {
+    glyph('\u{e45b}')
+}
 pub fn user() -> Text<'static> {
     glyph('\u{e19f}')
 }
