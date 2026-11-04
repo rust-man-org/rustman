@@ -1,0 +1,225 @@
+{
+  "info": {
+    "_postman_id": "7f3c2a10-5b1e-4c6d-9a8f-2e4b6c8d0a11",
+    "name": "Rustman Sample (Postman)",
+    "description": "Sample collection for testing Postman import in Rustman. Every request hits a public API (JSONPlaceholder, httpbin, Countries GraphQL), so Send works right after import.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "users",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://jsonplaceholder.typicode.com/users",
+              "protocol": "https",
+              "host": ["jsonplaceholder", "typicode", "com"],
+              "path": ["users"]
+            }
+          }
+        },
+        {
+          "name": "Get user",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "https://jsonplaceholder.typicode.com/users/1",
+              "protocol": "https",
+              "host": ["jsonplaceholder", "typicode", "com"],
+              "path": ["users", "1"]
+            }
+          }
+        },
+        {
+          "name": "Search users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://jsonplaceholder.typicode.com/users?username=Bret&_limit=5",
+              "protocol": "https",
+              "host": ["jsonplaceholder", "typicode", "com"],
+              "path": ["users"],
+              "query": [
+                { "key": "username", "value": "Bret" },
+                { "key": "_limit", "value": "5" },
+                { "key": "email", "value": "Sincere@april.biz", "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "posts",
+      "item": [
+        {
+          "name": "List posts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://jsonplaceholder.typicode.com/posts?userId=1",
+              "protocol": "https",
+              "host": ["jsonplaceholder", "typicode", "com"],
+              "path": ["posts"],
+              "query": [{ "key": "userId", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "Create post",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Debug", "value": "true", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Hello from Rustman\",\n  \"body\": \"Imported from a Postman collection\",\n  \"userId\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "https://jsonplaceholder.typicode.com/posts",
+              "protocol": "https",
+              "host": ["jsonplaceholder", "typicode", "com"],
+              "path": ["posts"]
+            }
+          }
+        },
+        {
+          "name": "Update post",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"title\": \"Updated title\",\n  \"body\": \"Updated body\",\n  \"userId\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "https://jsonplaceholder.typicode.com/posts/1",
+              "protocol": "https",
+              "host": ["jsonplaceholder", "typicode", "com"],
+              "path": ["posts", "1"]
+            }
+          }
+        },
+        {
+          "name": "Patch post title",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"title\": \"Patched title\" }",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "https://jsonplaceholder.typicode.com/posts/1",
+              "protocol": "https",
+              "host": ["jsonplaceholder", "typicode", "com"],
+              "path": ["posts", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete post",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "https://jsonplaceholder.typicode.com/posts/1",
+              "protocol": "https",
+              "host": ["jsonplaceholder", "typicode", "com"],
+              "path": ["posts", "1"]
+            }
+          }
+        },
+        {
+          "name": "comments",
+          "item": [
+            {
+              "name": "Comments of post",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://jsonplaceholder.typicode.com/posts/1/comments",
+                  "protocol": "https",
+                  "host": ["jsonplaceholder", "typicode", "com"],
+                  "path": ["posts", "1", "comments"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "forms",
+      "item": [
+        {
+          "name": "Form-data echo",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "Rustman", "type": "text" },
+                { "key": "role", "value": "tester", "type": "text" },
+                { "key": "debug", "value": "1", "type": "text", "disabled": true }
+              ]
+            },
+            "url": {
+              "raw": "https://httpbin.org/post",
+              "protocol": "https",
+              "host": ["httpbin", "org"],
+              "path": ["post"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "graphql",
+      "item": [
+        {
+          "name": "Country by code",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query Country($code: ID!) {\n  country(code: $code) {\n    name\n    capital\n    currency\n  }\n}",
+                "variables": "{\n  \"code\": \"ID\"\n}"
+              }
+            },
+            "url": {
+              "raw": "https://countries.trevorblades.com/",
+              "protocol": "https",
+              "host": ["countries", "trevorblades", "com"],
+              "path": [""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "https://jsonplaceholder.typicode.com/todos/1"
+      }
+    }
+  ]
+}

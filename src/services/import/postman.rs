@@ -371,3 +371,55 @@ fn export_request(req: &SavedRequest) -> serde_json::Value {
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE: &str =
+        include_str!("../../../samples/postman/rustman-sample.postman_collection.json");
+
+    #[test]
+    fn bundled_sample_imports_cleanly() {
+        let cols = import(SAMPLE).expect("sample must parse");
+        assert_eq!(cols.len(), 1);
+        let col = &cols[0];
+        assert_eq!(col.collection.name, "Rustman Sample (Postman)");
+
+        // Top level: users, posts, forms, graphql + one loose request.
+        let top: Vec<&str> = col.groups.iter().map(|g| g.name.as_str()).collect();
+        assert_eq!(top, ["users", "posts", "forms", "graphql"]);
+        assert_eq!(col.requests.len(), 1);
+        assert_eq!(col.requests[0].url, "https://jsonplaceholder.typicode.com/todos/1");
+
+        let posts = &col.groups[1];
+        assert_eq!(posts.groups.len(), 1, "posts/comments is nested");
+        assert_eq!(posts.groups[0].name, "comments");
+
+        let all: Vec<&SavedRequest> = col
+            .all_groups()
+            .iter()
+            .flat_map(|g| g.requests.iter())
+            .chain(col.requests.iter())
+            .collect();
+        assert_eq!(all.len(), 12);
+        let by = |n: &str| *all.iter().find(|r| r.name == n).expect(n);
+
+        let search = by("Search users");
+        assert_eq!(search.params.len(), 3);
+        assert!(!search.params[2].enabled, "disabled query param stays off");
+
+        let create = by("Create post");
+        assert_eq!(create.body_type, BodyType::Json);
+        assert!(create.body.contains("Hello from Rustman"));
+        assert!(!create.headers[1].enabled, "disabled header stays off");
+
+        let form = by("Form-data echo");
+        assert_eq!(form.body_type, BodyType::FormData);
+        assert_eq!(form.form_data_fields.len(), 3);
+
+        let gql = by("Country by code");
+        assert_eq!(gql.body_type, BodyType::GraphQL);
+        assert!(gql.graphql_variables.contains("\"ID\""));
+    }
+}
