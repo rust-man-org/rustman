@@ -1,4 +1,4 @@
-# 08 — Pull-Request Workflow & CI Integration
+# 08 — Save for Review (Branch → PR → main) & CI Integration
 
 **Master doc:** §21, §22 · Phases 17, 18.
 **Owner files:** PR calls appended to `src/services/github.rs`, `.github/workflows/company-ci.yml`,
@@ -6,9 +6,16 @@
 
 ## Objective
 
-Turn "edit → save → create review" into a first-class flow: create a branch,
-push it, open a GitHub Pull Request, and show review status. Add GitHub Actions
-that validate a pushed collection (schema, API test, security).
+The **Save button** is the only way a change reaches the shared collection
+(C12, decided by the user 2026-11-03): Ctrl+S keeps a local draft; Save
+commits the draft to a review branch, pushes it and opens a PR to `main`. The
+change lands only after discussion and merge on GitHub. Add GitHub Actions
+that validate every PR (schema, API test, security) so reviewers know the
+collection is safe to merge.
+
+Because Save is the publishing path, the PR flow (tasks 1–2) moves up to
+**wave 2**, right after 04's branch-commit API and 05's `GitHubClient`. CI
+(tasks 3–4) stays in wave 3.
 
 ## Codebase anchors
 
@@ -31,12 +38,17 @@ that validate a pushed collection (schema, API test, security).
   visible to Read too).
 - **Requires:** GitHub App permissions Pull requests R/W + Checks R
   (`auth-flow-rules.md` §4), set up by 05.
-- **Produces:** none shared (terminal workstream).
+- **Owns:** C12 (review publishing flow). Consumes 01's draft payload and
+  `review` field, 04's `commit_to_branch` + `push_branch`.
+- **Produces:** draft review state (`In review · PR #N`) shown by 01's UI.
 
 ## Deliverables
 
-1. In-app **Create Review**: `git checkout -b <user>/<slug>` → commit
-   (`feat(…): …`, master doc §21) → push branch → open GitHub PR.
+1. **Save** on a draft: 04's `commit_to_branch(repo, "origin/main",
+   "review/<login>/<endpoint-slug>", files)` builds the commit **without
+   checkout** → `push_branch` → `create_pull_request` (or update the existing
+   PR for that branch) → store `{branch, pr_number}` on the draft (01).
+   Commit subject `feat(<collection>): update <METHOD> <path>` (master doc §17).
 2. Review-status panel: Backend ✓ / QA ✓ / Security Pending (master doc §21).
 3. `.github/workflows/company-ci.yml`: collection validation, API test, schema
    validation, security checks.
@@ -44,11 +56,15 @@ that validate a pushed collection (schema, API test, security).
 
 ## Ordered tasks
 
-1. **Phase 17 — PR flow.** Add `create_pull_request` (+ `review_status`) to
-   `GitHubClient` (C6) in 05's module. Build the branch→commit→push→PR sequence
-   reusing 04's push; commit-message style per master doc §17/§21.
-2. **Review UI.** A "Create Review" action on the collection and a panel
-   rendering the review-state chips; refresh from the GitHub API.
+1. **Phase 17 — Save flow (wave 2).** Add `create_pull_request`,
+   `find_open_pull_request(branch)` and `review_status` to `GitHubClient` (C6).
+   Orchestrate Save: gates (C10 Write, no draft conflicts, 06 scan) → 01
+   payload → 04 branch commit + push → PR create/update → persist review info
+   on the draft. Failures leave the draft untouched and retryable.
+2. **Review UI.** Save button in the request toolbar (mockup requester
+   board), `In review · PR #N` badge with "Open PR", review-state chips
+   (Backend ✓ / QA ✓ / Security pending); refresh from the GitHub API.
+   Closed-unmerged PR → badge back to `● Draft`.
 3. **Phase 18 — CI.** Add `.github/workflows/company-ci.yml` triggered on
    `pull_request` (and push to default) that:
    - validates every `collections/**/*.json` against `rustman.json`'s spec
@@ -66,7 +82,8 @@ that validate a pushed collection (schema, API test, security).
 
 ## Out of scope
 
-- Branch protection / CODEOWNERS policy (org settings, not app code).
+- Configuring branch protection / CODEOWNERS (repo settings, not app code).
+  It is **required** for C12: document the setting in `docs/DEVELOPMENT.md`.
 - Real-time notifications (master doc §26 "not included").
 
 ## Verification
@@ -83,7 +100,19 @@ no-default-features test gate before merge.
 - The CI validator fails a collection containing a plaintext secret and passes a
   clean one.
 
+## Decision: comments and metadata (user, 2026-11-03)
+
+- Metadata, flags, status and endpoint notes skip review: branch
+  `rustman/meta`, pushed directly (C2–C4, owned by 03).
+- A comment on an endpoint **with an open review PR** is posted to that PR.
+  08 adds `GitHubClient::list_pr_comments` and `create_pr_comment` (issue
+  comments API on the PR number), used by 03's Discussion tab.
+- One PR per endpoint for now; "Save all" bundling later.
+
 ## Risks
+
+- One PR per endpoint can flood reviewers. Later: "Save all drafts of this
+  collection" bundles them into one branch/PR.
 
 - If the GitHub App was installed before Pull requests/Checks were added, the
   repo owner must approve the new permissions; otherwise PR calls fail with

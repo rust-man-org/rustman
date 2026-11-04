@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rustman — Local Drafts (Mockup)</title>
+<style>
+:root{
+  --bg-0:#FFFFFF;--bg-1:#F9F9F9;--bg-2:#F2F2F2;
+  --bd-1:#EDEDED;--bd-2:#E6E6E6;
+  --tx-1:#212121;--tx-2:#6B6B6B;--tx-3:#A6A6A6;
+  --accent:#FF6C37;--accent-tint:rgba(255,108,55,.10);
+  --success:#0CBB52;--danger:#EB2013;--danger-tint:rgba(235,32,19,.08);
+  --info:#097BED;--info-tint:rgba(9,123,237,.08);
+  --warn:#B86E00;--studio:#EDEDED;
+  --font-ui:'Inter',system-ui,'Segoe UI',Helvetica,Arial,sans-serif;
+  --font-code:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg-0:#212121;--bg-1:#1A1A1A;--bg-2:#2B2B2B;
+  --bd-1:#303030;--bd-2:#3B3B3B;
+  --tx-1:#F2F2F2;--tx-2:#A6A6A6;--tx-3:#6B6B6B;
+  --accent-tint:rgba(255,108,55,.16);--danger-tint:rgba(235,32,19,.16);
+  --info-tint:rgba(9,123,237,.18);--warn:#F0A030;--studio:#161616;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--studio);font:13px/1.4 var(--font-ui);color:var(--tx-1);padding:20px}
+.app{width:1240px;margin:0 auto;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:10px;overflow:hidden;display:grid;grid-template-columns:280px 1fr;grid-template-rows:auto 1fr auto}
+.top{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--bd-1)}
+.logo{width:24px;height:24px;border-radius:6px;background:var(--accent);color:#fff;font-weight:700;display:grid;place-items:center}
+.pill{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--bg-2);color:var(--tx-2)}
+.sync{margin-left:auto;color:var(--tx-2)} .sync b{color:var(--tx-1)} .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:6px}
+/* sidebar */
+.side{border-right:1px solid var(--bd-1);background:var(--bg-1);padding:12px}
+.search{border:1px solid var(--bd-2);background:var(--bg-0);border-radius:6px;padding:6px 10px;color:var(--tx-3)}
+.filters{display:flex;gap:6px;margin:10px 0}
+.chip{padding:3px 10px;border-radius:99px;border:1px solid var(--bd-2);font-size:12px;color:var(--tx-2)}
+.chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-tint)}
+.tree .row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:5px}
+.tree .row.sel{background:var(--accent-tint)}
+.tree .folder{font-weight:600;color:var(--tx-1)}
+.m{font:600 10px var(--font-code);width:34px}
+.post{color:var(--warn)} .get{color:var(--success)} .put{color:var(--info)}
+.name{flex:1}
+.badge{font-size:11px;white-space:nowrap}
+.b-draft{color:var(--accent)} .b-up{color:var(--info)} .b-conf{color:var(--danger)} .b-rev{color:var(--tx-2)} .b-orph{color:var(--tx-3)}
+.orph .name{color:var(--tx-3);text-decoration:line-through}
+/* main */
+.main{display:flex;flex-direction:column;min-width:0}
+.tabs{display:flex;border-bottom:1px solid var(--bd-1);background:var(--bg-1)}
+.tab{padding:8px 14px;border-right:1px solid var(--bd-1);display:flex;gap:6px;align-items:center;color:var(--tx-2)}
+.tab.on{background:var(--bg-0);color:var(--tx-1);box-shadow:inset 0 2px 0 var(--accent)}
+.tdot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.req{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.head{display:flex;align-items:center;gap:10px}
+.head h2{margin:0;font-size:16px}
+.crumb{color:var(--tx-2);font-size:12px}
+.btn{border:1px solid var(--bd-2);border-radius:6px;padding:5px 12px;background:var(--bg-0);font-size:12px;white-space:nowrap}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.dis{opacity:.45}
+.btn.ghost{border-color:transparent;color:var(--tx-2)}
+.right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.url{display:flex;border:1px solid var(--bd-2);border-radius:6px;overflow:hidden}
+.url .meth{padding:8px 12px;background:var(--bg-1);font:600 12px var(--font-code);color:var(--warn);border-right:1px solid var(--bd-2)}
+.url .u{padding:8px 12px;font:13px var(--font-code);flex:1}
+.url .send{background:var(--accent);color:#fff;font-weight:600;padding:8px 18px}
+/* banners */
+.banner{border:1px solid var(--bd-2);border-left:3px solid var(--accent);background:var(--accent-tint);border-radius:6px;padding:10px 12px;display:flex;gap:10px;align-items:center}
+.banner.info{border-left-color:var(--info);background:var(--info-tint)}
+.banner.conf{border-left-color:var(--danger);background:var(--danger-tint);flex-direction:column;align-items:stretch}
+.banner.rev{border-left-color:var(--tx-2);background:var(--bg-1)}
+.banner.orph{border-left-color:var(--tx-3);background:var(--bg-1)}
+.banner .ic{font-weight:700;width:16px;text-align:center}
+.banner .t b{display:block}
+.banner .t span{color:var(--tx-2);font-size:12px}
+.banner .acts{margin-left:auto;display:flex;gap:6px}
+.cl{display:flex;align-items:center;gap:10px}
+table{width:100%;border-collapse:collapse;font-size:12px;background:var(--bg-0);border:1px solid var(--bd-1);border-radius:6px}
+th{text-align:left;color:var(--tx-2);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--bd-1)}
+td{padding:6px 10px;border-bottom:1px solid var(--bd-1);vertical-align:top}
+td.v{font-family:var(--font-code)}
+.mine{color:var(--accent)} .main-v{color:var(--info)}
+.del{background:var(--danger-tint);text-decoration:line-through} .add{background:rgba(12,187,82,.14)}
+.label{font:600 11px var(--font-ui);color:var(--tx-3);letter-spacing:.06em;text-transform:uppercase;margin-top:6px}
+.status{grid-column:1/3;display:flex;gap:16px;padding:6px 16px;border-top:1px solid var(--bd-1);background:var(--bg-1);font-size:12px;color:var(--tx-2)}
+.status .d{color:var(--accent)}
+.note{font-size:11px;color:var(--tx-3)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="logo">R</div><b>Company APIs</b><span class="pill">main</span>
+    <span class="sync"><span class="dot"></span><b>Synced</b> · 10s ago</span>
+  </div>
+
+  <aside class="side">
+    <div class="search">Search requests or folders</div>
+    <div class="filters"><span class="chip">All</span><span class="chip on">Drafts · 5</span></div>
+    <div class="tree">
+      <div class="row folder">⌄ Merchant API</div>
+      <div class="row folder" style="padding-left:18px">⌄ auth</div>
+      <div class="row sel" style="padding-left:28px"><span class="m post">POST</span><span class="name">Login</span><span class="badge b-draft">● Draft</span></div>
+      <div class="row" style="padding-left:28px"><span class="m post">POST</span><span class="name">Logout</span><span class="badge b-conf">⚠ 2 conflicts</span></div>
+      <div class="row" style="padding-left:28px"><span class="m get">GET</span><span class="name">Profile</span><span class="badge b-rev">In review · #12</span></div>
+      <div class="row folder" style="padding-left:18px">⌄ merchant</div>
+      <div class="row" style="padding-left:28px"><span class="m get">GET</span><span class="name">Orders</span><span class="badge b-up">⇅ Main changed</span></div>
+      <div class="row orph" style="padding-left:28px"><span class="m put">PUT</span><span class="name">Refund</span><span class="badge b-orph">✕ Deleted</span></div>
+    </div>
+    <p class="note">The Drafts filter shows only endpoints with a local draft. Badges always carry text, never color alone.</p>
+  </aside>
+
+  <main class="main">
+    <div class="tabs">
+      <div class="tab on"><span class="m post">POST</span>Login<span class="tdot" title="Local draft"></span></div>
+      <div class="tab"><span class="m post">POST</span>Logout<span class="badge b-conf">⚠</span></div>
+      <div class="tab"><span class="m get">GET</span>Profile</div>
+    </div>
+    <div class="req">
+      <div class="head">
+        <div><div class="crumb">MERCHANT API › AUTH</div><h2>Login</h2></div>
+        <div class="right"><span class="btn">Save for review</span></div>
+      </div>
+      <div class="url"><span class="meth">POST</span><span class="u">{{base_url}}/v2/login</span><span class="send">→ Send</span></div>
+
+      <div class="label">1 · Local draft (shown on the open request)</div>
+      <div class="banner">
+        <span class="ic" style="color:var(--accent)">●</span>
+        <div class="t"><b>Local draft: only you see this</b><span>3 fields differ from main: URL, Body, Headers. Ctrl+S saves locally.</span></div>
+        <div class="acts"><span class="btn ghost">View diff</span><span class="btn">Discard</span><span class="btn pri">Save for review</span></div>
+      </div>
+
+      <div class="label">1b · View diff (expands under the banner)</div>
+      <table>
+        <tr><th style="width:110px">Field</th><th>main</th><th>Your draft</th></tr>
+        <tr><td>URL</td><td class="v"><span class="del">{{base_url}}/v1/login</span></td><td class="v"><span class="add">{{base_url}}/v2/login</span></td></tr>
+        <tr><td>Body</td><td class="v">{ "username": "{{user}}" }</td><td class="v">{ "username": "{{user}}", <span class="add">"otp": "{{otp}}"</span> }</td></tr>
+        <tr><td>Headers</td><td class="v">2 headers</td><td class="v">3 headers (<span class="add">X-Device</span>)</td></tr>
+      </table>
+
+      <div class="label">2 · Main changed under the draft (merged automatically)</div>
+      <div class="banner info">
+        <span class="ic" style="color:var(--info)">⇅</span>
+        <div class="t"><b>Main changed since your draft</b><span>Their change to Auth was merged in; your edits are kept.</span></div>
+        <div class="acts"><span class="btn ghost">View diff</span><span class="btn">Discard</span><span class="btn pri">Save for review</span></div>
+      </div>
+
+      <div class="label">3 · Conflict</div>
+      <div class="banner conf">
+        <div class="cl"><span class="ic" style="color:var(--danger)">⚠</span>
+          <div class="t"><b>2 fields changed on main and in your draft</b><span>Pick a side for each field. Save for review is blocked until all are resolved.</span></div>
+          <div class="acts"><span class="btn">Discard draft</span><span class="btn pri dis" title="Resolve 2 conflicts first">Save for review</span></div></div>
+        <table>
+          <tr><th style="width:110px">Field</th><th>Yours</th><th>main</th><th style="width:190px"></th></tr>
+          <tr><td>URL</td><td class="v mine">{{base_url}}/v2/logout</td><td class="v main-v">{{base_url}}/auth/logout</td><td><span class="btn">Keep mine</span> <span class="btn">Use main</span></td></tr>
+          <tr><td>Body</td><td class="v mine">{ "all": true }</td><td class="v main-v">{ "device": "{{id}}" }</td><td><span class="btn">Keep mine</span> <span class="btn">Use main</span></td></tr>
+        </table>
+      </div>
+
+      <div class="label">4 · In review</div>
+      <div class="banner rev">
+        <span class="ic" style="color:var(--tx-2)">⑂</span>
+        <div class="t"><b>In review · PR #12</b><span>review/yosua/profile → main. Edits you save again update the same PR.</span></div>
+        <div class="acts"><span class="btn ghost">View diff</span><span class="btn">Open PR</span><span class="btn">Discard</span></div>
+      </div>
+
+      <div class="label">5 · Deleted endpoint (orphaned draft)</div>
+      <div class="banner orph">
+        <span class="ic" style="color:var(--tx-3)">✕</span>
+        <div class="t"><b>This endpoint was deleted</b><span>Your draft is kept on this machine only. Restore it as a new endpoint or discard it.</span></div>
+        <div class="acts"><span class="btn">Discard</span><span class="btn pri">Restore as new</span></div>
+      </div>
+      <p class="note">Read-only users see Save for review and Restore as new disabled, with the tooltip "Needs write access to the collection repo".</p>
+    </div>
+  </main>
+
+  <div class="status"><span>main · Synced</span><span class="d">● 5 local drafts</span><span>⚠ 1 with conflicts</span></div>
+</div>
+</body>
+</html>

@@ -33,7 +33,9 @@ comment thread, all keyed by the stable `endpoint_id` (C1).
 - **Consumes:** C1 (endpoint ID is the metadata/comment key), C5 (env examples
   carry placeholders only), C10 (metadata and comments are Write-only).
 - **Note:** metadata and comments are shared data, so they have no draft layer
-  (C9). They write to base immediately and are committed on the next sync.
+  (C9). They live on branch `rustman/meta` (C2), are saved immediately and
+  pushed directly without a PR. Exception: a comment on an endpoint with an
+  open review PR is posted to that PR instead (C4, 08).
 
 ## Deliverables
 
@@ -59,8 +61,12 @@ comment thread, all keyed by the stable `endpoint_id` (C1).
    ALTERs) and domain types (C3/C4).
 3. **Phase 6 — metadata.** UI + handlers for status/flag/owner/tags. Status
    enum colours in the tree (master doc §8's `⚠ ✓ ●` legend) and a detail panel.
-4. **Phase 7 — comments.** Thread view + composer; on Send, append a `Comment`
-   and mark the workspace dirty (C7) — do not commit per keystroke.
+4. **Phase 7 — comments.** Thread view + composer. On Send: if the endpoint
+   has an open review PR, post to the PR via 08's `GitHubClient` call;
+   otherwise append a `Comment` to `discussions/<path>.json` and commit +
+   push it to `rustman/meta` (04's `commit_to_branch` + `push_branch`, base
+   `origin/rustman/meta`). Never per keystroke. Metadata edits use the same
+   direct path. Show two sections: "Review · PR #N" and "Endpoint notes".
 5. **Load path.** Wire `boot::init` (`src/app/boot.rs:22–54`) and
    `tree::insert_collection` to populate metadata/discussions alongside
    collections.

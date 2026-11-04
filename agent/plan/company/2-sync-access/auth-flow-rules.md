@@ -89,10 +89,10 @@ Get current user → check yanaatere/rustman-api-collections
 |---|---|---|
 | View collections, run requests, pull latest | ✓ | ✓ |
 | Local drafts (local SQLite only, never committed or pushed; C9) | ✓ | ✓ |
-| Edit shared data, publish drafts | — | ✓ |
-| Comment, flag | — | ✓ |
-| Push, sync | — | ✓ |
-| Create Review (pull request) | — | ✓ |
+| Save for review (branch + PR, C12) | — | ✓ |
+| Comment, flag, status (direct to `rustman/meta`, or on the open PR) | — | ✓ |
+| Push review branches (never `main`) | — | ✓ |
+| Pull / sync `main` | ✓ | ✓ |
 | See review status and CI results | ✓ | ✓ |
 
 ## 8. Token storage

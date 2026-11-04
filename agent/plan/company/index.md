@@ -43,7 +43,9 @@ and core verification requirements still apply.
 | Secrets, redaction, scanner, placeholders | 06 | C5/C6; Publish/commit call sites |
 | Self-update, release signature, checksum | 07 | Updater code and release workflow |
 | PR, Create Review, company collection CI | 08 | C2/C6/C10; 04/05 API boundaries |
+| Theme, colors, fonts, design tokens | 09 | Design rules token table |
 | Native design, light/dark, requester layout | Design rules + surface owner above | Matching mockup HTML/PNG pair |
+| Parallel work, waves, branches, merge conflicts, scaffold | `parallel-work-rules.md` | Ownership map below |
 | API, endpoint, service interface, new integration | `api/index.md` | Relevant catalog + owner plan |
 | Status, remaining tasks, resume | `.flow/progress.md` | Selected task's plan and evidence |
 
@@ -61,6 +63,8 @@ Check existing APIs first and reuse suitable implementations before adding new o
   and a test step in app CI starting with the first core implementation PR.
 - [Design references](./design-rules.md): the 18 checked-in mockup boards,
   their workstream mapping, native iced guidance and required adaptations.
+- [Parallel work and merge rules](./parallel-work-rules.md): scaffold PR,
+  waves, known file collisions, branch/PR naming and the merge gate.
 - These documents extend planning requirements. Tests and UI features remain
   implementation deliverables; this planning update does not implement them.
 
@@ -70,6 +74,7 @@ Check existing APIs first and reuse suitable implementations before adding new o
 |---|---|---|---|
 | **0 — Foundation** | 00 | [`0-foundation/00-shared-contracts.md`](./0-foundation/00-shared-contracts.md) | 5, 6, 8, 9, 14, 19 |
 | | 01 | [`0-foundation/01-local-drafts.md`](./0-foundation/01-local-drafts.md) | — (new) |
+| | 09 | [`0-foundation/09-design-tokens.md`](./0-foundation/09-design-tokens.md) | — (design) |
 | **1 — Data model** | 02 | [`1-data-model/02-postman-import.md`](./1-data-model/02-postman-import.md) | 3, 4, 5, 23–25 |
 | | 03 | [`1-data-model/03-repo-schema-metadata-comments.md`](./1-data-model/03-repo-schema-metadata-comments.md) | 6–9 |
 | **2 — Sync & access** | 04 | [`2-sync-access/04-git-sync-conflict.md`](./2-sync-access/04-git-sync-conflict.md) | 13–18 |
@@ -97,8 +102,20 @@ Workstreams were renumbered into execution order when 01 was added.
 
 ## Execution flow
 
+Day-to-day parallel order (waves, split tasks, collisions) lives in
+[`parallel-work-rules.md`](./parallel-work-rules.md). Summary:
+
+| Wave | Runs in parallel |
+|---|---|
+| 0 | baseline ✓, 00 contract freeze, scaffold PR, CI gate |
+| 1 | 01 · 09 · 02 (parser/report/IDs) · 03 (`repo_layout`) · 05 (services only) · 07 |
+| 2 | 02 re-import · 03 UI · 04 sync · 05 wiring/UI · 06 store/redaction |
+| 3 | 04 auto-sync · 06 scanner · 08 |
+
+Dependency view:
+
 ```text
-Phase 0   00 contracts ──► 01 local drafts
+Phase 0   00 contracts ──► 01 local drafts      09 design tokens (independent)
              │                  │
 Phase 1      ├──► 02 import ────┤
              └──► 03 repo schema┤
@@ -142,8 +159,10 @@ Phase 4                 └──► 08 PR + CI (needs 04 + 05)
 
 Hotspots: `src/services/vcs.rs`, `src/message.rs`, `src/app/mod.rs`,
 `src/app/boot.rs`, `src/services/storage.rs`, `src/app/request_ops.rs`,
-`Cargo.toml`. **Rule: one owner per file; everyone else makes only small
-additive edits** (one enum variant, one struct field, one function).
+`Cargo.toml`. **Rule: one owner per file.** The scaffold PR adds every
+workstream's variant, field, module and table to the shared files once;
+after that, workstreams edit their own files only. Remaining collisions and
+who goes first: `parallel-work-rules.md` §4.
 
 | File / area | Owner |
 |---|---|
@@ -155,6 +174,8 @@ additive edits** (one enum variant, one struct field, one function).
 | `src/services/secrets.rs`, redaction + scanner call sites | 06 |
 | `src/services/update.rs`, `.github/workflows/release.yml`, `self-update` feature | 07 |
 | `.github/workflows/company-ci.yml`, PR calls appended to `github.rs` | 08 |
+| `src/ui/theme.rs`, `src/ui/styles.rs`, `assets/fonts/*` | 09 |
+| Scaffold extension points, `.github/workflows/ci-iced.yml` | 00 |
 | `src/message.rs`, `src/app/mod.rs` | **shared, additive only** |
 | `src/services/storage.rs` | 03 owns; others append one table + CRUD fns |
 
