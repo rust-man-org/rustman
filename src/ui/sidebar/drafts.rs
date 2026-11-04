@@ -153,14 +153,14 @@ fn draft_badge(d: &RequestDraft) -> Element<'static, Message> {
 fn draft_look(d: &RequestDraft) -> (Mark, String, Tone) {
     match d.state() {
         DraftState::Orphaned => (Mark::Icon(icons::close()), "Deleted".to_owned(), Tone::Subtle),
-        DraftState::Conflict(_) => (Mark::Dot, "Conflict".to_owned(), Tone::Danger),
+        DraftState::Conflict(_) => (Mark::Icon(icons::alert()), "Conflict".to_owned(), Tone::Danger),
         DraftState::InReview(r) => (
             Mark::Icon(icons::git_branch()),
             r.pr_number.map_or("Review".to_owned(), |n| format!("#{n}")),
             Tone::Neutral,
         ),
         DraftState::UpstreamChanged => (Mark::Dot, "Merged".to_owned(), Tone::Info),
-        DraftState::Clean => (Mark::Dot, "Draft".to_owned(), Tone::Accent),
+        DraftState::Clean => (Mark::Dot, "Draft".to_owned(), Tone::Subtle),
     }
 }
 

@@ -8,8 +8,12 @@
 #                                 real one (created if missing)
 #   scripts/ui.sh -s              sample mode: works on a copy of your data
 #                                 (target/ui-data/), the real data stays as is
+#   scripts/ui.sh -x              example workspace (target/ui-example/): a
+#                                 "Sample API" collection with folders and
+#                                 working requests + a "Sample" environment.
+#                                 Delete that folder to get a fresh one.
 #
-# Flags combine: scripts/ui.sh -t -s
+# Flags combine: scripts/ui.sh -t -x
 # Works in Git Bash (Windows), Linux and macOS.
 
 set -eu
@@ -20,15 +24,17 @@ profile=debug
 run_tests=0
 data_dir=""
 sample=0
+example=0
 
-while getopts "trd:sh" opt; do
+while getopts "trd:sxh" opt; do
     case "$opt" in
         t) run_tests=1 ;;
         r) profile=release ;;
         d) data_dir="$OPTARG" ;;
         s) sample=1 ;;
+        x) example=1 ;;
         h | *)
-            sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
     esac
@@ -74,6 +80,12 @@ if [ "$sample" = 1 ]; then
             cp -R "$real/." "$data_dir/"
         fi
     fi
+fi
+
+if [ "$example" = 1 ]; then
+    # The app seeds the example only into a folder without collections.
+    data_dir="target/ui-example"
+    export RUSTMAN_SAMPLE=1
 fi
 
 if [ -n "$data_dir" ]; then

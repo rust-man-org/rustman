@@ -41,15 +41,26 @@ pub fn row_action<'a, M: Clone + 'a>(
     label: impl Into<String>,
     msg: M,
 ) -> Element<'a, M> {
-    let icon: Element<'a, M> = icon.size(13).color(Palette::text_muted()).into();
+    compact_icon_button(icon, label, msg, 22.0)
+}
+
+/// Small square icon button (mockup `.side-icon`: 26px, 14px glyph).
+pub fn compact_icon_button<'a, M: Clone + 'a>(
+    icon: Text<'static>,
+    label: impl Into<String>,
+    msg: M,
+    side: f32,
+) -> Element<'a, M> {
+    let glyph = if side >= 26.0 { 14 } else { 13 };
+    let icon: Element<'a, M> = icon.size(glyph).color(Palette::text_muted()).into();
     let btn = button(
         container(icon)
             .center_x(Length::Fill)
             .center_y(Length::Fill),
     )
     .on_press(msg)
-    .width(22)
-    .height(22)
+    .width(side)
+    .height(side)
     .padding(0)
     .style(|_t, s| button::Style {
         // Sits on an already-hovered row: tint relative to the text color
