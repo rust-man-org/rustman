@@ -82,6 +82,7 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 - Deletion: collection delete is two layers (warning + Delete, then type
   "delete"), enforced in the handler; request delete asks first (Enter/Esc).
   Gates 254/246. Visual check of tab bar/menu still pending in the real app.
+- Code snippet panel (mockup rustman-requester-snippet .rightbar), right side:  language dropdown (cURL, HTTP, JS Fetch, Node Axios, Python requests, Go,  Java OkHttp, C# HttpClient, Ruby Net::HTTP, wget) from the same input as  Share; literal secrets masked, {{vars}} kept; Copy gives the full code.  Hide via header icon or footer toggle; 26px reopen strip; left edge drags  to resize (220-720px). Open/width/language persist in the session. Cached  in AppState::snippet, refreshed after edits, not per frame. Gates 262/254.
 - Committed on feat/endpoint-examples at the user's request (for a PR); not pushed.
 
 ## Verification checkpoint
