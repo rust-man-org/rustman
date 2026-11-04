@@ -307,6 +307,7 @@ fn main_area(state: &AppState) -> Element<'_, Message> {
             iced::widget::rule::horizontal(1.0).style(crate::ui::styles::divider),
             url_bar,
             iced::widget::rule::horizontal(1.0).style(crate::ui::styles::divider),
+            request::draft_banner::view(state).unwrap_or_else(|| Space::new().into()),
             middle,
             iced::widget::rule::horizontal(1.0).style(crate::ui::styles::divider),
             status_bar::status_bar(state),

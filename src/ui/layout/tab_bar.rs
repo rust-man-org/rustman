@@ -144,10 +144,22 @@ pub(super) fn multi_tab_bar(state: &AppState) -> Element<'_, Message> {
             }
         };
 
+        // Unsaved edits, else the persisted local draft (01): red while it
+        // has field conflicts, accent otherwise.
+        let draft = tab
+            .saved_as
+            .as_ref()
+            .and_then(|(_, id)| state.drafts.get(id));
         let modified_dot = if tab.modified && tab.saved_as.is_some() {
             Some(Palette::accent())
         } else if tab.modified {
             Some(Palette::WARNING)
+        } else if let Some(d) = draft {
+            Some(if d.conflicts.is_empty() {
+                Palette::accent()
+            } else {
+                Palette::ERROR
+            })
         } else {
             None
         };

@@ -36,6 +36,39 @@ pub(super) fn status_bar(state: &AppState) -> Element<'_, Message> {
 
     let msg = state.status_message.as_deref().unwrap_or("");
 
+    // Local drafts (01): count plus conflicts; click toggles the filter.
+    let drafts_el: Element<Message> = match state.drafts.count() {
+        0 => Space::new().into(),
+        n => {
+            let conflicts = state.drafts.conflicted();
+            let mut r = row![
+                crate::ui::icons::dot(Palette::accent()),
+                text(format!("{n} local draft{}", if n == 1 { "" } else { "s" }))
+                    .size(TEXT_XS)
+                    .color(Palette::text_muted()),
+            ]
+            .spacing(5)
+            .align_y(Alignment::Center);
+            if conflicts > 0 {
+                r = r.push(
+                    text(format!("· {conflicts} with conflicts"))
+                        .size(TEXT_XS)
+                        .color(Palette::ERROR),
+                );
+            }
+            row![
+                iced::widget::button(r)
+                    .on_press(Message::Draft(crate::message::draft::DraftMsg::ToggleFilter))
+                    .padding([0, 2])
+                    .style(|_t, _s| iced::widget::button::Style::default()),
+                separator(),
+            ]
+            .spacing(10)
+            .align_y(Alignment::Center)
+            .into()
+        }
+    };
+
     container(
         row![
             if msg.is_empty() {
@@ -44,6 +77,7 @@ pub(super) fn status_bar(state: &AppState) -> Element<'_, Message> {
                 text(msg).size(TEXT_XS).color(Palette::SUCCESS)
             },
             Space::new().width(Length::Fill),
+            drafts_el,
             env_el,
             separator(),
             row![

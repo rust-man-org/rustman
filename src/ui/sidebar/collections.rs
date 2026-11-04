@@ -52,6 +52,15 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     ]
     .spacing(0);
 
+    // Local drafts (01): All / Drafts filter; the Drafts view is a flat list.
+    col = col.push(super::drafts::filter_bar(state));
+    if state.drafts.only_drafts {
+        return scrollable(col.push(super::drafts::list(state)))
+            .height(Length::Fill)
+            .style(crate::ui::theme::thin_scrollbar)
+            .into();
+    }
+
     for collection in &state.collections {
         let is_expanded = state.sidebar.expanded.contains(&collection.id);
         let arrow = if is_expanded {
@@ -353,6 +362,12 @@ fn request_view<'a>(
     let req_renaming = state.sidebar.req_renaming.as_deref() == Some(req.id.as_str());
     let menu_open = state.sidebar.context_menu.as_deref() == Some(req.id.as_str());
     let pad_left = 8.0 + (depth as f32) * 12.0 + 8.0;
+    let draft_badge = super::drafts::badge(state, &req.id);
+    let badge_w = if draft_badge.is_some() {
+        super::drafts::BADGE_WIDTH
+    } else {
+        0.0
+    };
 
     let name_part: Element<Message> = if req_renaming {
         let rid = req.id.clone();
@@ -394,9 +409,10 @@ fn request_view<'a>(
                     tree_label(
                         req.name.clone(),
                         12.0,
-                        state.sidebar_width - pad_left - 68.0
+                        state.sidebar_width - pad_left - 68.0 - badge_w
                     ),
                 ]
+                .push(draft_badge)
                 .spacing(4)
                 .align_y(iced::Alignment::Center),
             )

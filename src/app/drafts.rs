@@ -155,6 +155,16 @@ pub(crate) fn discard_draft(state: &mut AppState, request_id: &str) -> Result<()
     Ok(())
 }
 
+/// Focus or open a tab showing the draft of `request_id`. An orphan opens
+/// with its draft data so the banner can offer Restore / Discard.
+pub(crate) fn open_draft(state: &mut AppState, request_id: &str) {
+    let Some(draft) = state.drafts.get(request_id) else {
+        return;
+    };
+    let data = draft.data.clone();
+    state.tabs.open_request(&data);
+}
+
 /// Mark drafts whose endpoint is gone (deleted locally or upstream) as
 /// orphaned. Drafts are kept for recovery; boot re-derives the flag.
 pub(crate) fn mark_orphans(state: &mut AppState) {
@@ -672,6 +682,35 @@ mod flow_tests {
         assert_eq!(d.data.body, "mine");
         let stored = storage::drafts::get_drafts(e.state.db.as_ref().unwrap()).unwrap();
         assert!(stored[0].conflicts.is_empty());
+    }
+
+    #[test]
+    fn an_orphan_can_be_opened_from_the_drafts_list() {
+        use crate::message::draft::DraftMsg;
+        let mut e = env(true);
+        edit_body(&mut e.state, "mine");
+        sync(&mut e.state, Vec::new());
+        e.state.tabs.tabs.clear();
+        e.state.tabs.tabs.push(crate::state::tabs::RequestTabState::new());
+        e.state.tabs.active = 0;
+
+        send(&mut e.state, DraftMsg::Open(REQ.into()));
+        let tab = e.state.tabs.active_tab();
+        assert_eq!(tab.saved_as, Some((COL.to_owned(), REQ.to_owned())));
+        assert_eq!(tab.body_editor.content(), "mine");
+    }
+
+    #[test]
+    fn diff_toggle_and_filter_are_ui_only() {
+        use crate::message::draft::DraftMsg;
+        let mut e = env(true);
+        send(&mut e.state, DraftMsg::ToggleDiff(REQ.into()));
+        assert_eq!(e.state.drafts.diff_open.as_deref(), Some(REQ));
+        send(&mut e.state, DraftMsg::ToggleDiff(REQ.into()));
+        assert!(e.state.drafts.diff_open.is_none());
+        send(&mut e.state, DraftMsg::ToggleFilter);
+        assert!(e.state.drafts.only_drafts);
+        assert!(e.state.status_message.is_none());
     }
 
     #[test]

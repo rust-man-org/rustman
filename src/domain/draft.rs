@@ -8,9 +8,6 @@
 //!
 //! Everything here is pure: no I/O, no clock, no app state.
 
-// Wired into storage, sync and the tab flow by 01 tasks 2–6; remove then.
-#![cfg_attr(not(test), allow(dead_code))]
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -77,6 +74,78 @@ draft_fields! {
 impl DraftField {
     fn differs(self, a: &SavedRequest, b: &SavedRequest) -> bool {
         self.value(a) != self.value(b)
+    }
+
+    /// Human name for banners and diff tables.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Method => "Method",
+            Self::Url => "URL",
+            Self::Params => "Params",
+            Self::Headers => "Headers",
+            Self::Body => "Body",
+            Self::BodyType => "Body type",
+            Self::GraphqlVariables => "GraphQL variables",
+            Self::AuthType => "Auth type",
+            Self::BearerToken => "Bearer token",
+            Self::BasicUser => "Basic user",
+            Self::BasicPass => "Basic password",
+            Self::ApiKeyName => "API key name",
+            Self::ApiKeyValue => "API key value",
+            Self::ApiKeyLocation => "API key location",
+            Self::FormDataFields => "Form data",
+            Self::CookieString => "Cookie string",
+            Self::Cookies => "Cookies",
+            Self::JwtSecret => "JWT secret",
+            Self::JwtSubject => "JWT subject",
+            Self::JwtAlgo => "JWT algorithm",
+            Self::PreRequestScript => "Pre-request script",
+            Self::TestScript => "Test script",
+        }
+    }
+
+    /// Fields whose values are never shown on screen (design rules: no
+    /// secrets in UI, screenshots or errors).
+    pub fn is_secret(self) -> bool {
+        matches!(
+            self,
+            Self::BearerToken | Self::BasicPass | Self::ApiKeyValue | Self::JwtSecret
+        )
+    }
+
+    /// One-line, length-capped rendering of this field of `r` for the UI.
+    /// Secrets are masked.
+    pub fn preview(self, r: &SavedRequest) -> String {
+        const MAX: usize = 80;
+        let value = self.value(r);
+        if self.is_secret() {
+            return match &value {
+                Value::String(s) if s.is_empty() => "(empty)".to_owned(),
+                _ => "•••••• (hidden)".to_owned(),
+            };
+        }
+        let raw = match &value {
+            Value::String(s) if s.is_empty() => return "(empty)".to_owned(),
+            Value::String(s) => s.clone(),
+            Value::Array(a) if a.is_empty() => return "(none)".to_owned(),
+            Value::Array(a) => format!("{} item(s): {}", a.len(), value_compact(&value)),
+            other => value_compact(other),
+        };
+        let one_line: String = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+        let mut chars = one_line.chars();
+        let head: String = chars.by_ref().take(MAX).collect();
+        if chars.next().is_some() {
+            format!("{head}…")
+        } else {
+            head
+        }
+    }
+}
+
+fn value_compact(v: &Value) -> String {
+    match v {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
     }
 }
 
@@ -256,6 +325,7 @@ impl RequestDraft {
 
     /// The request committed to the review branch on Save: the draft's data
     /// with the base's identity and structure.
+    #[allow(dead_code)] // first caller: 08 Save for review (C12)
     pub fn published_request(&self) -> SavedRequest {
         let mut out = self.data.clone();
         Self::copy_structure(&self.base, &mut out);
@@ -476,6 +546,21 @@ mod tests {
         assert_eq!(d.state(), DraftState::Conflict(vec![DraftField::Url]));
         d.orphaned = true;
         assert_eq!(d.state(), DraftState::Orphaned);
+    }
+
+    #[test]
+    fn previews_mask_secrets_and_cap_length() {
+        let mut r = base();
+        r.bearer_token = "super-secret".into();
+        assert!(!DraftField::BearerToken.preview(&r).contains("secret"));
+        r.bearer_token.clear();
+        assert_eq!(DraftField::BearerToken.preview(&r), "(empty)");
+
+        r.body = "{\n  \"a\": 1\n}".into();
+        assert_eq!(DraftField::Body.preview(&r), "{ \"a\": 1 }");
+        r.body = "x".repeat(500);
+        assert!(DraftField::Body.preview(&r).chars().count() <= 81);
+        assert!(DraftField::ALL.iter().all(|f| !f.label().is_empty()));
     }
 
     #[test]

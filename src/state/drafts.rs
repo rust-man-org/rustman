@@ -9,6 +9,10 @@ use crate::domain::draft::RequestDraft;
 #[derive(Debug, Default)]
 pub struct DraftsState {
     pub by_request: HashMap<String, RequestDraft>,
+    /// Request whose draft diff is expanded under the banner (UI only).
+    pub diff_open: Option<String>,
+    /// Sidebar shows only requests with a local draft (UI only).
+    pub only_drafts: bool,
 }
 
 impl DraftsState {
@@ -23,16 +27,39 @@ impl DraftsState {
             d.orphaned = !base_exists(requests, &d.request_id);
             by_request.insert(d.request_id.clone(), d);
         }
-        Self { by_request }
+        Self {
+            by_request,
+            ..Self::default()
+        }
     }
 
     pub fn get(&self, request_id: &str) -> Option<&RequestDraft> {
         self.by_request.get(request_id)
     }
 
-    #[allow(dead_code)] // status-bar draft count (01 task 8)
     pub fn count(&self) -> usize {
         self.by_request.len()
+    }
+
+    /// Drafts with at least one unresolved field conflict.
+    pub fn conflicted(&self) -> usize {
+        self.by_request
+            .values()
+            .filter(|d| !d.conflicts.is_empty())
+            .count()
+    }
+
+    /// Every draft, orphans included, in a stable order for the sidebar.
+    pub fn sorted(&self) -> Vec<&RequestDraft> {
+        let mut v: Vec<&RequestDraft> = self.by_request.values().collect();
+        v.sort_by(|a, b| {
+            a.data
+                .name
+                .to_lowercase()
+                .cmp(&b.data.name.to_lowercase())
+                .then_with(|| a.request_id.cmp(&b.request_id))
+        });
+        v
     }
 }
 
