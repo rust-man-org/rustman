@@ -448,6 +448,14 @@ pub enum LayoutMsg {
     PanelSplitChanged(u16),
     /// Drag on the sidebar/main-area splitter (issue #53): new sidebar width.
     SidebarWidthChanged(f32),
+    /// Show or hide the right "Code snippet" panel.
+    SnippetToggled,
+    /// Drag on the snippet panel's left edge: new panel width.
+    SnippetWidthChanged(f32),
+    /// Copy the full (unmasked) cURL of the active tab.
+    SnippetCopied,
+    /// Pick the snippet language (mockup `.rb-lang`).
+    SnippetLangChanged(crate::services::snippet::Lang),
 }
 
 #[derive(Debug, Clone)]

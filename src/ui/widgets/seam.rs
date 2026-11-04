@@ -13,6 +13,8 @@ pub enum LineAt {
     /// First pixel (handle sits right of / below the panel it belongs to).
     Start,
     Center,
+    /// Last pixel (handle sits left of the panel it belongs to).
+    End,
 }
 
 /// `vertical`: the handle separates left/right panels (a vertical line).
@@ -34,6 +36,7 @@ pub fn draw<R: renderer::Renderer>(
         let x = match at {
             LineAt::Start => bounds.x,
             LineAt::Center => (bounds.x + bounds.width / 2.0).floor(),
+            LineAt::End => bounds.x + bounds.width - 1.0,
         };
         Rectangle {
             x,
@@ -44,6 +47,7 @@ pub fn draw<R: renderer::Renderer>(
         let y = match at {
             LineAt::Start => bounds.y,
             LineAt::Center => (bounds.y + bounds.height / 2.0).floor(),
+            LineAt::End => bounds.y + bounds.height - 1.0,
         };
         Rectangle {
             y,

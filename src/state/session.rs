@@ -12,6 +12,14 @@ pub struct AppSession {
     /// Sidebar content width in px (issue #53).
     #[serde(default = "default_sidebar_width")]
     pub sidebar_width: f32,
+    /// Right "Code snippet" panel (mockup `.rightbar`): shown, and its width.
+    #[serde(default = "default_snippet_open")]
+    pub snippet_open: bool,
+    #[serde(default = "default_snippet_width")]
+    pub snippet_width: f32,
+    /// Snippet language key (`services::snippet::Lang::key`).
+    #[serde(default)]
+    pub snippet_lang: String,
     #[serde(default)]
     pub theme_idx: usize,
     #[serde(default = "default_timeout_ms")]
@@ -44,4 +52,15 @@ fn default_timeout_ms() -> u64 {
 
 fn default_sidebar_width() -> f32 {
     200.0
+}
+
+fn default_snippet_open() -> bool {
+    true
+}
+
+/// Mockup `.rightbar`: 272px.
+pub const DEFAULT_SNIPPET_WIDTH: f32 = 272.0;
+
+fn default_snippet_width() -> f32 {
+    DEFAULT_SNIPPET_WIDTH
 }

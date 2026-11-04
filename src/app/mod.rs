@@ -22,6 +22,7 @@ mod request_ops;
 mod sample;
 mod scripting;
 mod session;
+pub(crate) mod snippet;
 mod subscription;
 mod tree;
 mod update;
@@ -96,6 +97,14 @@ pub struct AppState {
     /// Sidebar content width in px (issue #53: the sidebar used to be a fixed
     /// 264px and could not be adjusted). Excludes the 48px icon rail.
     pub sidebar_width: f32,
+    /// Right "Code snippet" panel: shown, width in px (clamped on use).
+    pub snippet_open: bool,
+    pub snippet_width: f32,
+    /// The active tab as cURL, secrets masked; refreshed after edits while
+    /// the panel is open (see `app::snippet`), never rebuilt per frame.
+    pub snippet: String,
+    /// Language the snippet panel generates.
+    pub snippet_lang: crate::services::snippet::Lang,
     /// Layout direction: false = top/bottom, true = left/right.
     pub horizontal_layout: bool,
     /// UI zoom level (0.7 – 2.0). Applied via iced scale_factor.

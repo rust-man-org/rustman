@@ -8,6 +8,7 @@ pub mod layout;
 pub mod notification;
 pub mod request;
 pub mod response;
+pub mod snippet_panel;
 pub mod sidebar;
 pub mod styles;
 pub mod theme;

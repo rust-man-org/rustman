@@ -90,6 +90,9 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
     let mut global_pre_request_script = String::new();
     let mut global_test_script = String::new();
     let mut sidebar_width = 200.0;
+    let mut snippet_open = true;
+    let mut snippet_width = crate::state::session::DEFAULT_SNIPPET_WIDTH;
+    let mut snippet_lang = crate::services::snippet::Lang::default();
     #[cfg(feature = "self-update")]
     let mut auto_check_updates = false;
     let mut tls_options = crate::services::http::TlsOptions::default();
@@ -99,6 +102,9 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
         global_pre_request_script = sess.global_pre_request_script.clone();
         global_test_script = sess.global_test_script.clone();
         sidebar_width = sess.sidebar_width;
+        snippet_open = sess.snippet_open;
+        snippet_width = sess.snippet_width;
+        snippet_lang = crate::services::snippet::Lang::from_key(&sess.snippet_lang);
         #[cfg(feature = "self-update")]
         {
             auto_check_updates = sess.auto_check_updates;
@@ -247,6 +253,10 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
         panel_split: 50,
         sidebar_width,
         horizontal_layout: false,
+        snippet_open,
+        snippet_width,
+        snippet: String::new(),
+        snippet_lang,
         ui_scale: 1.0,
         #[cfg(feature = "self-update")]
         update: crate::app::UpdateState::Idle,
@@ -287,6 +297,8 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
     #[cfg(not(feature = "self-update"))]
     let boot_task = Task::none();
 
+    let mut state = state;
+    super::snippet::refresh(&mut state);
     (state, boot_task)
 }
 

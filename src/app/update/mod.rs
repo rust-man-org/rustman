@@ -39,7 +39,33 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 | crate::message::SidebarMsg::DeleteGroup(_)
         )
     );
+    // Requests reach the active tab through many paths (row release, drafts,
+    // search, palette, restore…), so refresh after everything except the
+    // high-frequency noise that cannot change the request.
+    let refresh_snippet = state.snippet_open
+        && !matches!(
+            &message,
+            Message::Response(_)
+                | Message::Layout(
+                    LayoutMsg::SnippetWidthChanged(_)
+                        | LayoutMsg::SidebarWidthChanged(_)
+                        | LayoutMsg::PanelSplitChanged(_)
+                        | LayoutMsg::SnippetCopied
+                )
+                | Message::Sidebar(
+                    crate::message::SidebarMsg::ItemDragOver(_)
+                        | crate::message::SidebarMsg::RowHoverEnd(_)
+                        | crate::message::SidebarMsg::FilterChanged(_)
+                        | crate::message::SidebarMsg::ContextMenuOpened(_)
+                        | crate::message::SidebarMsg::ContextMenuClosed
+                        | crate::message::SidebarMsg::EnvironmentVariableHover(..)
+                )
+                | Message::Request(crate::message::RequestMsg::TabDragOver(_))
+        );
     let task = dispatch(state, message);
+    if refresh_snippet {
+        crate::app::snippet::refresh(state);
+    }
     if prune_examples {
         let ids: std::collections::HashSet<_> = state
             .requests
@@ -81,7 +107,7 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
     }
     if matches!(
         message,
-        Message::Layout(LayoutMsg::ConsoleToggled)
+        Message::Layout(LayoutMsg::ConsoleToggled | LayoutMsg::SnippetCopied)
             | Message::Sidebar(crate::message::SidebarMsg::EnvironmentPageClosed)
             | Message::App(crate::message::AppMsg::OpenTerminal)
             | Message::Response(crate::message::ResponseMsg::ConsoleEdited(_))
@@ -282,6 +308,29 @@ fn handle_layout(state: &mut AppState, msg: LayoutMsg) -> Task<Message> {
         }
         LayoutMsg::SidebarWidthChanged(width) => {
             state.sidebar_width = width.clamp(160.0, 600.0);
+        }
+        LayoutMsg::SnippetToggled => {
+            state.snippet_open = !state.snippet_open;
+            crate::app::snippet::refresh(state);
+        }
+        LayoutMsg::SnippetWidthChanged(width) => {
+            state.snippet_width = width.clamp(crate::app::snippet::MIN_W, crate::app::snippet::MAX_W);
+        }
+        LayoutMsg::SnippetLangChanged(lang) => {
+            state.snippet_lang = lang;
+            crate::app::snippet::refresh(state);
+        }
+        LayoutMsg::SnippetCopied => {
+            return match crate::app::snippet::code(state.tabs.active_tab(), state.snippet_lang) {
+                Ok(cmd) => {
+                    state.status_message = Some("cURL command copied!".to_owned());
+                    iced::clipboard::write::<Message>(cmd)
+                }
+                Err(err) => {
+                    state.status_message = Some(err);
+                    Task::none()
+                }
+            };
         }
     }
     Task::none()

@@ -140,3 +140,9 @@ pub fn dot<'a, M: 'a>(color: Color) -> Element<'a, M> {
         })
         .into()
 }
+pub fn panel_right_close() -> Text<'static> {
+    glyph('\u{e432}')
+}
+pub fn panel_right_open() -> Text<'static> {
+    glyph('\u{e434}')
+}

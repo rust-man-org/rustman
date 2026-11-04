@@ -571,105 +571,13 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             tab.body_editor.set_indent_style(style);
         }
         RequestMsg::ExportCurl => {
-            use crate::domain::request::{FormFieldType, graphql_body};
-            use crate::services::curl::{FormFieldInput, GenerateCurlInput, KvPair, generate};
-            let body_text = tab.body_editor.content();
-            let is_graphql = tab.body_type == BodyType::GraphQL;
-            let body = if is_graphql {
-                // Export what would actually be sent, not the raw query, so the
-                // generated command is runnable as-is.
-                let variables = tab.graphql_variables_editor.content();
-                if body_text.trim().is_empty() && variables.trim().is_empty() {
-                    None
-                } else {
-                    match graphql_body(&body_text, &variables) {
-                        Ok(compiled) => Some(compiled),
-                        Err(err) => {
-                            state.status_message = Some(err);
-                            return Task::none();
-                        }
-                    }
+            let curl_cmd = match crate::app::snippet::command(state.tabs.active_tab()) {
+                Ok(cmd) => cmd,
+                Err(err) => {
+                    state.status_message = Some(err);
+                    return Task::none();
                 }
-            } else if body_text.trim().is_empty() {
-                None
-            } else {
-                Some(body_text)
             };
-            let mut headers: Vec<KvPair> = tab
-                .headers
-                .iter()
-                .filter(|h| h.enabled && !h.key.is_empty())
-                .map(|h| KvPair {
-                    key: h.key.clone(),
-                    value: h.value.clone(),
-                })
-                .collect();
-            // The GraphQL body is JSON, and unlike the JSON body type nothing
-            // else here says so — without this curl would send it as form data.
-            if is_graphql
-                && !headers
-                    .iter()
-                    .any(|h| h.key.eq_ignore_ascii_case("content-type"))
-            {
-                headers.push(KvPair {
-                    key: "Content-Type".to_owned(),
-                    value: "application/json".to_owned(),
-                });
-            }
-            let form_fields: Vec<FormFieldInput> = if tab.body_type == BodyType::FormData {
-                tab.form_fields
-                    .iter()
-                    .filter(|f| f.enabled && !f.key.is_empty())
-                    .map(|f| FormFieldInput {
-                        key: f.key.clone(),
-                        value: f.value.clone(),
-                        is_file: f.field_type == FormFieldType::File,
-                        file_name: f.file_name.clone(),
-                    })
-                    .collect()
-            } else {
-                vec![]
-            };
-            let api_loc = match tab.api_key_location {
-                crate::domain::request::ApiKeyLocation::Header => None,
-                crate::domain::request::ApiKeyLocation::Query => Some("query".to_owned()),
-            };
-            let input = GenerateCurlInput {
-                method: tab.method.as_str().to_owned(),
-                url: tab.url.clone(),
-                headers,
-                body,
-                form_fields,
-                cookies: vec![],
-                auth_type: tab.auth_type.as_str().to_owned(),
-                bearer_token: if tab.bearer_token.is_empty() {
-                    None
-                } else {
-                    Some(tab.bearer_token.clone())
-                },
-                basic_user: if tab.basic_user.is_empty() {
-                    None
-                } else {
-                    Some(tab.basic_user.clone())
-                },
-                basic_pass: if tab.basic_pass.is_empty() {
-                    None
-                } else {
-                    Some(tab.basic_pass.clone())
-                },
-                api_key_name: if tab.api_key_name.is_empty() {
-                    None
-                } else {
-                    Some(tab.api_key_name.clone())
-                },
-                api_key_value: if tab.api_key_value.is_empty() {
-                    None
-                } else {
-                    Some(tab.api_key_value.clone())
-                },
-                api_key_location: api_loc,
-            };
-            let curl_cmd = generate(&input);
             state.curl_modal_command = curl_cmd;
             state.curl_modal_open = true;
         }

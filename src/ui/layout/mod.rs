@@ -23,8 +23,16 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     // fire alongside any nested control's own press (parent-first), so row
     // clicks still toggle/open and right-clicks on another header still swap
     // the menu over — the nested message is published last and wins.
+    // The snippet panel belongs to the request view; the environment editor
+    // and the example editor keep the full width.
+    let request_view =
+        state.sidebar.environment_page.is_none() && state.examples.editor.is_none();
+    let mut columns = row![left_panel(state), main_area(state)].height(Length::Fill);
+    if request_view {
+        columns = columns.push(crate::ui::snippet_panel::view(state));
+    }
     let shell: Element<Message> =
-        mouse_area(row![left_panel(state), main_area(state)].height(Length::Fill))
+        mouse_area(columns)
             .on_press(Message::Sidebar(SidebarMsg::ContextMenuClosed))
             .on_right_press(Message::Sidebar(SidebarMsg::ContextMenuClosed))
             .into();

@@ -129,6 +129,22 @@ pub(super) fn status_bar(state: &AppState) -> Element<'_, Message> {
             "Command palette (Ctrl+P)",
             Message::Palette(PaletteMsg::Open)
         ),
+        // Mirrors the sidebar toggle on the left: shows/hides the right
+        // "Code snippet" panel.
+        footer_action(
+            Some(if state.snippet_open {
+                icons::panel_right_close()
+            } else {
+                icons::panel_right_open()
+            }),
+            "",
+            if state.snippet_open {
+                "Hide code snippet"
+            } else {
+                "Show code snippet"
+            },
+            Message::Layout(LayoutMsg::SnippetToggled)
+        ),
     ]
     .spacing(8)
     .align_y(Alignment::Center)
