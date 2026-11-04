@@ -10,6 +10,7 @@ mod state;
 mod ui;
 
 fn main() -> iced::Result {
+    prefer_memory_efficient_renderer_on_windows();
     prefer_integrated_gpu_on_linux();
     app::run()
 }
@@ -57,6 +58,65 @@ fn prefer_integrated_gpu_on_linux() {
             unsafe {
                 std::env::set_var("WGPU_POWER_PREF", "low");
             }
+        }
+    }
+}
+
+/// Prefer the built-in software renderer on Windows. Native profiling showed
+/// that initializing the GPU backend dominates idle memory for this UI.
+/// Keep GPU support as a fallback and respect explicit renderer/adapter choices.
+fn prefer_memory_efficient_renderer_on_windows() {
+    #[cfg(target_os = "windows")]
+    {
+        let backend = std::env::var_os("ICED_BACKEND");
+        let gpu_requested = ["WGPU_BACKEND", "WGPU_ADAPTER_NAME", "WGPU_POWER_PREF"]
+            .iter()
+            .any(|key| std::env::var_os(key).is_some());
+        if let Some(default) = memory_backend_default("windows", backend.as_deref(), gpu_requested)
+        {
+            // SAFETY: main calls this before starting threads or initializing iced.
+            unsafe {
+                std::env::set_var("ICED_BACKEND", default);
+            }
+        }
+    }
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn memory_backend_default(
+    platform: &str,
+    backend_override: Option<&std::ffi::OsStr>,
+    gpu_requested: bool,
+) -> Option<&'static str> {
+    (platform == "windows" && backend_override.is_none() && !gpu_requested)
+        .then_some("tiny-skia,wgpu")
+}
+
+#[cfg(test)]
+mod renderer_policy_tests {
+    use super::memory_backend_default;
+    use std::ffi::OsStr;
+    #[test]
+    fn windows_prefers_software_with_gpu_fallback() {
+        assert_eq!(
+            memory_backend_default("windows", None, false),
+            Some("tiny-skia,wgpu")
+        );
+    }
+    #[test]
+    fn explicit_renderer_and_gpu_preferences_are_preserved() {
+        for backend in ["wgpu", "tiny-skia", ""] {
+            assert_eq!(
+                memory_backend_default("windows", Some(OsStr::new(backend)), false),
+                None
+            );
+        }
+        assert_eq!(memory_backend_default("windows", None, true), None);
+    }
+    #[test]
+    fn other_platforms_keep_their_existing_renderer_default() {
+        for platform in ["linux", "macos"] {
+            assert_eq!(memory_backend_default(platform, None, false), None);
         }
     }
 }

@@ -44,6 +44,14 @@ pub(crate) fn subscription(state: &AppState) -> Subscription<Message> {
         .collect();
 
     let mut all = vec![kbd];
+    if state.sidebar.search_open && !state.palette_open {
+        all.push(event::listen_with(sidebar_search_keys));
+    }
+    if state.sidebar.dragging_item.is_some() {
+        // Release outside the tree (or over a control that captures it) must
+        // still end the drag and restore the row's hover actions.
+        all.push(event::listen_with(sidebar_drag_end));
+    }
 
     // Autosave only while there is actually something new to save.
     //
@@ -243,4 +251,69 @@ fn palette_keys(event: Event, _status: event::Status, _id: window::Id) -> Option
         keyboard::Key::Named(Named::Enter) => Some(Message::Palette(PaletteMsg::Confirm)),
         _ => None,
     }
+}
+
+fn sidebar_drag_end(event: Event, _status: event::Status, _window: window::Id) -> Option<Message> {
+    matches!(
+        event,
+        Event::Mouse(iced::mouse::Event::ButtonReleased(
+            iced::mouse::Button::Left
+        )) | Event::Window(window::Event::Unfocused)
+    )
+    .then_some(Message::Sidebar(crate::message::SidebarMsg::ItemDragEnd))
+}
+
+#[cfg(test)]
+mod sidebar_drag_tests {
+    use super::*;
+
+    #[test]
+    fn drag_ends_even_when_release_was_captured_or_window_loses_focus() {
+        for status in [event::Status::Captured, event::Status::Ignored] {
+            for event in [
+                Event::Mouse(iced::mouse::Event::ButtonReleased(
+                    iced::mouse::Button::Left,
+                )),
+                Event::Window(window::Event::Unfocused),
+            ] {
+                assert!(matches!(
+                    sidebar_drag_end(event, status, window::Id::unique()),
+                    Some(Message::Sidebar(crate::message::SidebarMsg::ItemDragEnd))
+                ));
+            }
+        }
+        assert!(
+            sidebar_drag_end(
+                Event::Mouse(iced::mouse::Event::ButtonReleased(
+                    iced::mouse::Button::Right
+                )),
+                event::Status::Ignored,
+                window::Id::unique()
+            )
+            .is_none()
+        );
+    }
+}
+
+fn sidebar_search_keys(
+    event: Event,
+    _status: event::Status,
+    _window: window::Id,
+) -> Option<Message> {
+    let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event else {
+        return None;
+    };
+    if modifiers.command() || modifiers.alt() {
+        return None;
+    }
+    let msg = match key {
+        keyboard::Key::Named(keyboard::key::Named::ArrowDown) => {
+            crate::message::SidebarMsg::SearchMove(1)
+        }
+        keyboard::Key::Named(keyboard::key::Named::ArrowUp) => {
+            crate::message::SidebarMsg::SearchMove(-1)
+        }
+        _ => return None,
+    };
+    Some(Message::Sidebar(msg))
 }

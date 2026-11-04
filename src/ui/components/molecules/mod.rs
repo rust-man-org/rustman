@@ -11,3 +11,5 @@ pub use data_table::DataTable;
 pub use menu::{menu, menu_divider, menu_item};
 pub use status_chip::status_chip;
 pub use tree_row::tree_row;
+
+pub mod search_result;

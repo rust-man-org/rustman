@@ -6,6 +6,7 @@ use crate::message::{Message, PaletteMsg};
 pub(super) fn handle(state: &mut AppState, msg: PaletteMsg) -> Task<Message> {
     match msg {
         PaletteMsg::Open => {
+            state.sidebar.search_open = false;
             state.palette_open = true;
             state.palette_query = String::new();
             state.palette_selected = 0;

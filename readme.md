@@ -106,58 +106,138 @@ rather than a rendered page, and PDFs show a binary-response summary.
 
 ## Build from source
 
-You will need a few things first.
+Use the current stable [Rust toolchain](https://rust-lang.org/tools/install/)
+installed through rustup, plus Git. The project uses Rust edition 2024; the
+locked dependencies may require a newer compiler than the edition's minimum.
+Two dependencies are fetched directly from GitHub by Cargo, so the first build
+needs network access. C/C++ tools and CMake are needed for native dependencies.
+On Unix, [vendored OpenSSL](https://docs.rs/openssl/latest/openssl/#vendored)
+also needs Perl and Make.
 
-- A recent [Rust toolchain](https://www.rust-lang.org/tools/install), 1.85 or newer. Rustman is edition 2024, as is the iced-code-editor fork it builds against, so older toolchains will not build it. The latest stable Rust works fine.
-- A C toolchain and CMake. git2 builds with vendored-libgit2 and vendored-openssl, so libgit2 and OpenSSL compile from source, and rusqlite bundles SQLite. You need a C compiler and cmake on the machine.
-- A few system libraries on Linux, listed below.
-
-Two dependencies (the scripting engine and the editor fork) come from
-`rust-man-org` repos on GitHub and are fetched by cargo automatically —
-there is nothing extra to clone.
+Clone the repository, or use your team's fork URL for a shared branch:
 
 ```sh
-git clone https://github.com/rust-man-org/rustman
+git clone https://github.com/rust-man-org/rustman.git
 cd rustman
-cargo build --release
 ```
 
-The binary ends up at `target/release/rustman`. The longer guide lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Run the following build commands from the repository root, on the branch you
+want to build. `--locked` keeps the versions recorded in `Cargo.lock`.
 
-Package managers should build with `--no-default-features`:
+### Windows (x86_64, PowerShell)
 
-```sh
-cargo build --release --no-default-features
+Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+with **Desktop development with C++**, the MSVC compiler and a Windows SDK.
+Install CMake, or include **C++ CMake tools for Windows** in that workload.
+Use Developer PowerShell for Visual Studio if `cl.exe` or `link.exe` cannot be
+found in a regular shell. See the [official MSVC setup guide](https://rust-lang.github.io/rustup/installation/windows-msvc.html).
+
+```powershell
+rustup toolchain install stable-x86_64-pc-windows-msvc
+cargo +stable-x86_64-pc-windows-msvc build --release --locked
+.\target\release\rustman.exe
 ```
 
-That compiles out the in-app updater entirely — no launch check, no
-Settings → Updates card, no update banner, none of the crates that swap the
-running binary — so the package manager stays the only thing that touches the
-installed executable. The default build keeps the updater.
+Output: `target/release/rustman.exe`. Close a running copy of that executable
+before rebuilding it; Windows cannot replace the executable while it is open.
+No WSL, Node.js or browser runtime is required.
 
-There is no WebKitGTK, GTK or pdfium build dependency: HTML responses are
-rendered as readable text.
+### macOS (Apple Silicon or Intel)
 
-### Linux system dependencies
+Install Xcode Command Line Tools, then CMake and the native build helpers
+(the example uses [Homebrew](https://brew.sh/)):
 
 ```sh
+xcode-select --install
+brew install cmake pkg-config perl
+rustup toolchain install stable
+cargo +stable build --release --locked
+./target/release/rustman
+```
+
+Output: `target/release/rustman`, built for the Mac's native architecture.
+A source build produces the executable; the universal `.dmg` is produced by
+the release workflow, not by `cargo build` alone.
+
+### Linux (Ubuntu, Debian or Mint; x86_64 or ARM64)
+
+Install the system libraries used by the Linux CI build:
+
+```sh
+sudo apt-get update
 sudo apt-get install -y \
-  libxkbcommon-dev libxi-dev libx11-dev \
-  libxcb1-dev libxcb-xkb-dev libdbus-1-dev \
-  pkg-config cmake build-essential
+  git curl build-essential cmake pkg-config perl \
+  libxkbcommon-dev libxkbcommon-x11-dev libxi-dev libx11-dev \
+  libxcb1-dev libxcb-xkb-dev libdbus-1-dev
+rustup toolchain install stable
+cargo +stable build --release --locked
+./target/release/rustman
 ```
 
-macOS and Windows want the platform C toolchain (Xcode command line tools or MSVC build tools) plus CMake for the vendored native bits, on top of Rust.
+Output: `target/release/rustman`, built for the host architecture. On other
+Linux distributions, install equivalent compiler, CMake, Perl, pkg-config,
+X11/XCB, xkbcommon and D-Bus development packages through the distro's package
+manager. There is no WebKitGTK, GTK or pdfium build dependency.
 
-### Development
+### Renderer and RAM usage (all platforms)
+
+Windows defaults to the `tiny-skia` software renderer, with `wgpu` as a fallback,
+to reduce GPU driver/device memory for the API-client UI. Linux and macOS retain
+their existing defaults. Software rendering is available there too; enable it
+for one launch with:
 
 ```sh
-cargo run
+# Linux / macOS
+ICED_BACKEND="tiny-skia,wgpu" ./target/release/rustman
 ```
+
+To explicitly choose the GPU renderer:
+
+```powershell
+# Windows, for this PowerShell session
+$env:ICED_BACKEND = 'wgpu'
+.\target\release\rustman.exe
+# Return to the app's default for future launches from this shell:
+Remove-Item Env:ICED_BACKEND
+```
+
+```sh
+# Linux / macOS, for this launch only
+ICED_BACKEND=wgpu ./target/release/rustman
+```
+
+Explicit `ICED_BACKEND`, `WGPU_BACKEND`, `WGPU_ADAPTER_NAME` and `WGPU_POWER_PREF`
+settings are respected. Lower software-renderer memory can come with more CPU
+work during repaint. The savings measured on Windows are not a guarantee for
+other platforms or workloads. Compare release builds with the same data, tabs
+and window size; private working set and total working set are different metrics.
+
+### Package-manager builds (all platforms)
+
+```sh
+cargo +stable build --release --locked --no-default-features
+```
+
+This removes the in-app updater, its settings/banner, and binary replacement
+code so the package manager owns updates. The normal build includes the updater;
+automatic update checking remains opt-in.
+
+### Development and checks
+
+```sh
+cargo run --locked
+cargo test --locked --all-targets
+cargo test --locked --no-default-features --all-targets
+cargo check --locked --no-default-features --all-targets
+```
+
+Development builds go to `target/debug/`; use `target/debug/rustman.exe` on
+Windows and `target/debug/rustman` on macOS/Linux. Release optimization (including
+LTO) makes the first release build slower. More details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Tech stack
 
-- **GUI.** [iced](https://github.com/iced-rs/iced) 0.14, pure Rust, drawn with wgpu.
+- **GUI.** [iced](https://github.com/iced-rs/iced) 0.14, pure Rust, with software (`tiny-skia`) and GPU (`wgpu`) renderers.
 - **HTTP.** reqwest with rustls and multipart.
 - **WebSocket.** tokio-tungstenite.
 - **Storage.** rusqlite (bundled SQLite), the source of truth.

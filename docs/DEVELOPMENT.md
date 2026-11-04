@@ -6,7 +6,7 @@ I try to be honest here. Where something is UI only, stubbed, or half wired, I s
 
 ## Toolchain
 
-You need Rust 1.85 or newer. Rustman is edition 2024, as is the `iced-code-editor` fork it builds against, so older toolchains will not build it. The latest stable Rust works fine. Two dependencies come from `rust-man-org` repos on GitHub (the engine and the editor fork) and are fetched by cargo automatically. You also need a C toolchain and CMake, because git2 builds vendored libgit2 and OpenSSL and rusqlite bundles SQLite, all from source. On Linux add the X, xkb, and dbus dev packages (`libxkbcommon-dev libxi-dev libx11-dev libxcb1-dev libxcb-xkb-dev libdbus-1-dev pkg-config cmake build-essential`). Build with `cargo build --release` and the binary lands at `target/release/rustman`. Day to day I just use `cargo run`.
+Use the current stable Rust toolchain through rustup. Rustman and its editor fork use edition 2024, and the locked dependencies may require a compiler newer than the edition minimum; no separate minimum Rust version is validated. Two dependencies come from `rust-man-org` repos on GitHub (the engine and the editor fork) and are fetched by cargo automatically. You also need a C toolchain and CMake, because git2 builds vendored libgit2 and OpenSSL and rusqlite bundles SQLite, all from source. On Linux add the X, xkb, and dbus dev packages (`libxkbcommon-dev libxi-dev libx11-dev libxcb1-dev libxcb-xkb-dev libdbus-1-dev pkg-config cmake build-essential`). Build with `cargo build --release` and the binary lands at `target/release/rustman`. Day to day I just use `cargo run`.
 
 For distro packaging, build with `--no-default-features`: that compiles out the in-app updater (boot check, Settings → Updates card, update banner, and the binary-swapping code) so the package manager is the only thing that delivers updates.
 
@@ -76,6 +76,26 @@ A multi megabyte JSON response should not crash the UI, blow up memory, or freez
 ### Release profile
 
 I ship one small binary. The release profile uses `opt-level = 'z'`, `lto = true`, `codegen-units = 1`, `strip = true`, and `panic = "abort"`. The catch with `panic = "abort"` is that there is no per task isolation, a panic kills the whole process. That makes every stray `.unwrap()` matter more, so the fallible ones (the git2 `workdir().unwrap()` sites, the LRU double lookup, `build_client().expect()`) are worth converting to `?` over time.
+
+### Windows renderer and memory
+
+Windows defaults to iced's software renderer (`tiny-skia`), with `wgpu` as a
+fallback. This avoids GPU driver/device allocations for the normal API-client
+UI. The tradeoff is CPU work during repaint; graphics-heavy workloads can
+prefer the GPU explicitly. Linux keeps its existing integrated-GPU preference.
+
+An explicit `ICED_BACKEND`, `WGPU_BACKEND`, `WGPU_ADAPTER_NAME`, or
+`WGPU_POWER_PREF` is respected. To opt into the GPU for one PowerShell session:
+
+```powershell
+$env:ICED_BACKEND = 'wgpu'
+.\target\release\rustman.exe
+```
+
+Compare memory using the same window size, tabs, collection and warmup time.
+Windows private working set (physical private RAM), total working set, and
+private commit are different counters; do not compare one to another. Release
+profile measurements are tracked in the company progress checkpoint.
 
 ### Not leaking the URL in errors
 

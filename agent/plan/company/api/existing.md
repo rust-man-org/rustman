@@ -283,7 +283,12 @@ Owner / planned integration: 01 (draft integration). No inline test module found
 
 ## `src/app/tree.rs`
 
-Owner / planned integration: 01 (draft integration). No inline test module found; other coverage unverified.
+Owner / planned integration: 01 (draft integration). Inline regression test in
+`app::tree::tests` covers Postman folder ownership through insertion, repeat
+application, tree reconstruction and database restart. `insert_collection`
+normalizes request collection/group links from the containing imported tree;
+import and git-sync callers keep the same signature. Existing persisted imports
+are unchanged until re-imported; no hierarchy is guessed from request names.
 
 | Symbol | Source |
 |---|---|
@@ -293,6 +298,20 @@ Owner / planned integration: 01 (draft integration). No inline test module found
 | `collection_from_state` | [definition](<../../../../src/app/tree.rs:57>) |
 | `insert_collection` | [definition](<../../../../src/app/tree.rs:116>) |
 | `groups_under` | [definition](<../../../../src/app/tree.rs:181>) |
+
+## `src/services/search.rs`
+
+Owner: local sidebar search (10). `find` consumes collections, folders, effective
+request references and a query; returns ranked, capped `Hit` values. No network,
+authentication or persistence side effects. Content hits expose match location,
+not body/script snippets. Existing tree filtering remains a separate index.
+Regression evidence: `services::search::tests` and
+`app::update::sidebar_search::tests` (typos, ranking, nested folders, draft data,
+open/clear/navigation and preservation of stored requests).
+
+| Symbol | Source |
+|---|---|
+| `find` | [definition](<../../../../src/services/search.rs>) |
 
 ## Effects, consumers and compatibility boundaries
 

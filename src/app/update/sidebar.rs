@@ -8,17 +8,29 @@ use crate::services::storage;
 pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
     match msg {
         SidebarMsg::ToggleCollapsed => {
+            state.sidebar.search_open = false;
             state.sidebar.collapsed = !state.sidebar.collapsed;
         }
-        SidebarMsg::FilterChanged(q) => {
-            state.sidebar.filter = q;
+        SidebarMsg::FilterChanged(q) => return super::sidebar_search::query_changed(state, q),
+        SidebarMsg::SearchMove(delta) => {
+            return super::sidebar_search::move_selection(state, delta);
         }
+        SidebarMsg::SearchConfirm => {
+            if !state.sidebar.search_open {
+                return super::sidebar_search::query_changed(state, state.sidebar.filter.clone());
+            }
+            return super::sidebar_search::confirm(state, state.sidebar.search_selected);
+        }
+        SidebarMsg::SearchPick(index) => return super::sidebar_search::confirm(state, index),
+        SidebarMsg::SearchClose => state.sidebar.search_open = false,
         SidebarMsg::PanelSelected(panel) => {
+            state.sidebar.search_open = false;
             if state.sidebar.panel == panel && !state.sidebar.collapsed {
                 state.sidebar.collapsed = true;
                 return Task::none();
             }
             let is_git = panel == crate::message::SidebarPanel::Git;
+            state.sidebar.search_open = false;
             state.sidebar.panel = panel;
             state.sidebar.collapsed = false;
             if is_git {
@@ -417,6 +429,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             }
         }
         SidebarMsg::ContextMenuOpened(id) => {
+            state.sidebar.search_open = false;
             // Right-click toggles: clicking the same row again dismisses.
             state.sidebar.context_menu = if state.sidebar.context_menu.as_deref() == Some(&id) {
                 None

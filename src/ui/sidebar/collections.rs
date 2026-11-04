@@ -26,7 +26,7 @@ use crate::{
         icons,
         theme::{MONO, Palette, TEXT_XS, UI_FONT_MEDIUM},
         tree_label::{tree_label_styled, tree_label_weighted},
-        widgets::kv_table,
+        widgets::{kv_table, popup::popup},
     },
 };
 
@@ -108,7 +108,7 @@ fn panel(state: &AppState) -> Element<'_, Message> {
     }
 
     let all: Vec<&SavedRequest> = state.requests.values().flatten().collect();
-    let index = TreeIndex::build(&state.collections, &state.groups, &all, &state.sidebar.filter);
+    let index = TreeIndex::build(&state.collections, &state.groups, &all, "");
 
     let mut tree = column![section_header("Collections")].spacing(0);
     let mut any = false;
@@ -188,9 +188,17 @@ fn more_menu() -> Element<'static, Message> {
 /// the draft filter chips while there are drafts.
 fn top_bar(state: &AppState) -> Element<'_, Message> {
     let first = row![
-        search_input("Search", &state.sidebar.filter, |s| {
-            Message::Sidebar(SidebarMsg::FilterChanged(s))
-        }),
+        crate::ui::widgets::popup::popup_left(
+            search_input("Search", &state.sidebar.filter, |s| Message::Sidebar(
+                SidebarMsg::FilterChanged(s)
+            ))
+            .id("sidebar-search-input")
+            .on_submit(Message::Sidebar(SidebarMsg::SearchConfirm))
+            .into(),
+            super::search::view(state),
+            Message::Sidebar(SidebarMsg::SearchClose),
+            state.sidebar.search_open,
+        ),
         compact_icon_button(
             icons::plus(),
             "New…",
@@ -263,7 +271,8 @@ fn collection_view<'a>(
                 parent_is_collection: true,
             })),
         );
-        let (trailing, trailing_w) = count_or_actions(actions, actions_w, index.count(&collection.id), true);
+        let (trailing, trailing_w) =
+            count_or_actions(actions, actions_w, index.count(&collection.id), true);
         // Label room: sidebar minus tree padding, row padding, chevron, trailing.
         let avail = state.sidebar_width - 2.0 * TREE_PAD_X - BASE_INDENT - 8.0 - 16.0 - trailing_w;
         let content = row![
@@ -288,17 +297,26 @@ fn collection_view<'a>(
                 content,
                 BASE_INDENT,
                 COLLECTION_ROW_H,
-                drag_fill(dragging),
+                drag_fill(
+                    dragging
+                        || state.sidebar.hovered_row.as_deref() == Some(collection.id.as_str()),
+                ),
                 Message::Sidebar(SidebarMsg::ItemDragStart(collection.id.clone())),
             ),
             &collection.id,
         )
     };
 
+    let header = if menu_open {
+        popup(
+            header,
+            collection_menu(&collection.id),
+            Message::Sidebar(SidebarMsg::ContextMenuClosed),
+        )
+    } else {
+        header
+    };
     let mut col = column![header].spacing(0);
-    if menu_open {
-        col = col.push(collection_menu(&collection.id));
-    }
     if expanded {
         let (groups, requests) = children_of(state, index, &collection.id, true);
         if groups.is_empty() && requests.is_empty() && !index.filtering() {
@@ -399,8 +417,10 @@ fn group_view<'a>(
                 parent_is_collection: false,
             })),
         );
-        let (trailing, trailing_w) = count_or_actions(actions, actions_w, index.count(&group.id), false);
-        let avail = state.sidebar_width - 2.0 * TREE_PAD_X - indent - 8.0 - FOLDER_LEAD - trailing_w;
+        let (trailing, trailing_w) =
+            count_or_actions(actions, actions_w, index.count(&group.id), false);
+        let avail =
+            state.sidebar_width - 2.0 * TREE_PAD_X - indent - 8.0 - FOLDER_LEAD - trailing_w;
         // Mockup `.folder-row`: chevron, folder icon, secondary-text name.
         let content = row![
             chevron(expanded, 9.0),
@@ -415,17 +435,25 @@ fn group_view<'a>(
                 content,
                 indent,
                 ROW_H,
-                drag_fill(dragging),
+                drag_fill(
+                    dragging || state.sidebar.hovered_row.as_deref() == Some(group.id.as_str()),
+                ),
                 Message::Sidebar(SidebarMsg::ItemDragStart(group.id.clone())),
             ),
             &group.id,
         )
     };
 
+    let header = if menu_open {
+        popup(
+            header,
+            group_menu(&group.id),
+            Message::Sidebar(SidebarMsg::ContextMenuClosed),
+        )
+    } else {
+        header
+    };
     let mut col = column![header].spacing(0);
-    if menu_open {
-        col = col.push(group_menu(&group.id, indent + 8.0));
-    }
     if expanded {
         let (groups, requests) = children_of(state, index, &group.id, false);
         if groups.is_empty() && requests.is_empty() && !index.filtering() {
@@ -483,7 +511,13 @@ fn request_view<'a>(
         // Mockup `.req-row`: names are secondary text; the selected one
         // reads as primary, medium weight, on the accent tint.
         let name = if selected {
-            tree_label_weighted(req.name.clone(), 12.0, avail, UI_FONT_MEDIUM, Palette::text())
+            tree_label_weighted(
+                req.name.clone(),
+                12.0,
+                avail,
+                UI_FONT_MEDIUM,
+                Palette::text(),
+            )
         } else {
             tree_label_styled(req.name.clone(), 12.0, avail, None, Palette::text_muted())
         };
@@ -504,7 +538,7 @@ fn request_view<'a>(
         let fill = if selected {
             RowFill::Selected
         } else {
-            drag_fill(dragging)
+            drag_fill(dragging || state.sidebar.hovered_row.as_deref() == Some(req.id.as_str()))
         };
         draggable(
             tree_row(
@@ -519,10 +553,11 @@ fn request_view<'a>(
     };
 
     if menu_open {
-        column![row_el, request_menu(req, indent + 8.0)]
-            .spacing(0)
-            .width(Length::Fill)
-            .into()
+        popup(
+            row_el,
+            request_menu(req),
+            Message::Sidebar(SidebarMsg::ContextMenuClosed),
+        )
     } else {
         row_el
     }
@@ -534,14 +569,20 @@ fn draggable<'a>(row_el: Element<'a, Message>, id: &str) -> Element<'a, Message>
     mouse_area(row_el)
         .on_enter(Message::Sidebar(SidebarMsg::ItemDragOver(id.to_owned())))
         .on_exit(Message::Sidebar(SidebarMsg::RowHoverEnd(id.to_owned())))
-        .on_right_press(Message::Sidebar(SidebarMsg::ContextMenuOpened(id.to_owned())))
+        .on_right_press(Message::Sidebar(SidebarMsg::ContextMenuOpened(
+            id.to_owned(),
+        )))
         .into()
 }
 
 const ACTION_W: f32 = 22.0;
 
 fn drag_fill(dragging: bool) -> RowFill {
-    if dragging { RowFill::Hover } else { RowFill::None }
+    if dragging {
+        RowFill::Hover
+    } else {
+        RowFill::None
+    }
 }
 
 /// Trailing slot of collection / folder rows: the request count (mockup
@@ -555,7 +596,9 @@ fn count_or_actions(
     if let Some(a) = actions {
         return (a, actions_w);
     }
-    let mut label = text(n.to_string()).size(TEXT_XS).color(Palette::text_subtle());
+    let mut label = text(n.to_string())
+        .size(TEXT_XS)
+        .color(Palette::text_subtle());
     if mono {
         label = label.font(MONO);
     }
@@ -643,113 +686,104 @@ fn empty_state<'a>(label: &'static str, depth: usize) -> Element<'a, Message> {
 
 /// Right-click menu for a collection: add children, rename, export, delete.
 fn collection_menu(col_id: &str) -> Element<'_, Message> {
-    context_menu(
-        vec![
-            ctx_item(
-                "New request",
-                Message::Sidebar(SidebarMsg::NewRequestIn {
-                    parent_id: col_id.to_owned(),
-                    parent_is_collection: true,
-                }),
-                false,
-            ),
-            ctx_item(
-                "New folder",
-                Message::Sidebar(SidebarMsg::NewGroupIn {
-                    parent_id: col_id.to_owned(),
-                    parent_is_collection: true,
-                }),
-                false,
-            ),
-            menu_divider(),
-            ctx_item(
-                "Rename",
-                Message::Sidebar(SidebarMsg::ToggleRenameCollection(col_id.to_owned())),
-                false,
-            ),
-            ctx_item(
-                "Export…",
-                Message::Import(ImportMsg::OpenExportDialog(col_id.to_owned())),
-                false,
-            ),
-            menu_divider(),
-            ctx_item(
-                "Delete",
-                Message::Sidebar(SidebarMsg::DeleteCollection(col_id.to_owned())),
-                true,
-            ),
-        ],
-        BASE_INDENT + 8.0,
-    )
+    context_menu(vec![
+        ctx_item(
+            "New request",
+            Message::Sidebar(SidebarMsg::NewRequestIn {
+                parent_id: col_id.to_owned(),
+                parent_is_collection: true,
+            }),
+            false,
+        ),
+        ctx_item(
+            "New folder",
+            Message::Sidebar(SidebarMsg::NewGroupIn {
+                parent_id: col_id.to_owned(),
+                parent_is_collection: true,
+            }),
+            false,
+        ),
+        menu_divider(),
+        ctx_item(
+            "Rename",
+            Message::Sidebar(SidebarMsg::ToggleRenameCollection(col_id.to_owned())),
+            false,
+        ),
+        ctx_item(
+            "Export…",
+            Message::Import(ImportMsg::OpenExportDialog(col_id.to_owned())),
+            false,
+        ),
+        menu_divider(),
+        ctx_item(
+            "Delete",
+            Message::Sidebar(SidebarMsg::DeleteCollection(col_id.to_owned())),
+            true,
+        ),
+    ])
 }
 
 /// Right-click menu for a folder: add children, rename, delete.
-fn group_menu(group_id: &str, indent: f32) -> Element<'_, Message> {
-    context_menu(
-        vec![
-            ctx_item(
-                "New request",
-                Message::Sidebar(SidebarMsg::NewRequestIn {
-                    parent_id: group_id.to_owned(),
-                    parent_is_collection: false,
-                }),
-                false,
-            ),
-            ctx_item(
-                "New folder",
-                Message::Sidebar(SidebarMsg::NewGroupIn {
-                    parent_id: group_id.to_owned(),
-                    parent_is_collection: false,
-                }),
-                false,
-            ),
-            menu_divider(),
-            ctx_item(
-                "Rename",
-                Message::Sidebar(SidebarMsg::ToggleRenameGroup(group_id.to_owned())),
-                false,
-            ),
-            menu_divider(),
-            ctx_item(
-                "Delete",
-                Message::Sidebar(SidebarMsg::DeleteGroup(group_id.to_owned())),
-                true,
-            ),
-        ],
-        indent,
-    )
+fn group_menu(group_id: &str) -> Element<'_, Message> {
+    context_menu(vec![
+        ctx_item(
+            "New request",
+            Message::Sidebar(SidebarMsg::NewRequestIn {
+                parent_id: group_id.to_owned(),
+                parent_is_collection: false,
+            }),
+            false,
+        ),
+        ctx_item(
+            "New folder",
+            Message::Sidebar(SidebarMsg::NewGroupIn {
+                parent_id: group_id.to_owned(),
+                parent_is_collection: false,
+            }),
+            false,
+        ),
+        menu_divider(),
+        ctx_item(
+            "Rename",
+            Message::Sidebar(SidebarMsg::ToggleRenameGroup(group_id.to_owned())),
+            false,
+        ),
+        menu_divider(),
+        ctx_item(
+            "Delete",
+            Message::Sidebar(SidebarMsg::DeleteGroup(group_id.to_owned())),
+            true,
+        ),
+    ])
 }
 
 /// Right-click menu for a request: duplicate, rename, delete.
-fn request_menu(req: &SavedRequest, indent: f32) -> Element<'_, Message> {
-    context_menu(
-        vec![
-            ctx_item(
-                "Duplicate",
-                Message::Sidebar(SidebarMsg::CloneRequest {
-                    id: req.id.clone(),
-                    collection_id: req.collection_id.clone(),
-                }),
-                false,
-            ),
-            menu_divider(),
-            ctx_item(
-                "Rename",
-                Message::Sidebar(SidebarMsg::ToggleRenameRequest(req.id.clone())),
-                false,
-            ),
-            menu_divider(),
-            ctx_item(
-                "Delete",
-                Message::Sidebar(SidebarMsg::DeleteRequest {
-                    id: req.id.clone(),
-                    collection_id: req.collection_id.clone(),
-                }),
-                true,
-            ),
-        ],
-        indent,
-    )
+fn request_menu(req: &SavedRequest) -> Element<'_, Message> {
+    context_menu(vec![
+        ctx_item(
+            "Duplicate",
+            Message::Sidebar(SidebarMsg::CloneRequest {
+                id: req.id.clone(),
+                collection_id: req.collection_id.clone(),
+            }),
+            false,
+        ),
+        menu_divider(),
+        ctx_item(
+            "Rename",
+            Message::Sidebar(SidebarMsg::ToggleRenameRequest(req.id.clone())),
+            false,
+        ),
+        menu_divider(),
+        ctx_item(
+            "Delete",
+            Message::Sidebar(SidebarMsg::DeleteRequest {
+                id: req.id.clone(),
+                collection_id: req.collection_id.clone(),
+            }),
+            true,
+        ),
+    ])
 }
 
 /// The `+` dropdown (Postman-style): what to create. Folder and request go
@@ -805,13 +839,11 @@ fn add_menu(state: &AppState) -> Element<'_, Message> {
 
 /// Where the `+` menu adds a folder or request: (parent id, is collection).
 fn add_target(state: &AppState) -> Option<(String, bool)> {
-    let selected = state.sidebar.selected_request.as_deref().and_then(|id| {
-        state
-            .requests
-            .values()
-            .flatten()
-            .find(|r| r.id == id)
-    });
+    let selected = state
+        .sidebar
+        .selected_request
+        .as_deref()
+        .and_then(|id| state.requests.values().flatten().find(|r| r.id == id));
     match selected {
         Some(r) => Some(match &r.group_id {
             Some(g) => (g.clone(), false),
@@ -821,19 +853,9 @@ fn add_target(state: &AppState) -> Option<(String, bool)> {
     }
 }
 
-/// Right-click menu card, indented under its row.
-/// Mockup `.ctx-menu`: a 196px card under its row, right-aligned.
-fn context_menu(items: Vec<Element<'static, Message>>, indent: f32) -> Element<'static, Message> {
-    container(menu(items, Length::Fixed(196.0)))
-        .padding(Padding {
-            top: 2.0,
-            right: 0.0,
-            bottom: 4.0,
-            left: indent,
-        })
-        .width(Length::Fill)
-        .align_x(iced::alignment::Horizontal::Right)
-        .into()
+/// Fixed-width popup card; positioning belongs to the anchored overlay.
+fn context_menu(items: Vec<Element<'static, Message>>) -> Element<'static, Message> {
+    menu(items, Length::Fixed(196.0))
 }
 
 /// Mockup `.ctx-item`: every entry carries its icon.

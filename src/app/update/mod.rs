@@ -18,6 +18,7 @@ mod save_dialog;
 mod secrets;
 mod settings;
 mod sidebar;
+mod sidebar_search;
 #[cfg(feature = "self-update")]
 mod updater;
 mod ws;
@@ -67,6 +68,8 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
         // The tree search box is view state; nothing persisted changes.
         | Message::Sidebar(
             crate::message::SidebarMsg::FilterChanged(_)
+                | crate::message::SidebarMsg::SearchMove(_)
+                | crate::message::SidebarMsg::SearchClose
                 | crate::message::SidebarMsg::RowHoverEnd(_)
                 // Hover; a drag's new order is persisted on ItemDragEnd.
                 | crate::message::SidebarMsg::ItemDragOver(_)

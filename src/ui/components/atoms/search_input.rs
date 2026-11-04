@@ -3,7 +3,7 @@
 //! For a field that only *opens* a search surface, see `search_field`.
 
 use iced::{
-    Background, Border, Color, Element, Length,
+    Background, Border, Color, Length,
     widget::text_input::{self, Icon, Side, Status},
 };
 
@@ -19,7 +19,7 @@ pub fn search_input<'a, M: Clone + 'a>(
     placeholder: &str,
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
-) -> Element<'a, M> {
+) -> iced::widget::TextInput<'a, M> {
     iced::widget::text_input(placeholder, value)
         .on_input(on_input)
         .icon(Icon {
@@ -55,5 +55,4 @@ pub fn search_input<'a, M: Clone + 'a>(
                 },
             }
         })
-        .into()
 }

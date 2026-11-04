@@ -7,6 +7,7 @@ pub mod import;
 pub mod keychain;
 pub mod repo_layout;
 pub mod repos;
+pub mod search;
 pub mod secrets;
 pub mod spreadsheet;
 pub mod storage;

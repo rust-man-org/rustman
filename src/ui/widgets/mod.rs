@@ -5,3 +5,5 @@ pub mod kv_table;
 pub mod panel_splitter;
 pub mod seam;
 pub mod sidebar_splitter;
+
+pub mod popup;

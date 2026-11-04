@@ -115,8 +115,26 @@ fn direct_requests(
 /// collection replaces its old subtree (idempotent).
 pub fn insert_collection(state: &mut AppState, imported: ImportedCollection) {
     let col = imported.collection.clone();
-    let requests: Vec<SavedRequest> = imported.all_requests().into_iter().cloned().collect();
     let group_refs = imported.all_groups();
+    // Importers carry ownership in the nested tree; leaf group_id values may
+    // be absent (Postman) or stale. Normalize at this shared import/sync boundary
+    // before flattening, so state and persisted rows use the same hierarchy.
+    let requests: Vec<SavedRequest> = imported
+        .requests
+        .iter()
+        .map(|r| (r, None))
+        .chain(
+            group_refs
+                .iter()
+                .flat_map(|g| g.requests.iter().map(move |r| (r, Some(g.id.as_str())))),
+        )
+        .map(|(r, group_id)| {
+            let mut request = r.clone();
+            request.collection_id = col.id.clone();
+            request.group_id = group_id.map(str::to_owned);
+            request
+        })
+        .collect();
     let groups: Vec<Group> = group_refs
         .iter()
         .map(|ig| Group {
@@ -185,4 +203,70 @@ pub fn groups_under(state: &AppState, collection_id: &str) -> Vec<String> {
         .filter(|g| root_collection_of(&state.groups, &g.id).as_deref() == Some(collection_id))
         .map(|g| g.id.clone())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn postman_import_preserves_folder_membership_after_insert_and_restart() {
+        let dir =
+            std::env::temp_dir().join(format!("rustman-import-tree-{}", uuid::Uuid::new_v4()));
+        let (mut state, _) = crate::app::boot::init_at(dir.clone());
+        let json = include_str!("../../samples/postman/rustman-sample.postman_collection.json");
+        let imported = crate::services::import::postman::import(json)
+            .unwrap()
+            .remove(0);
+        let col = imported.collection.clone();
+        let expected: Vec<_> = imported
+            .all_groups()
+            .into_iter()
+            .flat_map(|g| {
+                g.requests
+                    .iter()
+                    .map(|r| (r.id.clone(), g.id.clone(), r.sort_order))
+            })
+            .collect();
+        let root_id = imported.requests[0].id.clone();
+        insert_collection(&mut state, imported.clone());
+        // Reapplying the same tree must not duplicate or flatten its leaves.
+        insert_collection(&mut state, imported);
+        let requests = &state.requests[&col.id];
+        assert_eq!(requests.len(), 12);
+        assert_eq!(state.groups.len(), 5);
+        assert_eq!(
+            requests.iter().find(|r| r.id == root_id).unwrap().group_id,
+            None
+        );
+        for (id, group, order) in &expected {
+            let r = requests.iter().find(|r| &r.id == id).unwrap();
+            assert_eq!(
+                r.group_id.as_ref(),
+                Some(group),
+                "{} must stay in its folder",
+                r.name
+            );
+            assert_eq!(r.collection_id, col.id);
+            assert_eq!(r.sort_order, *order);
+        }
+        let rebuilt = collection_from_state(&state, &col);
+        assert_eq!(rebuilt.requests.len(), 1);
+        assert_eq!(rebuilt.groups[1].groups[0].requests.len(), 1);
+        drop(state);
+        let (restored, _) = crate::app::boot::init_at(dir.clone());
+        for (id, group, _) in &expected {
+            assert_eq!(
+                restored.requests[&col.id]
+                    .iter()
+                    .find(|r| &r.id == id)
+                    .unwrap()
+                    .group_id
+                    .as_ref(),
+                Some(group)
+            );
+        }
+        drop(restored);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

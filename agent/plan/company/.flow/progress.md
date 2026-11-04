@@ -1,23 +1,21 @@
 # Company Plan — Current Progress
 
-Updated: 2026-11-03 (Asia/Jakarta).
+Updated: 2026-11-04 (Asia/Jakarta).
 
 ## Resume checkpoint
 
-- Current scope: wave 0 of `../parallel-work-rules.md`.
-- Active task: none.
-- Completed: baseline green on Windows (zip 9 fix in `update.rs`), app
-  launches; parallel-work rules and 09 design-tokens plan written.
+- Current scope: local sidebar/RAM fixes on `fix/import-folders-sidebar-hover`; local development integration authorized.
+- Active task: memory optimization complete; sidebar visual follow-up pending.
+- Completed: Windows baseline/launch green (zip 9 fix); parallel rules and 09 plan written.
 - Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
-  committed locally as `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
+  Local scaffold/CI commit: `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
 - Decisions 2026-11-03 (user): Ctrl+S = local draft; Save = review branch +
   PR to `main` (C12, never push `main`); metadata/flags/notes on unprotected
   branch `rustman/meta` pushed directly; comments on an endpoint with an open
   PR go to that PR (C4); one PR per endpoint.
 - Next: wave 1 is open — 01, 09, 02 t1–5/7, 03 t1–2, 05 t1–4, 07.
 - Blockers: none.
-- Working tree already contains unrelated source/workflow edits. Preserve them;
-  do not infer company-plan completion from modified files alone.
+- Preserve unrelated working-tree edits; modified files do not prove plan completion.
 
 ## Status legend and ownership
 
@@ -25,8 +23,7 @@ Updated: 2026-11-03 (Asia/Jakarta).
 - `[~]` = in progress; an owner has claimed the task and its file scope.
 - `[ ]` = todo; completion is not yet verified, including unaudited work.
 
-Planning completion is separate from implementation completion. Existing code
-may already satisfy part of a todo; audit before implementing it again.
+Planning is separate from implementation; audit existing code before reimplementing todo items.
 Blocked work keeps `[~]` while owned; record its cause and next action. If
 released, return it to `[ ]` and keep the blocker visible in the task details.
 
@@ -51,39 +48,38 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 
 ## Active task details
 
-No active task. For the next task, replace this template with its claim:
-
-- Task: `[~]` + workstream ID + ordered-task number + one-sentence scope.
-- Owner: unique worker/session identifier; claimed/updated time with timezone.
-- Files: exact owned files and shared-file edits requiring coordination.
-- Done: only verified outcomes for this task.
-- Remaining: next concrete actions; include unresolved decisions/blockers.
-- Evidence: source/test paths, exact verification commands and results.
-- Resume: the next file/symbol/action; do not paste its contents here.
+- Task: [~] sidebar fuzzy-search visual follow-up; Windows RAM optimization [X].
+- Owner: Codex, 2026-11-04 (Asia/Jakarta); branch fix/import-folders-sidebar-hover.
+- Integration: user authorized local commit and merge into development; no push.
+- Plans: ../0-foundation/{memory-optimization,sidebar-fuzzy-search}.md; readme.md now covers platform builds.
+- Memory: Windows defaults to tiny-skia,wgpu; explicit renderer/GPU preferences
+  respected. src/main.rs; docs/DEVELOPMENT.md. Other platforms unchanged.
+- Final release: 18.46 MiB private / 40.36 MiB total working set; CPU idle 0%;
+  9 requests, one restored JSON tab (39 bytes), five stable samples, no GPU modules.
+- Earlier controlled GPU/software baseline: ~162 / 12 MiB private; software JSON
+  editing reached 14 MiB. Final simultaneous GPU rerun exited before sampling;
+  use the earlier controlled baseline. Larger workloads remain unmeasured.
+- Evidence: target/memory-{backend-comparison,software-editor,optimized-release}.json;
+  target/memory-{tests,tests-no-default,check,release-build}.log.
+- Release: target/release/rustman.exe runs with target/memory-final-default.
+- Remaining: sidebar light/dark/Playwright visual checks (earlier physical Escape
+  interruptions); Postman comparison under equivalent load. Global plans not Done.
 
 ## Verification checkpoint
 
-Windows MSVC via `cmd.exe /c`, rustc/cargo 1.99.0, branch
-`feat/company-foundation` at `14f2d73` plus existing working-tree changes.
-
-Re-run 2026-11-03 after fixing `extract_binary` (`src/services/update.rs:347`,
-zip 9 `name()` returns `Result`; Windows-only code, so Linux CI missed it):
-
-- `cargo build`: PASS.
-- `cargo test`: PASS, 139 passed, 0 failed, 3 ignored (live network).
-- `cargo test --no-default-features`: PASS, 131 passed, 0 failed, 3 ignored.
-- App launch: `target\debug\rustman.exe` opens the "Rustman" window, UI
-  renders (empty Collections, New Request tab, response pane), stays running.
-  Manual request/sync flows not exercised.
-- Gap: CI builds Linux only and runs no tests; scaffold PR adds the gate.
+- Latest pre-merge Windows gate: 228 default / 220 no-default tests passed; 3 live-network
+  tests ignored each; locked no-default all-target check and release build pass.
+- Historical 2026-11-03 baseline: zip 9 Windows extraction fixed; build and launch
+  passed, tests 139 default / 131 no-default; manual request/sync not exhaustive.
+- CI execution is not proven by local tests; wave 0 scaffold added the test gate.
 
 ## Compact completion record
 
-Keep at most five recent entries. Replace older entries with one durable
-outcome/evidence line; use git history or linked PRs for detailed chronology.
+Keep five recent entries; compact older outcomes and use git history for detail.
 
 | Status | Date | Completed scope | Evidence / limitation |
 |---|---|---|---|
+| [X] | 2026-11-04 | Windows renderer memory default | ../0-foundation/memory-optimization.md; local release measured; integration authorized; workload limits above. |
 | [X] | 2026-11-03 | Planning docs: selective reading, API map, reuse policy | `../index.md`, `../api/index.md`, `../api-reuse-rules.md`; docs only. |
 | [X] | 2026-11-03 | Draft review fixes: durable conflicts and merged-tab refresh | `../0-foundation/01-local-drafts.md`, C9; required regressions specified, runtime not implemented. |
 | [X] | 2026-11-03 | Baseline fixed and green; app launches | `src/services/update.rs` zip 9 fix; results above. |

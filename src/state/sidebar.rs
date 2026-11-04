@@ -57,6 +57,10 @@ pub struct SidebarState {
     pub collapsed: bool,
     /// Collection tree search box text (not persisted).
     pub filter: String,
+    /// Transient local search. Cached per query, never stored in the session.
+    pub search_open: bool,
+    pub search_selected: usize,
+    pub search_hits: Vec<crate::services::search::Hit>,
     /// Tree row under the cursor; it shows its inline actions (Postman).
     pub hovered_row: Option<String>,
 }
@@ -78,6 +82,9 @@ impl Default for SidebarState {
             env_edit_rows: Vec::new(),
             collapsed: false,
             filter: String::new(),
+            search_open: false,
+            search_selected: 0,
+            search_hits: Vec::new(),
             hovered_row: None,
         }
     }
