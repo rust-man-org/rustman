@@ -362,7 +362,7 @@ fn request_view<'a>(
     let req_renaming = state.sidebar.req_renaming.as_deref() == Some(req.id.as_str());
     let menu_open = state.sidebar.context_menu.as_deref() == Some(req.id.as_str());
     let pad_left = 8.0 + (depth as f32) * 12.0 + 8.0;
-    let draft_badge = super::drafts::badge(state, &req.id);
+    let draft_badge = super::drafts::badge_for(state, &req.id);
     let badge_w = if draft_badge.is_some() {
         super::drafts::BADGE_WIDTH
     } else {

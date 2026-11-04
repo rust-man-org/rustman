@@ -1,10 +1,12 @@
 //! Sidebar pieces for local drafts (workstream 01, C9): the All / Drafts
 //! filter, the flat drafts list (the only place orphans are reachable from)
 //! and the per-request badge in the collection tree.
+//!
+//! Composition only: visuals come from `ui::components`.
 
 use iced::{
-    Alignment, Background, Border, Color, Element, Length,
-    widget::{Space, button, column, container, row, text},
+    Alignment, Background, Border, Element, Length,
+    widget::{button, column, container, row, text},
 };
 
 use crate::{
@@ -12,8 +14,12 @@ use crate::{
     domain::draft::{DraftState, RequestDraft},
     message::{Message, draft::DraftMsg},
     ui::{
+        components::{
+            Tone,
+            atoms::{Mark, badge, chip, text as t},
+        },
         icons,
-        theme::{MONO, Palette, TEXT_SM, TEXT_XS},
+        theme::{MONO, Palette},
         tree_label::tree_label,
     },
 };
@@ -30,10 +36,11 @@ pub fn filter_bar(state: &AppState) -> Option<Element<'_, Message>> {
     if n == 0 && !on {
         return None;
     }
+    let toggle = Message::Draft(DraftMsg::ToggleFilter);
     Some(
         row![
-            chip("All".to_owned(), !on),
-            chip(format!("Drafts · {n}"), on),
+            chip("All", !on, toggle.clone()),
+            chip(format!("Drafts · {n}"), on, toggle),
         ]
         .spacing(6)
         .padding([6, 10])
@@ -41,47 +48,13 @@ pub fn filter_bar(state: &AppState) -> Option<Element<'_, Message>> {
     )
 }
 
-fn chip(label: String, active: bool) -> Element<'static, Message> {
-    let fg = if active {
-        Palette::accent()
-    } else {
-        Palette::text_muted()
-    };
-    button(text(label).size(TEXT_SM).color(fg))
-        .on_press_maybe((!active).then_some(Message::Draft(DraftMsg::ToggleFilter)))
-        .padding([2, 10])
-        .style(move |_t, s| button::Style {
-            background: Some(Background::Color(if active {
-                Palette::accent_soft()
-            } else if matches!(s, button::Status::Hovered) {
-                Palette::hover()
-            } else {
-                Color::TRANSPARENT
-            })),
-            text_color: fg,
-            border: Border {
-                color: if active {
-                    Palette::accent()
-                } else {
-                    Palette::border()
-                },
-                width: 1.0,
-                radius: 10.0.into(),
-            },
-            ..Default::default()
-        })
-        .into()
-}
-
 /// Every draft as a flat list, orphans included.
 pub fn list(state: &AppState) -> Element<'_, Message> {
     let drafts = state.drafts.sorted();
     if drafts.is_empty() {
-        return container(
-            text("No local drafts. Edits to synced requests show up here.")
-                .size(TEXT_SM)
-                .color(Palette::text_subtle()),
-        )
+        return container(t::caption(
+            "No local drafts. Edits to synced requests show up here.",
+        ))
         .padding([10, 16])
         .into();
     }
@@ -115,11 +88,11 @@ fn list_row<'a>(state: &'a AppState, d: &'a RequestDraft, selected: bool) -> Ele
         .width(32),
         column![
             tree_label(d.data.name.clone(), 12.0, label_w),
-            text(collection.to_owned()).size(TEXT_XS).color(Palette::text_subtle()),
+            t::meta(collection),
         ]
         .spacing(1)
         .width(Length::Fill),
-        badge_for(d),
+        draft_badge(d),
     ]
     .spacing(4)
     .align_y(Alignment::Center);
@@ -146,46 +119,26 @@ fn list_row<'a>(state: &'a AppState, d: &'a RequestDraft, selected: bool) -> Ele
 }
 
 /// Badge for a request in the collection tree, if it has a draft.
-pub fn badge(state: &AppState, request_id: &str) -> Option<Element<'static, Message>> {
-    state.drafts.get(request_id).map(badge_for)
+pub fn badge_for(state: &AppState, request_id: &str) -> Option<Element<'static, Message>> {
+    state.drafts.get(request_id).map(draft_badge)
 }
 
-/// Text always accompanies the color (design rules).
-fn badge_for(d: &RequestDraft) -> Element<'static, Message> {
-    let (mark, label, color): (Element<'static, Message>, String, Color) = match d.state() {
-        DraftState::Orphaned => (
-            icons::close().size(10).color(Palette::text_subtle()).into(),
-            "Deleted".to_owned(),
-            Palette::text_subtle(),
-        ),
-        DraftState::Conflict(_) => (
-            icons::dot(Palette::ERROR),
-            "Conflict".to_owned(),
-            Palette::ERROR,
-        ),
+fn draft_badge(d: &RequestDraft) -> Element<'static, Message> {
+    let (mark, label, tone) = match d.state() {
+        DraftState::Orphaned => (Mark::Icon(icons::close()), "Deleted".to_owned(), Tone::Subtle),
+        DraftState::Conflict(_) => (Mark::Dot, "Conflict".to_owned(), Tone::Danger),
         DraftState::InReview(r) => (
-            icons::git_branch().size(10).color(Palette::text_muted()).into(),
+            Mark::Icon(icons::git_branch()),
             r.pr_number.map_or("Review".to_owned(), |n| format!("#{n}")),
-            Palette::text_muted(),
+            Tone::Neutral,
         ),
-        DraftState::UpstreamChanged => (
-            icons::dot(Palette::PUT),
-            "Merged".to_owned(),
-            Palette::PUT,
-        ),
-        DraftState::Clean => (
-            icons::dot(Palette::accent()),
-            "Draft".to_owned(),
-            Palette::accent(),
-        ),
+        DraftState::UpstreamChanged => (Mark::Dot, "Merged".to_owned(), Tone::Info),
+        DraftState::Clean => (Mark::Dot, "Draft".to_owned(), Tone::Accent),
     };
-    row![mark, text(label).size(TEXT_XS).color(color), Space::new().width(2)]
-        .spacing(4)
-        .align_y(Alignment::Center)
-        .into()
+    badge(mark, label, tone)
 }
 
-fn method_color(method: &str) -> Color {
+fn method_color(method: &str) -> iced::Color {
     match method {
         "GET" => Palette::GET,
         "POST" => Palette::POST,
