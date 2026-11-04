@@ -228,11 +228,14 @@ in V1). This is pure, deterministic and unit-testable. Do not build a CRDT.
    the refreshed tab plus any newer local edits, so a non-conflicting upstream
    URL and the local body both reach the actual outgoing request. Ctrl+S after
    refresh must not restore stale pre-sync fields.
-6. **Publish / Discard.** Publish = copy `draft.data` into base (keep base
-   `name`, `group_id`, `sort_order`), persist with `storage::create_request`,
-   delete draft, mark dirty for 04. Reject unresolved conflicts and gate
-   Publish on C10 Write; until 05 lands,
-   treat everyone as Write.
+6. **Discard + review payload** (C12, user decision 2026-11-03). Ctrl+S is
+   the local save (done). There is **no Publish-to-base**: the Save button
+   sends the draft for review through 08. 01 provides: `discard_draft`;
+   `RequestDraft::published_request()` as the payload; a persisted
+   `review: Option<{branch, pr_number}>` column and `DraftState::InReview`;
+   `can_publish()` (no conflicts, not orphaned) as the gate. The draft is
+   never deleted by Save; it collapses after the PR merges and `main` is
+   pulled. A closed-unmerged PR clears `review`.
 7. **Orphans.** In `remove_collection` and the per-request delete path, keep
    drafts and mark them `Orphaned`. Actions: Discard, or (Write) Restore as new
    endpoint.
@@ -295,6 +298,15 @@ appears in `git status`.
 - **Drafts hold secrets locally.** Acceptable (local-only), but the table is
   plaintext SQLite. 06 decides whether secret fields in drafts move to the
   secret store.
+
+## Decision: which requests get drafts (implemented 2026-11-03)
+
+Only requests in a **shared** collection: owned by a repo other than
+`LOCAL_ID` that has a non-empty `remote_url` (`app::drafts::is_shared`).
+Purely local collections keep saving straight to base, so users without a
+remote see no behaviour change. Upstream deletes leave the draft orphaned
+(row kept); a failed draft capture aborts the sync apply without calling
+`refresh_task`, which would write stale state over the pulled tree.
 
 ## Decision: Read users and drafts (confirmed 2026-11-03)
 
