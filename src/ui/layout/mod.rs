@@ -221,6 +221,15 @@ fn icon_btn(
 }
 
 fn main_area(state: &AppState) -> Element<'_, Message> {
+    if let Some(editor) = &state.examples.editor {
+        return column![
+            tab_bar::multi_tab_bar(state),
+            crate::ui::examples::view(state, editor)
+        ]
+        .height(Length::Fill)
+        .width(Length::Fill)
+        .into();
+    }
     let active_tab = state.tabs.active_tab();
     let active_env = state.environments.iter().find(|e| e.is_active);
     // Mockup `.req-bar`: breadcrumb/name/actions row above the URL row.
@@ -269,10 +278,31 @@ fn main_area(state: &AppState) -> Element<'_, Message> {
         ResponseTab::Tests => response::tests::view(active_tab),
     };
 
+    let save_example: Element<Message> = container(
+        crate::ui::components::atoms::Button::new("Save as example")
+            .on_press_maybe(
+                (active_tab.saved_as.is_some()
+                    && active_tab
+                        .response
+                        .as_ref()
+                        .is_some_and(|r| r.error.is_none() && !r.is_binary && !r.body_stored))
+                .then_some(Message::Example(
+                    crate::message::example::ExampleMsg::SaveResponse,
+                )),
+            )
+            .tooltip("Save a complete text response under this endpoint"),
+    )
+    .padding([4, 12])
+    .into();
     let response_panel = container(
-        column![resp_status, response::tabs::view(active_tab), resp_body]
-            .spacing(0)
-            .height(Length::Fill),
+        column![
+            resp_status,
+            save_example,
+            response::tabs::view(active_tab),
+            resp_body
+        ]
+        .spacing(0)
+        .height(Length::Fill),
     )
     .style(surface_style)
     .width(Length::Fill);

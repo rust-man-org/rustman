@@ -155,24 +155,9 @@ pub fn insert_collection(state: &mut AppState, imported: ImportedCollection) {
         } else {
             let _ = storage::create_collection(db, &col);
         }
-        // Idempotent re-sync: clear rows that belong to this collection.
-        let _ = storage::delete_requests_for_collection(db, &col.id);
-        let old_group_ids: Vec<String> = state
-            .groups
-            .iter()
-            .filter(|g| {
-                root_collection_of(&state.groups, &g.id).as_deref() == Some(col.id.as_str())
-            })
-            .map(|g| g.id.clone())
-            .collect();
-        for gid in old_group_ids {
-            let _ = storage::delete_group(db, &gid);
-        }
-        for g in &groups {
-            let _ = storage::create_group(db, g);
-        }
-        for r in &requests {
-            let _ = storage::create_request(db, r);
+        if let Err(error) = storage::replace_collection_contents(db, &col.id, &groups, &requests) {
+            state.status_message = Some(format!("Could not replace collection contents: {error}"));
+            return;
         }
     }
 
@@ -192,6 +177,16 @@ pub fn insert_collection(state: &mut AppState, imported: ImportedCollection) {
     state.groups.retain(|g| !old_group_ids.contains(&g.id));
     state.groups.extend(groups);
     state.requests.insert(col.id.clone(), requests);
+    let ids: std::collections::HashSet<_> = state
+        .requests
+        .values()
+        .flatten()
+        .map(|r| r.id.as_str())
+        .collect();
+    state
+        .examples
+        .items
+        .retain(|id, _| ids.contains(id.as_str()));
 }
 
 /// All ids of groups that live anywhere under `collection_id` (for cascade

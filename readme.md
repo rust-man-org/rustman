@@ -55,6 +55,7 @@ This is not a startup and I am not trying to sell you anything. It is a tool I w
 - **Scripting.** Pre-request and test scripts run on a custom Rust scripting language — see below.
 - **Environment variables.** `{{variable}}` substitution from the active environment, applied to the URL, headers, query params, and the JSON, Text or GraphQL body.
 - **Collections and history.** Organize requests and replay them from history. Local SQLite is the source of truth.
+- **Endpoint examples.** Use an endpoint's `···` menu → **Add example**, or use **Save as example** after a response. Edit the request/response snapshot and select **Save example**. Saved examples appear under the endpoint and remain after restart. Editing an example does not send HTTP or change its parent.
 - **Git for collections.** A built in Source Control panel. Commit collections (they are stored as JSON), browse the log, restore any commit back into the app, make and switch branches, see the working diff, and juggle several repos. Clone, fetch, pull, and push go through your system git, so they use the SSH keys and logins you already have. SQLite stays the source of truth and git sits on top.
 - **Import.** cURL commands (native Rust tokenizer), Postman v2 and v2.1 collections, and OpenAPI specs. The OpenAPI parser reads JSON or YAML, but the file picker only offers `.json`, so a `.yaml` spec cannot be chosen through the dialog yet.
 - **Export.** Turn any request into a cURL command, or export a collection as Postman v2.1 JSON.
@@ -63,6 +64,13 @@ This is not a startup and I am not trying to sell you anything. It is a tool I w
 - **Session persistence.** Your open tabs come back next launch.
 - **Self update.** A built in updater (self-replace) grabs and swaps in new releases.
 - **Global default timeout.** One Settings-panel value applied to every request, persisted across restarts.
+
+## Endpoint examples
+
+Endpoint examples are local to this device. They are not included in Git sync or
+Postman import/export. Each example body is limited to 256 KiB. Binary or partial
+responses cannot be saved as examples. Save or discard unsaved example edits
+before you leave the editor or restart the app.
 
 ## Scripting
 

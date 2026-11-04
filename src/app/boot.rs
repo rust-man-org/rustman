@@ -31,7 +31,6 @@ fn data_dir_from(env: Option<std::ffi::OsString>) -> PathBuf {
 /// Boot from an explicit data directory. `init` passes the user's data dir;
 /// tests pass a throwaway one so they never touch real data.
 pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
-
     let db = storage::open(&data_dir).ok();
 
     // `RUSTMAN_SAMPLE=1` (scripts/ui.sh -x): example collection for trying
@@ -173,6 +172,24 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
     let git_identity = crate::services::vcs::resolve_identity(&data_dir.join("collections"));
 
     let state = AppState {
+        examples: {
+            let mut examples = crate::state::examples::ExamplesState::default();
+            if let Some(db) = &db {
+                match storage::examples::load(db) {
+                    Ok(items) => {
+                        for item in items {
+                            examples
+                                .items
+                                .entry(item.request_id.clone())
+                                .or_default()
+                                .push(item);
+                        }
+                    }
+                    Err(e) => eprintln!("Could not load examples: {e}"),
+                }
+            }
+            examples
+        },
         tabs,
         sidebar,
         collections,

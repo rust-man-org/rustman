@@ -14,6 +14,7 @@ use crate::state::session::AppSession;
 
 // Company-edition table owners (contract C11).
 pub mod drafts;
+pub mod examples;
 pub mod meta;
 pub mod secrets;
 
@@ -71,6 +72,7 @@ pub fn open(data_dir: &PathBuf) -> SqlResult<Connection> {
          );",
     )?;
     migrate(&conn);
+    examples::migrate(&conn)?;
     Ok(conn)
 }
 
@@ -441,8 +443,10 @@ pub fn get_requests(conn: &Connection, collection_id: &str) -> Result<Vec<SavedR
 pub fn create_request(conn: &Connection, req: &SavedRequest) -> Result<(), String> {
     let data = serde_json::to_string(req).map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT OR REPLACE INTO requests (id, collection_id, group_id, sort_order, data) \
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO requests (id, collection_id, group_id, sort_order, data) \
+         VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(id) DO UPDATE SET \
+         collection_id=excluded.collection_id, group_id=excluded.group_id, \
+         sort_order=excluded.sort_order, data=excluded.data",
         params![
             req.id,
             req.collection_id,
@@ -470,16 +474,34 @@ pub fn delete_request(conn: &Connection, id: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn delete_requests_for_collection(
+/// Reapply a collection without deleting retained request rows. Their local
+/// examples must survive a pull or an idempotent import with the same IDs.
+pub fn replace_collection_contents(
     conn: &Connection,
     collection_id: &str,
+    groups: &[Group],
+    requests: &[SavedRequest],
 ) -> Result<(), String> {
-    conn.execute(
-        "DELETE FROM requests WHERE collection_id=?1",
-        params![collection_id],
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let old_requests = get_requests(&tx, collection_id)?;
+    let old_groups = get_groups(&tx)?;
+    for id in descendant_groups(&old_groups, collection_id, true) {
+        tx.execute("DELETE FROM groups WHERE id=?1", [id])
+            .map_err(|e| e.to_string())?;
+    }
+    for group in groups {
+        create_group(&tx, group)?;
+    }
+    for request in requests {
+        create_request(&tx, request)?;
+    }
+    let incoming: std::collections::HashSet<_> = requests.iter().map(|r| r.id.as_str()).collect();
+    for old in old_requests {
+        if !incoming.contains(old.id.as_str()) {
+            delete_request(&tx, &old.id)?;
+        }
+    }
+    tx.commit().map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

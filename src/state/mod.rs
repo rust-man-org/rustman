@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod drafts;
+pub mod examples;
 pub mod meta;
 pub mod review;
 pub mod secrets;

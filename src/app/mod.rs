@@ -26,6 +26,7 @@ mod tree;
 mod update;
 
 pub struct AppState {
+    pub examples: crate::state::examples::ExamplesState,
     pub tabs: TabManager,
     pub sidebar: SidebarState,
     pub collections: Vec<Collection>,
@@ -203,6 +204,13 @@ impl AppState {
         // which the user can't even see right now.
         if self.global_scripts_modal_open {
             return true;
+        }
+
+        if let Some(editor) = &self.examples.editor {
+            return (!editor.request_show_headers
+                && !editor.request_show_params
+                && editor.request_body.has_keyboard_focus())
+                || (!editor.response_show_headers && editor.response_body.has_keyboard_focus());
         }
 
         let tab = self.tabs.active_tab();

@@ -2,6 +2,7 @@
 // its own file, owned by its workstream; this file is not edited again.
 pub mod auth;
 pub mod draft;
+pub mod example;
 pub mod meta;
 pub mod review;
 pub mod secrets;
@@ -12,6 +13,7 @@ use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    Example(example::ExampleMsg),
     Sidebar(SidebarMsg),
     Request(RequestMsg),
     Response(ResponseMsg),

@@ -161,6 +161,24 @@
       "w": 1280,
       "x": 2800.0,
       "y": 4900.0
+    },
+    {
+      "file": "mockups/rustman-endpoint-examples.html",
+      "page": "pages/rustman-endpoint-examples.html",
+      "png": "png/23-rustman-endpoint-examples.png",
+      "w": 1280,
+      "h": 800,
+      "x": 0.0,
+      "y": 5880.0
+    },
+    {
+      "file": "mockups/rustman-endpoint-examples-dark.html",
+      "page": "pages/rustman-endpoint-examples.html?theme=dark",
+      "png": "png/24-rustman-endpoint-examples-dark.png",
+      "w": 1280,
+      "h": 800,
+      "x": 1400.0,
+      "y": 5880.0
     }
   ],
   "exported": "2026-11-04_100647",

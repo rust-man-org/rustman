@@ -4,8 +4,8 @@ Updated: 2026-11-04 (Asia/Jakarta).
 
 ## Resume checkpoint
 
-- Current scope: local sidebar/RAM fixes on `fix/import-folders-sidebar-hover`; local development integration authorized.
-- Active task: sidebar visual follow-up pending; GPU-default launcher/docs verified.
+- Current scope: endpoint examples mockup on `feat/endpoint-examples`, branched from development (`a39ddd5`).
+- Active task: native endpoint examples implementation and verification.
 - Completed: Windows baseline/launch green (zip 9 fix); parallel rules and 09 plan written.
 - Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
   Local scaffold/CI commit: `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
@@ -48,27 +48,24 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 
 ## Active task details
 
-- Task: [~] sidebar fuzzy-search visual follow-up; Windows RAM optimization [X].
-- Owner: Codex, 2026-11-04 (Asia/Jakarta); branch fix/import-folders-sidebar-hover.
-- Integration: user authorized local commit and merge into development; no push.
-- Plans: ../0-foundation/{memory-optimization,sidebar-fuzzy-search}.md; readme.md now covers platform builds.
-- User correction: GPU is the default on all platforms. Use scripts/ui.sh for
-  build/run. Software rendering is opt-in through ICED_BACKEND; see readme.md.
-- Previous software release: 18.46 MiB private / 40.36 MiB total working set; CPU 0%;
-  9 requests, one restored JSON tab (39 bytes), five stable samples, no GPU modules.
-- Earlier controlled GPU/software baseline: ~162 / 12 MiB private; software JSON
-  editing reached 14 MiB. Final simultaneous GPU rerun exited before sampling;
-  use the earlier controlled baseline. Larger workloads remain unmeasured.
-- Evidence: target/memory-{backend-comparison,software-editor,optimized-release}.json;
-  target/memory-{tests,tests-no-default,check,release-build}.log.
-- Current launcher gate/build evidence: target/gpu-default-script.log; example data target/ui-example.
-- Remaining: sidebar light/dark/Playwright visual checks (earlier physical Escape
-  interruptions); Postman comparison under equivalent load. Global plans not Done.
+- Task: [~] native endpoint examples; user reported missing Add example in the real app.
+- Owner: Codex, 2026-11-04 (Asia/Jakarta); branch feat/endpoint-examples.
+- Base: local development at a39ddd5; unrelated .gitignore/.claude-flow edits preserved.
+- Design: ../mockup/pages/rustman-endpoint-examples.html; light/dark in gallery.
+- Flow: endpoint Add example; child rows; editable request/response; Save as example.
+- Preview is in-memory only; it does not send HTTP or persist native application data.
+- Playwright: add/edit/save/reopen, response snapshot, empty-name validation and
+  menu overlay geometry passed at 1280 x 800; light/dark screenshots in ../mockup/png/.
+- Native menu/SQLite/editor implemented; Postman reference now drives compact layout and themed code editors.
+- Release rebuilt/launched via scripts/ui.sh -t -r -x; final visual input stopped by physical Escape; import/export/Git example sync excluded.
+- Earlier memory measurements/limitations: ../0-foundation/memory-optimization.md.
+- Deferred sidebar fuzzy-search visual checks and equal-load Postman RAM comparison
+  remain open; global plans are not Done. No commit or push for this new feature.
 
 ## Verification checkpoint
 
-- Latest Windows gate: 225 default / 217 no-default tests passed; 3 live-network
-  tests ignored each; locked no-default all-target check, release build/launch and 4 launcher tests pass.
+- Latest Windows gate: 238 default / 230 no-default tests passed; 3 live-network
+  tests ignored each; no-default all-target check and release build/launch pass (target/endpoint-example-postman-release.log).
 - Historical 2026-11-03 baseline: zip 9 Windows extraction fixed; build and launch
   passed, tests 139 default / 131 no-default; manual request/sync not exhaustive.
 - CI execution is not proven by local tests; wave 0 scaffold added the test gate.

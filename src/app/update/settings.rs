@@ -12,6 +12,14 @@ pub(super) fn handle(state: &mut AppState, msg: SettingsMsg) -> Task<Message> {
             for tab in &mut state.tabs.tabs {
                 tab.sync_editor_themes();
             }
+            if let Some(editor) = &mut state.examples.editor {
+                editor
+                    .request_body
+                    .set_theme(crate::ui::theme::Palette::code_editor_style());
+                editor
+                    .response_body
+                    .set_theme(crate::ui::theme::Palette::code_editor_style());
+            }
         }
         SettingsMsg::GitNameChanged(name) => {
             state.git_user_name = name.clone();

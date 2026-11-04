@@ -552,7 +552,7 @@ fn request_view<'a>(
         )
     };
 
-    if menu_open {
+    let row_el = if menu_open {
         popup(
             row_el,
             request_menu(req),
@@ -560,7 +560,76 @@ fn request_view<'a>(
         )
     } else {
         row_el
+    };
+    let Some(examples) = state
+        .examples
+        .items
+        .get(&req.id)
+        .filter(|items| !items.is_empty())
+    else {
+        return row_el;
+    };
+    let expanded = state.examples.expanded.contains(&req.id);
+    let toggle = crate::ui::components::atoms::Button::new(format!(
+        "{} {} example{}",
+        if expanded { "▾" } else { "▸" },
+        examples.len(),
+        if examples.len() == 1 { "" } else { "s" },
+    ))
+    .ghost()
+    .on_press(Message::Example(
+        crate::message::example::ExampleMsg::Toggle(req.id.clone()),
+    ));
+    let mut children = column![
+        row_el,
+        container(toggle).padding(Padding {
+            left: indent + METHOD_W,
+            ..Padding::ZERO
+        })
+    ];
+    if expanded {
+        for example in examples {
+            let selected = state
+                .examples
+                .editor
+                .as_ref()
+                .is_some_and(|e| e.data.id == example.id);
+            let label = tree_label_styled(
+                example.name.clone(),
+                11.0,
+                (state.sidebar_width - indent - 65.0).max(45.0),
+                None,
+                if selected {
+                    Palette::text()
+                } else {
+                    Palette::text_muted()
+                },
+            );
+            let content = row![
+                label,
+                text(example.response.status.to_string())
+                    .size(10)
+                    .font(MONO)
+                    .color(Palette::text_muted())
+            ]
+            .spacing(8)
+            .align_y(iced::Alignment::Center);
+            children = children.push(tree_row(
+                content,
+                indent + 24.0,
+                ROW_H,
+                if selected {
+                    RowFill::Selected
+                } else {
+                    RowFill::None
+                },
+                Message::Example(crate::message::example::ExampleMsg::Open(
+                    example.id.clone(),
+                )),
+            ));
+        }
     }
+    children.into()
 }
 
 /// Every tree row: entering marks it hovered (and reorders onto it during a
@@ -761,6 +830,12 @@ fn group_menu(group_id: &str) -> Element<'_, Message> {
 fn request_menu(req: &SavedRequest) -> Element<'_, Message> {
     context_menu(vec![
         ctx_item(
+            "Add example",
+            Message::Example(crate::message::example::ExampleMsg::Create(req.id.clone())),
+            false,
+        ),
+        menu_divider(),
+        ctx_item(
             "Duplicate",
             Message::Sidebar(SidebarMsg::CloneRequest {
                 id: req.id.clone(),
@@ -861,7 +936,7 @@ fn context_menu(items: Vec<Element<'static, Message>>) -> Element<'static, Messa
 /// Mockup `.ctx-item`: every entry carries its icon.
 fn ctx_item(label: &'static str, msg: Message, danger: bool) -> Element<'static, Message> {
     let icon = match label {
-        "New request" => icons::plus(),
+        "New request" | "Add example" => icons::plus(),
         "New folder" => icons::folder_plus(),
         "Rename" => icons::edit(),
         "Export…" => icons::export(),

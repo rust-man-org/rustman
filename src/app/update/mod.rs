@@ -7,6 +7,7 @@ use super::AppState;
 mod app_msg;
 mod auth;
 mod drafts;
+mod examples;
 mod git;
 mod import;
 mod meta;
@@ -25,7 +26,27 @@ mod ws;
 
 pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
     let dirty = marks_session_dirty(&message);
+    let prune_examples = matches!(
+        &message,
+        Message::Sidebar(
+            crate::message::SidebarMsg::DeleteRequest { .. }
+                | crate::message::SidebarMsg::DeleteCollection(_)
+                | crate::message::SidebarMsg::DeleteGroup(_)
+        )
+    );
     let task = dispatch(state, message);
+    if prune_examples {
+        let ids: std::collections::HashSet<_> = state
+            .requests
+            .values()
+            .flatten()
+            .map(|r| r.id.as_str())
+            .collect();
+        state
+            .examples
+            .items
+            .retain(|id, _| ids.contains(id.as_str()));
+    }
 
     if dirty {
         state.session_dirty = true;
@@ -42,6 +63,9 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
 /// Expanded editors DO dirty on content edits (their write-back mutates the
 /// snapshot); navigation/selection/search inside them does not.
 pub(crate) fn marks_session_dirty(message: &Message) -> bool {
+    if matches!(message, Message::Example(_)) {
+        return false;
+    }
     // Company-edition messages decide for themselves (contract C11).
     match message {
         Message::Draft(m) => return m.marks_session_dirty(),
@@ -97,7 +121,61 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
 }
 
 fn dispatch(state: &mut AppState, message: Message) -> Task<Message> {
+    if blocks_example_exit(state, &message) {
+        return Task::none();
+    }
+    if state.examples.editor.is_some() {
+        if let Message::Request(msg) = &message {
+            use crate::message::RequestMsg;
+            match msg {
+                RequestMsg::SaveRequest => {
+                    return examples::handle(state, crate::message::example::ExampleMsg::Save);
+                }
+                RequestMsg::Send => {
+                    state.status_message =
+                        Some("Examples are edited without sending HTTP requests.".into());
+                    return Task::none();
+                }
+                RequestMsg::SwitchTab(_)
+                | RequestMsg::NewTab
+                | RequestMsg::NewWsTab
+                | RequestMsg::CloseTab(_)
+                | RequestMsg::CloseCurrentTab => {
+                    if examples::protect(state) {
+                        return Task::none();
+                    }
+                    state.examples.editor = None;
+                }
+                _ => return Task::none(),
+            }
+        }
+        if matches!(
+            &message,
+            Message::Sidebar(
+                crate::message::SidebarMsg::RequestOpened(_)
+                    | crate::message::SidebarMsg::HistoryEntryOpened(_)
+                    | crate::message::SidebarMsg::DeleteRequest { .. }
+                    | crate::message::SidebarMsg::DeleteCollection(_)
+                    | crate::message::SidebarMsg::DeleteGroup(_)
+            )
+        ) {
+            if examples::protect(state) {
+                return Task::none();
+            }
+            state.examples.editor = None;
+        }
+        if matches!(
+            &message,
+            Message::Draft(crate::message::draft::DraftMsg::Open(_))
+        ) {
+            if examples::protect(state) {
+                return Task::none();
+            }
+            state.examples.editor = None;
+        }
+    }
     match message {
+        Message::Example(msg) => examples::handle(state, msg),
         Message::Sidebar(msg) => sidebar::handle(state, msg),
         Message::Request(msg) => request::handle(state, msg),
         Message::Response(msg) => response::handle(state, msg),
@@ -117,6 +195,16 @@ fn dispatch(state: &mut AppState, message: Message) -> Task<Message> {
         Message::Secrets(msg) => secrets::handle(state, msg),
         Message::Review(msg) => review::handle(state, msg),
     }
+}
+
+fn blocks_example_exit(state: &mut AppState, message: &Message) -> bool {
+    let exit = matches!(
+        message,
+        Message::App(crate::message::AppMsg::WindowCloseRequested(_))
+    );
+    #[cfg(feature = "self-update")]
+    let exit = exit || matches!(message, Message::Update(crate::message::UpdateMsg::Restart));
+    exit && examples::protect(state)
 }
 
 fn handle_layout(state: &mut AppState, msg: LayoutMsg) -> Task<Message> {
