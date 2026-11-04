@@ -57,6 +57,8 @@ pub struct SidebarState {
     pub collapsed: bool,
     /// Collection tree search box text (not persisted).
     pub filter: String,
+    /// Tree row under the cursor; it shows its inline actions (Postman).
+    pub hovered_row: Option<String>,
 }
 
 impl Default for SidebarState {
@@ -76,6 +78,7 @@ impl Default for SidebarState {
             env_edit_rows: Vec::new(),
             collapsed: false,
             filter: String::new(),
+            hovered_row: None,
         }
     }
 }

@@ -1,5 +1,4 @@
-//! Collection tree index: request counts per collection / folder (mockup
-//! `.count` / `.f-mini`) and the sidebar search filter. Built once per view
+//! Collection tree index: the sidebar search filter. Built once per view
 //! from plain slices, so it is testable without an `AppState`.
 
 use std::collections::{HashMap, HashSet};
@@ -10,7 +9,6 @@ use crate::domain::{
 };
 
 pub struct TreeIndex {
-    counts: HashMap<String, usize>,
     /// `None` while the search box is empty: everything shows.
     visible: Option<HashSet<String>>,
 }
@@ -23,15 +21,6 @@ impl TreeIndex {
         query: &str,
     ) -> Self {
         let by_id: HashMap<&str, &Group> = groups.iter().map(|g| (g.id.as_str(), g)).collect();
-
-        // Each request counts toward its collection and every enclosing folder.
-        let mut counts: HashMap<String, usize> = HashMap::new();
-        for r in requests {
-            *counts.entry(r.collection_id.clone()).or_default() += 1;
-            for g in chain(&by_id, r.group_id.as_deref()).0 {
-                *counts.entry(g.to_owned()).or_default() += 1;
-            }
-        }
 
         let q = query.trim().to_lowercase();
         let visible = (!q.is_empty()).then(|| {
@@ -73,7 +62,7 @@ impl TreeIndex {
             vis
         });
 
-        Self { counts, visible }
+        Self { visible }
     }
 
     pub fn filtering(&self) -> bool {
@@ -82,11 +71,6 @@ impl TreeIndex {
 
     pub fn shows(&self, id: &str) -> bool {
         self.visible.as_ref().is_none_or(|v| v.contains(id))
-    }
-
-    /// Requests under a collection or folder, nested folders included.
-    pub fn count(&self, id: &str) -> usize {
-        self.counts.get(id).copied().unwrap_or(0)
     }
 }
 
@@ -168,16 +152,6 @@ mod tests {
     }
 
     #[test]
-    fn counts_include_nested_folders() {
-        let ix = index("");
-        assert_eq!(ix.count("c1"), 3);
-        assert_eq!(ix.count("c2"), 1);
-        assert_eq!(ix.count("auth"), 2);
-        assert_eq!(ix.count("merchant"), 1);
-        assert_eq!(ix.count("orders"), 1);
-    }
-
-    #[test]
     fn empty_query_shows_everything() {
         let ix = index("  ");
         assert!(!ix.filtering());
@@ -223,7 +197,7 @@ mod tests {
     fn cyclic_parents_do_not_hang() {
         let groups = vec![group("a", "b", false, "a"), group("b", "a", false, "b")];
         let r = req("r", "c1", Some("a"), "R", "");
-        let ix = TreeIndex::build(&[], &groups, &[&r], "");
-        assert_eq!(ix.count("a"), 1);
+        let ix = TreeIndex::build(&[], &groups, &[&r], "a");
+        assert!(ix.shows("a") && ix.shows("b") && ix.shows("r"));
     }
 }
