@@ -77,15 +77,25 @@ where
 
     fn draw(
         &self,
-        _tree: &Tree,
-        _renderer: &mut Renderer,
+        tree: &Tree,
+        renderer: &mut Renderer,
         _theme: &Theme,
         _style: &renderer::Style,
-        _layout: Layout<'_>,
-        _cursor: mouse::Cursor,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        // No visible handle — sidebar panel already has its own border.
+        // Fill the drag area so no window background shows as a gap; the
+        // visible divider is one hairline against the sidebar.
+        let state = tree.state.downcast_ref::<State>();
+        let active = state.dragging || cursor.is_over(layout.bounds());
+        crate::ui::widgets::seam::draw(
+            renderer,
+            layout.bounds(),
+            true,
+            crate::ui::widgets::seam::LineAt::Start,
+            active,
+        );
     }
     fn mouse_interaction(
         &self,
