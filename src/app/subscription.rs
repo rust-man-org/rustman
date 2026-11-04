@@ -47,6 +47,9 @@ pub(crate) fn subscription(state: &AppState) -> Subscription<Message> {
     if state.sidebar.collection_delete_id.is_some() {
         all.push(event::listen_with(collection_delete_keys));
     }
+    if state.sidebar.request_delete.is_some() {
+        all.push(event::listen_with(request_delete_keys));
+    }
     if state.sidebar.search_open && !state.palette_open {
         all.push(event::listen_with(sidebar_search_keys));
     }
@@ -95,6 +98,26 @@ fn collection_delete_keys(
         }) => Some(Message::Sidebar(
             crate::message::SidebarMsg::CollectionDeleteCancelled,
         )),
+        _ => None,
+    }
+}
+
+/// Escape cancels, Enter confirms the request delete dialog.
+fn request_delete_keys(
+    event: Event,
+    _status: event::Status,
+    _window: window::Id,
+) -> Option<Message> {
+    use crate::message::SidebarMsg;
+    match event {
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(keyboard::key::Named::Escape),
+            ..
+        }) => Some(Message::Sidebar(SidebarMsg::RequestDeleteCancelled)),
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(keyboard::key::Named::Enter),
+            ..
+        }) => Some(Message::Sidebar(SidebarMsg::RequestDeleteConfirmed)),
         _ => None,
     }
 }

@@ -25,10 +25,38 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
         SidebarMsg::CollectionDeleteCancelled => {
             state.sidebar.collection_delete_id = None;
             state.sidebar.collection_delete_text.clear();
+            state.sidebar.collection_delete_typing = false;
             state.status_message = None;
         }
+        SidebarMsg::CollectionDeleteProceed => {
+            if state.sidebar.collection_delete_id.is_some() {
+                state.sidebar.collection_delete_typing = true;
+                state.sidebar.collection_delete_text.clear();
+                return iced::widget::operation::focus("collection-delete-confirm");
+            }
+        }
+        SidebarMsg::RequestDeleteAsked { id, collection_id } => {
+            state.sidebar.context_menu = None;
+            state.sidebar.request_delete = Some((id, collection_id));
+        }
+        SidebarMsg::RequestDeleteCancelled => {
+            state.sidebar.request_delete = None;
+        }
+        SidebarMsg::RequestDeleteConfirmed => {
+            // Re-enter through the full update path, so the example pruning
+            // and unsaved-example guards on DeleteRequest still run.
+            if let Some((id, collection_id)) = state.sidebar.request_delete.take() {
+                return super::update(
+                    state,
+                    Message::Sidebar(SidebarMsg::DeleteRequest { id, collection_id }),
+                );
+            }
+        }
         SidebarMsg::CollectionDeleteConfirmed => {
-            if state.sidebar.collection_delete_text != "delete" {
+            // Both layers: the warning was accepted, then "delete" typed.
+            if !state.sidebar.collection_delete_typing
+                || state.sidebar.collection_delete_text != "delete"
+            {
                 return Task::none();
             }
             let Some(id) = state.sidebar.collection_delete_id.clone() else {
@@ -53,6 +81,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             state.requests.remove(&id);
             state.sidebar.collection_delete_id = None;
             state.sidebar.collection_delete_text.clear();
+            state.sidebar.collection_delete_typing = false;
             state.status_message = Some("Collection deleted".into());
             crate::app::drafts::mark_orphans(state);
             return crate::app::notifications::success(
@@ -153,12 +182,13 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             if !state.collections.iter().any(|c| c.id == id) {
                 return Task::none();
             }
+            // First layer: the warning. Typing "delete" is the second.
             state.sidebar.collection_delete_id = Some(id);
             state.sidebar.collection_delete_text.clear();
+            state.sidebar.collection_delete_typing = false;
             state.sidebar.context_menu = None;
             state.notification = None;
             state.status_message = None;
-            return iced::widget::operation::focus("collection-delete-confirm");
         }
         SidebarMsg::DeleteRequest { id, collection_id } => {
             if let Some(reqs) = state.requests.get_mut(&collection_id) {

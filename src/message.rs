@@ -99,6 +99,15 @@ pub enum SidebarMsg {
     CollectionDeleteTextChanged(String),
     CollectionDeleteCancelled,
     CollectionDeleteConfirmed,
+    /// Warning accepted: move to the type-`delete` step.
+    CollectionDeleteProceed,
+    /// Ask before deleting a request (sidebar menu).
+    RequestDeleteAsked {
+        id: String,
+        collection_id: String,
+    },
+    RequestDeleteCancelled,
+    RequestDeleteConfirmed,
     EnvironmentsSectionToggled,
     EnvironmentOpened(String),
     EnvironmentPageClosed,

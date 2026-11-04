@@ -897,7 +897,7 @@ fn request_menu(req: &SavedRequest) -> Element<'_, Message> {
         menu_divider(),
         ctx_item(
             "Delete",
-            Message::Sidebar(SidebarMsg::DeleteRequest {
+            Message::Sidebar(SidebarMsg::RequestDeleteAsked {
                 id: req.id.clone(),
                 collection_id: req.collection_id.clone(),
             }),

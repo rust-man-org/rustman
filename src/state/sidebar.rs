@@ -38,6 +38,11 @@ pub fn collection_rename_input_id(collection_id: &str) -> iced::widget::Id {
 pub struct SidebarState {
     pub collection_delete_id: Option<String>,
     pub collection_delete_text: String,
+    /// Second layer of collection deletion: the warning was accepted and
+    /// the type-`delete` box is showing.
+    pub collection_delete_typing: bool,
+    /// Request awaiting a delete confirmation: (request id, collection id).
+    pub request_delete: Option<(String, String)>,
     pub collections_collapsed: bool,
     pub environments_collapsed: bool,
     pub panel: SidebarPanel,
@@ -77,6 +82,8 @@ impl Default for SidebarState {
         Self {
             collection_delete_id: None,
             collection_delete_text: String::new(),
+            collection_delete_typing: false,
+            request_delete: None,
             collections_collapsed: false,
             environments_collapsed: false,
             panel: SidebarPanel::Collections,

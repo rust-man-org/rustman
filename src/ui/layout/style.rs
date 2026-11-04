@@ -70,14 +70,3 @@ pub fn surface_style(_theme: &iced::Theme) -> iced::widget::container::Style {
     }
 }
 
-pub fn tab_bar_container(_theme: &iced::Theme) -> iced::widget::container::Style {
-    iced::widget::container::Style {
-        background: Some(Background::Color(Palette::chrome())),
-        border: Border {
-            color: Palette::border_subtle(),
-            width: 1.0,
-            radius: 0.0.into(),
-        },
-        ..Default::default()
-    }
-}

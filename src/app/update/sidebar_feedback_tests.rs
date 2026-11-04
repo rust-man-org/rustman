@@ -70,6 +70,10 @@ fn sidebar_feedback_confirmed_delete_shows_success_after_storage_succeeds() {
     );
     let _ = super::update(
         &mut state,
+        Message::Sidebar(SidebarMsg::CollectionDeleteProceed),
+    );
+    let _ = super::update(
+        &mut state,
         Message::Sidebar(SidebarMsg::CollectionDeleteTextChanged("delete".into())),
     );
     let _ = super::update(
@@ -142,6 +146,10 @@ fn sidebar_feedback_failed_delete_rolls_back_and_keeps_confirmation_open() {
     );
     let _ = super::update(
         &mut state,
+        Message::Sidebar(SidebarMsg::CollectionDeleteProceed),
+    );
+    let _ = super::update(
+        &mut state,
         Message::Sidebar(SidebarMsg::CollectionDeleteTextChanged("delete".into())),
     );
     let _ = super::update(
@@ -180,6 +188,83 @@ fn sidebar_feedback_stale_dismissal_does_not_hide_new_toast() {
     assert!(!super::marks_session_dirty(&message));
     let _ = super::update(&mut state, message);
     assert!(state.notification.is_none());
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn sidebar_feedback_typed_delete_alone_cannot_skip_the_warning() {
+    let (mut state, dir) = fixture();
+    let _ = super::update(
+        &mut state,
+        Message::Sidebar(SidebarMsg::DeleteCollection("feedback-col".into())),
+    );
+    assert!(
+        !state.sidebar.collection_delete_typing,
+        "opens on the warning"
+    );
+    let _ = super::update(
+        &mut state,
+        Message::Sidebar(SidebarMsg::CollectionDeleteTextChanged("delete".into())),
+    );
+    let _ = super::update(
+        &mut state,
+        Message::Sidebar(SidebarMsg::CollectionDeleteConfirmed),
+    );
+    assert_eq!(state.collections.len(), 1, "layer 1 must be accepted first");
+    let _ = super::update(
+        &mut state,
+        Message::Sidebar(SidebarMsg::CollectionDeleteProceed),
+    );
+    assert!(state.sidebar.collection_delete_typing);
+    assert!(
+        state.sidebar.collection_delete_text.is_empty(),
+        "layer 2 starts with an empty box"
+    );
+    let _ = super::update(
+        &mut state,
+        Message::Sidebar(SidebarMsg::CollectionDeleteCancelled),
+    );
+    assert!(!state.sidebar.collection_delete_typing);
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn sidebar_feedback_request_delete_waits_for_confirmation() {
+    let (mut state, dir) = fixture();
+    let id = state.requests["feedback-col"][0].id.clone();
+    let ask = || {
+        Message::Sidebar(SidebarMsg::RequestDeleteAsked {
+            id: id.clone(),
+            collection_id: "feedback-col".into(),
+        })
+    };
+    let _ = super::update(&mut state, ask());
+    assert_eq!(
+        state.requests["feedback-col"].len(),
+        1,
+        "asking deletes nothing"
+    );
+    let _ = super::update(
+        &mut state,
+        Message::Sidebar(SidebarMsg::RequestDeleteCancelled),
+    );
+    assert!(state.sidebar.request_delete.is_none());
+    assert_eq!(state.requests["feedback-col"].len(), 1);
+
+    let _ = super::update(&mut state, ask());
+    let _ = super::update(
+        &mut state,
+        Message::Sidebar(SidebarMsg::RequestDeleteConfirmed),
+    );
+    assert!(state.sidebar.request_delete.is_none());
+    assert!(state.requests["feedback-col"].is_empty());
+    assert!(
+        storage::get_requests(state.db.as_ref().unwrap(), "feedback-col")
+            .unwrap()
+            .is_empty()
+    );
     drop(state);
     let _ = std::fs::remove_dir_all(dir);
 }

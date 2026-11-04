@@ -60,23 +60,43 @@ pub fn view<'a>(
         text_color: color,
         placeholder_color: Palette::text_subtle(),
         handle_color: Palette::text_subtle(),
-        // `.methoddd summary`: bg-2, a step darker on hover.
+        // `.methoddd summary`: bg-2, a step darker on hover, bg-0 while open.
+        // No ring: inside the pill it read as a second, misaligned border.
         background: Background::Color(match status {
             iced::widget::pick_list::Status::Hovered => Palette::border(),
+            iced::widget::pick_list::Status::Opened { .. } => Palette::surface(),
             _ => Palette::surface_high(),
         }),
         border: Border {
-            color: match status {
-                iced::widget::pick_list::Status::Opened { .. } => Palette::accent(),
-                _ => Color::TRANSPARENT,
-            },
-            width: 1.0,
+            color: Color::TRANSPARENT,
+            width: 0.0,
             radius: iced::border::Radius {
                 top_left: 4.0,
                 top_right: 0.0,
                 bottom_right: 0.0,
                 bottom_left: 4.0,
             },
+        },
+    })
+    // `.combo-menu`: bg-0 card, bd-2 border, 6px radius, soft shadow; the
+    // current method sits on bg-2 instead of iced's default cyan.
+    .menu_style(|_theme| iced::overlay::menu::Style {
+        background: Background::Color(Palette::surface()),
+        border: Border {
+            color: Palette::border(),
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        text_color: Palette::text(),
+        selected_text_color: Palette::text(),
+        selected_background: Background::Color(Palette::surface_high()),
+        shadow: iced::Shadow {
+            color: Color {
+                a: 0.16,
+                ..Color::BLACK
+            },
+            offset: Vector::new(0.0, 8.0),
+            blur_radius: 24.0,
         },
     });
 
