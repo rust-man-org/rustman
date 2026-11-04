@@ -16,7 +16,7 @@ use crate::{
     ui::{
         components::{
             Tone,
-            atoms::{Mark, badge, chip, text as t},
+            atoms::{Mark, badge, chip, text as t, tooltip::tooltip},
         },
         icons,
         theme::{MONO, Palette},
@@ -43,7 +43,6 @@ pub fn filter_bar(state: &AppState) -> Option<Element<'_, Message>> {
             chip(format!("Drafts · {n}"), on, toggle),
         ]
         .spacing(6)
-        .padding([6, 10])
         .into(),
     )
 }
@@ -118,13 +117,41 @@ fn list_row<'a>(state: &'a AppState, d: &'a RequestDraft, selected: bool) -> Ele
         .into()
 }
 
-/// Badge for a request in the collection tree, if it has a draft.
-pub fn badge_for(state: &AppState, request_id: &str) -> Option<Element<'static, Message>> {
-    state.drafts.get(request_id).map(draft_badge)
+/// Room the tree's status mark takes; callers shrink the label by this.
+pub const MARK_WIDTH: f32 = 16.0;
+
+/// Compact status mark for a request row in the collection tree (mockup
+/// `.req-row .st`): icon only, the state is named in the tooltip.
+pub fn mark_for(state: &AppState, request_id: &str) -> Option<Element<'static, Message>> {
+    let d = state.drafts.get(request_id)?;
+    let (mark, _, tone) = draft_look(d);
+    let tip = match d.state() {
+        DraftState::Orphaned => "Deleted on main · local draft kept".to_owned(),
+        DraftState::Conflict(_) => "Local draft · conflicts with main".to_owned(),
+        DraftState::InReview(r) => {
+            r.pr_number.map_or("In review".to_owned(), |n| format!("In review · PR #{n}"))
+        }
+        DraftState::UpstreamChanged => "Local draft · main changed since".to_owned(),
+        DraftState::Clean => "Local draft".to_owned(),
+    };
+    let size = if matches!(mark, Mark::Dot) { 8.0 } else { 12.0 };
+    Some(tooltip(
+        container(mark.view(tone, size))
+            .center_x(MARK_WIDTH)
+            .center_y(MARK_WIDTH),
+        tip,
+    ))
 }
 
 fn draft_badge(d: &RequestDraft) -> Element<'static, Message> {
-    let (mark, label, tone) = match d.state() {
+    let (mark, label, tone) = draft_look(d);
+    badge(mark, label, tone)
+}
+
+/// One mapping from draft state to mark, short label and tone, shared by
+/// the flat list's badge and the tree's mark.
+fn draft_look(d: &RequestDraft) -> (Mark, String, Tone) {
+    match d.state() {
         DraftState::Orphaned => (Mark::Icon(icons::close()), "Deleted".to_owned(), Tone::Subtle),
         DraftState::Conflict(_) => (Mark::Dot, "Conflict".to_owned(), Tone::Danger),
         DraftState::InReview(r) => (
@@ -134,11 +161,10 @@ fn draft_badge(d: &RequestDraft) -> Element<'static, Message> {
         ),
         DraftState::UpstreamChanged => (Mark::Dot, "Merged".to_owned(), Tone::Info),
         DraftState::Clean => (Mark::Dot, "Draft".to_owned(), Tone::Accent),
-    };
-    badge(mark, label, tone)
+    }
 }
 
-fn method_color(method: &str) -> iced::Color {
+pub(super) fn method_color(method: &str) -> iced::Color {
     match method {
         "GET" => Palette::GET,
         "POST" => Palette::POST,

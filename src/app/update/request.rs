@@ -183,6 +183,12 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             persist_session(state);
             return Task::none();
         }
+        RequestMsg::NewWsTab => {
+            state.tabs.new_tab();
+            state.tabs.active_tab_mut().set_url("wss://".to_owned());
+            persist_session(state);
+            return Task::none();
+        }
         RequestMsg::CloseTab(i) => {
             if state.tabs.tabs.get(i).map_or(false, |t| t.modified) {
                 state.close_confirm_tab = Some(i);

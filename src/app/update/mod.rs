@@ -64,6 +64,8 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
         // touches the persisted snapshot. A rejected oversized paste changes
         // nothing either — the old URL is kept. The import dialog chrome is
         // likewise UI-only until a parse lands.
+        // The tree search box is view state; nothing persisted changes.
+        | Message::Sidebar(crate::message::SidebarMsg::FilterChanged(_))
         | Message::Request(
             crate::message::RequestMsg::FormValueExpandToggled(_)
                 | crate::message::RequestMsg::FormValuePagePrev(_)

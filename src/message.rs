@@ -103,6 +103,8 @@ pub enum SidebarMsg {
     EnvironmentVarValueChanged(String, usize, String),
     EnvironmentVarRemoved(String, usize),
     ToggleCollapsed,
+    /// Collection tree search box.
+    FilterChanged(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -191,6 +193,8 @@ pub enum RequestMsg {
     WsSend,
     // Tabs
     NewTab,
+    /// New tab pre-filled with `wss://`, which makes it a WebSocket tab.
+    NewWsTab,
     CloseTab(usize),
     CloseCurrentTab,
     ConfirmCloseTab,
