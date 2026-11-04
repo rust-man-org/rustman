@@ -55,6 +55,8 @@ pub struct SidebarState {
     pub env_editing: Option<String>,
     pub env_edit_rows: Vec<(String, String)>,
     pub collapsed: bool,
+    /// Collection tree search box text (not persisted).
+    pub filter: String,
 }
 
 impl Default for SidebarState {
@@ -73,6 +75,7 @@ impl Default for SidebarState {
             env_editing: None,
             env_edit_rows: Vec::new(),
             collapsed: false,
+            filter: String::new(),
         }
     }
 }

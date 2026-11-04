@@ -10,6 +10,9 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
         SidebarMsg::ToggleCollapsed => {
             state.sidebar.collapsed = !state.sidebar.collapsed;
         }
+        SidebarMsg::FilterChanged(q) => {
+            state.sidebar.filter = q;
+        }
         SidebarMsg::PanelSelected(panel) => {
             if state.sidebar.panel == panel && !state.sidebar.collapsed {
                 state.sidebar.collapsed = true;
