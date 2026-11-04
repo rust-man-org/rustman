@@ -46,7 +46,7 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 | [ ] | 06 | Secrets / scanner | — | Audit redaction, re-merge and write guards. |
 | [ ] | 07 | Self-update integrity | — | Audit existing verification and tests. |
 | [ ] | 08 | PR / company CI | — | Audit review flow and validator. |
-| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header done (`a488b7f`, merged). Next: t2 request header + URL row on `ws/10-layout/t2-request-header`. |
+| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header (`a488b7f`), t2 request header + URL row (`1a494f2`), seams (`9846277`) and t5 sidebar (`d382c1c`, `dc731ca`) done and merged. Sidebar is made as close to Postman as possible (user decision 2026-11-04): filter box, `+` menu incl. Folder, import, `⋯`, COLLECTIONS section; full suite 203/195. Next: t3 tab bar, t4 sub-tabs, t6 response pane. |
 | [X] | 09 | Design tokens | — | `4289b76` on `ws/09-design-tokens/t1-tokens`: Rustman Light/Dark appended, fresh-install default, 5 tests. Fonts deferred; status colors kept global (36 call sites). |
 
 ## Active task details

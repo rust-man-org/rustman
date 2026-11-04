@@ -21,16 +21,20 @@ Behaviour does not change; only layout and styling.
   and dark screenshot checked against the mockup.
 - Data from workstreams not done yet is shown as a placeholder or hidden,
   never faked.
+- The sidebar follows Postman, not the mockup, as closely as possible so it
+  feels familiar (user decision 2026-11-04): filter box + `+` / import /
+  `⋯`, a COLLECTIONS section, `+` dropdown listing what can be created.
 
 ## Tasks
 
 | # | Area | Files | Status | Notes |
 |---|---|---|---|---|
 | 1 | App header: logo, workspace, branch pill, global search (opens palette), sync chip, settings | `ui/layout/header.rs` (new), `layout/mod.rs`, `tab_bar.rs` (search moved out) | [X] `a488b7f` | Avatar waits for 05; "Synced · 10s ago" timing waits for 04 |
-| 2 | Request header + URL row: breadcrumb, name, Save/Share; method + URL + Send in one box | `ui/request/url_bar.rs` (+ new `request/header.rs`) | [~] | Save keeps Ctrl+S semantics until 08 |
+| 2 | Request header + URL row: breadcrumb, name, Save/Share; method + URL + Send in one box | `ui/request/url_bar.rs` (+ new `request/header.rs`) | [X] `1a494f2` | Save keeps Ctrl+S semantics until 08 |
+| 2b | Seams: no thick gaps between panels, 1px hairlines only | `ui/widgets/seam.rs` (new), both splitters, `layout/style.rs` | [X] `9846277` | Panels lost their four-sided borders |
 | 3 | Tab bar: request name as title, mockup tab style | `ui/layout/tab_bar.rs` | [ ] | Old behaviour showed the URL |
 | 4 | Request sub-tabs: underline style, labels (Docs, Params, Authorization, Headers, Body, Scripts, Cookies) | `ui/request/tabs.rs` | [ ] | "Diskusi" tab waits for 03 |
-| 5 | Sidebar: search box, New / Import buttons, tree spacing, status icons | `ui/sidebar/collections.rs` | [ ] | |
+| 5 | Sidebar, Postman-style: filter box, `+` menu (HTTP, WebSocket, request, folder, collection, environment), import, `⋯` (import/export), COLLECTIONS section, counts, status icons, row actions in right-click menus | `ui/sidebar/collections.rs`, `sidebar/tree.rs` (new), components `search_input`, `menu`, `tree_row` | [X] `d382c1c` `dc731ca` | History / Environments panels not restyled yet |
 | 6 | Response pane: status line, tabs, body toolbar | `ui/response/*` | [ ] | |
 | 7 | Fonts: Inter + IBM Plex Mono (OFL), replace Noto Sans / JetBrains Mono | `assets/fonts`, `ui/theme.rs` | [ ] | Check binary size |
 | 8 | Code snippet side panel (today a dialog) | `layout/dialogs.rs`, new panel | [ ] | Optional, after 1–7 |
