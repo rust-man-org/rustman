@@ -34,6 +34,14 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
 
     let db = storage::open(&data_dir).ok();
 
+    // `RUSTMAN_SAMPLE=1` (scripts/ui.sh -x): example collection for trying
+    // the UI, only into a data folder without collections.
+    if let Some(c) = db.as_ref().filter(|_| super::sample::wanted()) {
+        if let Err(e) = super::sample::seed_if_empty(c) {
+            eprintln!("sample data not created: {e}");
+        }
+    }
+
     let collections = db
         .as_ref()
         .and_then(|c| storage::get_collections(c).ok())

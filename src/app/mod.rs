@@ -18,6 +18,7 @@ use crate::{
 mod boot;
 mod drafts;
 mod request_ops;
+mod sample;
 mod scripting;
 mod session;
 mod subscription;
