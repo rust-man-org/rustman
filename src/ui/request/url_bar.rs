@@ -34,14 +34,15 @@ pub fn view<'a>(
     let method_picker = pick_list(methods, Some(tab.method.as_str()), |m| {
         Message::Request(RequestMsg::MethodChanged(m.to_owned()))
     })
-    .width(100)
-    .text_size(TEXT_MD)
-    .padding([6, 8])
+    .width(115)
+    .text_size(TEXT_SM)
+    .padding([10, 10])
+    .font(crate::ui::theme::MONO)
     .style(move |_theme, _status| iced::widget::pick_list::Style {
         text_color: color,
         placeholder_color: Palette::text_subtle(),
-        handle_color: Palette::text_muted(),
-        background: Background::Color(Color::TRANSPARENT),
+        handle_color: Palette::text_subtle(),
+        background: Background::Color(Palette::surface_high()),
         border: Border {
             color: Color::TRANSPARENT,
             width: 0.0,
@@ -57,28 +58,10 @@ pub fn view<'a>(
     let url_input = url_field(tab);
 
     let inner_divider =
-        container(Space::new().width(1).height(24)).style(|_| iced::widget::container::Style {
-            background: Some(Background::Color(Palette::border())),
+        container(Space::new().width(1).height(Length::Fill)).style(|_| iced::widget::container::Style {
+            background: Some(Background::Color(Palette::border_subtle())),
             ..Default::default()
         });
-
-    // One rounded pill holding method + URL — the app's hero input. In
-    // WebSocket mode the method picker and its divider are dropped entirely
-    // (the "WS" badge to the left of the pill already says what this is).
-    let pill_row = if ws_mode {
-        row![url_input]
-    } else {
-        row![method_picker, inner_divider, url_input]
-    };
-    let url_pill = container(pill_row.align_y(Alignment::Center))
-        .style(url_pill_style)
-        .width(Length::Fill);
-
-    let curl_btn: Element<'static, Message> = button(icons::curl().size(11).color(Palette::text_subtle()))
-        .on_press(Message::Request(RequestMsg::ExportCurl))
-        .style(iced::widget::button::text)
-        .padding([5, 6])
-        .into();
 
     // Clipboard/file import that bypasses text widgets entirely: pasting
     // megabytes into this bar freezes iced's input shaping for minutes
@@ -116,16 +99,27 @@ pub fn view<'a>(
         .into()
     };
 
-    let mut bar = row![]
-        .spacing(6)
-        .align_y(Alignment::Center)
-        .padding([6, 10]);
+    // Mockup `.url-row`: one flat 40px box holding method | URL | Send (Send
+    // inset by 4px). In WebSocket mode the method picker is dropped (the
+    // "WS" badge already says what this is). cURL export moved to the
+    // request header's Share button.
+    let mut pill_row = row![].align_y(Alignment::Center).height(Length::Fill);
     if ws_mode {
-        bar = bar.push(ws_badge());
+        pill_row = pill_row.push(container(ws_badge()).padding([0, 4]));
+    } else {
+        pill_row = pill_row.push(method_picker).push(inner_divider);
     }
-    bar = bar.push(url_pill).push(action_btn);
+    pill_row = pill_row
+        .push(url_input)
+        .push(container(action_btn).padding(4));
+    let url_pill = container(pill_row)
+        .style(url_pill_style)
+        .height(40)
+        .width(Length::Fill);
+
+    let mut bar = row![url_pill].spacing(6).align_y(Alignment::Center);
     if !ws_mode {
-        bar = bar.push(import_btn).push(curl_btn);
+        bar = bar.push(import_btn);
     }
 
     // Same resolution the send path uses, so the preview can't claim a different
@@ -140,14 +134,13 @@ pub fn view<'a>(
         }
     }
 
-    let mut outer = iced::widget::Column::new()
-        .push(container(bar).style(url_bar_container).width(Length::Fill));
+    let mut outer = iced::widget::Column::new().push(container(bar).width(Length::Fill));
 
     if let Some(exp) = expanded {
         outer = outer.push(
             container(
                 row![
-                    Space::new().width(100 + 6),
+                    Space::new().width(115 + 1),
                     text(exp)
                         .size(10)
                         .color(Palette::accent())
@@ -260,45 +253,14 @@ fn url_editor_style(
     }
 }
 
+/// Flat box, mockup `.url-row`: 1px subtle border, 4px radius, no shadow.
 fn url_pill_style(_theme: &iced::Theme) -> iced::widget::container::Style {
     iced::widget::container::Style {
-        background: Some(Background::Color(Palette::surface_high())),
+        background: Some(Background::Color(Palette::background())),
         border: Border {
             color: Palette::border_subtle(),
             width: 1.0,
-            radius: 10.0.into(),
-        },
-        shadow: Shadow {
-            color: Color {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: 0.25,
-            },
-            offset: Vector::new(0.0, 2.0),
-            blur_radius: 8.0,
-        },
-        ..Default::default()
-    }
-}
-
-fn url_bar_container(_theme: &iced::Theme) -> iced::widget::container::Style {
-    iced::widget::container::Style {
-        background: Some(Background::Color(Palette::chrome())),
-        border: Border {
-            color: Palette::border_subtle(),
-            width: 1.0,
-            radius: 0.0.into(),
-        },
-        shadow: Shadow {
-            color: Color {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: 0.14,
-            },
-            offset: Vector::new(0.0, 1.0),
-            blur_radius: 6.0,
+            radius: 4.0.into(),
         },
         ..Default::default()
     }
@@ -322,18 +284,8 @@ fn send_button(
         })),
         text_color: Color::WHITE,
         border: Border {
-            radius: 8.0.into(),
+            radius: 4.0.into(),
             ..Default::default()
-        },
-        shadow: Shadow {
-            color: Color {
-                r: base_bg.r,
-                g: base_bg.g,
-                b: base_bg.b,
-                a: 0.35,
-            },
-            offset: Vector::new(0.0, 2.0),
-            blur_radius: 10.0,
         },
         ..Default::default()
     }
