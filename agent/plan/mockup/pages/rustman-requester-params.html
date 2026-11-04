@@ -319,29 +319,23 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 .kv-add{display:flex;align-items:center;gap:6px;margin:10px 2px 0;padding:6px 10px;border-radius:4px;font-size:12px;color:var(--tx-2)}
 .kv-add:hover{background:var(--bg-2);color:var(--tx-1)}
 .kv-note{margin-top:10px;font-size:11px;color:var(--tx-3)}
-.hdr-toolbar{display:flex;align-items:center;gap:8px;padding-bottom:12px}
-.hdr-filter{position:relative;flex:1;max-width:320px}
-.hdr-filter svg{position:absolute;left:9px;top:8px;color:var(--tx-3)}
-.hdr-filter input{width:100%;height:30px;box-sizing:border-box;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);padding:0 10px 0 30px;font-size:12px;color:var(--tx-1)}
-.hdr-filter input::placeholder{color:var(--tx-3)}
-.hdr-filter input:focus{outline:none;border-color:var(--bd-2);background:var(--bg-0)}
-.dd{position:relative;margin-left:auto}
-.dd summary{list-style:none;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);font-size:12px;color:var(--tx-2);cursor:pointer}
-.dd summary::-webkit-details-marker{display:none}
-.dd summary:hover{color:var(--tx-1);border-color:var(--bd-2)}
-.dd summary .count{font:600 10px var(--font-code);background:var(--bg-2);border-radius:24px;padding:2px 6px;color:var(--tx-2);font-variant-numeric:tabular-nums}
-.dd[open] summary{color:var(--tx-1);border-color:var(--accent)}
-.dd-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:5;min-width:232px;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px}
-.dd-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:4px;font-size:12px;color:var(--tx-1);cursor:pointer}
-.dd-item:hover{background:var(--bg-1)}
-.hdr-bulk{height:30px;padding:0 10px;border-radius:4px;font-size:12px;color:var(--tx-2)}
-.hdr-bulk:hover{background:var(--bg-2);color:var(--tx-1)}
-.hidden-head{display:flex;align-items:center;gap:8px;margin:16px 2px 8px;font-size:11px;font-weight:600;color:var(--tx-3)}
-.hidden-head .pill{font:600 10px var(--font-code);background:var(--bg-2);color:var(--tx-2);border-radius:24px;padding:2px 7px}
-.hidden-head .n{font-weight:400;color:var(--tx-3);font-variant-numeric:tabular-nums;margin-left:auto}
-.kv-row.hidden input{color:var(--tx-3);cursor:default}
-.kv-row.hidden input:hover{background:transparent}
-.lock{display:flex;justify-content:center;color:var(--tx-3)}
+.hdr-toolbar{display:flex;align-items:center;gap:8px;padding-bottom:10px}
+.hdr-check{position:absolute;opacity:0;pointer-events:none;width:0;height:0}
+.hdr-lbl{font-size:12px;color:var(--tx-2)}
+.hidden-toggle{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border:1px solid var(--bd-2);border-radius:24px;font-size:11px;color:var(--tx-2);cursor:pointer}
+.hidden-toggle:hover{color:var(--tx-1);border-color:var(--tx-3)}
+.hidden-toggle .open-txt{display:none}
+#hdr-hidden:checked ~ .hdr-toolbar .hidden-toggle{color:var(--accent);border-color:var(--accent);background:var(--accent-tint)}
+#hdr-hidden:checked ~ .hdr-toolbar .closed-txt{display:none}
+#hdr-hidden:checked ~ .hdr-toolbar .open-txt{display:inline}
+.hdr-spacer{flex:1}
+.kv-row.auto{display:none}
+#hdr-hidden:checked ~ .kv .kv-row.auto{display:grid}
+.val-cell{display:flex;align-items:center;gap:6px;min-width:0;font:400 12px var(--font-code);color:var(--tx-2);padding:0 2px}
+.val-cell svg{color:var(--tx-3);flex:0 0 auto}
+.val-cell .masked{color:var(--tx-3);letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.val-cell .calc{color:var(--tx-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kv-row .check{cursor:pointer}
 .seg{display:flex;gap:4px;padding-bottom:12px}
 .bmode{height:26px;padding:0 10px;border-radius:4px;font-size:12px;color:var(--tx-2);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .bmode:hover{color:var(--tx-1);background:var(--bg-2)}
@@ -826,7 +820,7 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
           </button>
           <label class="rtab" for="rt-params">Params</label>
           <label class="rtab" for="rt-auth">Authorization</label>
-          <label class="rtab" for="rt-headers">Headers <span class="rt-count">8</span></label>
+          <label class="rtab" for="rt-headers">Headers <span class="rt-count">11</span></label>
           <label class="rtab" for="rt-body">Body</label>
           <label class="rtab" for="rt-scripts">Scripts</label>
           <button class="docs-tab">Settings</button>
@@ -929,26 +923,40 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
           </div>
         </section>
 
-        <section class="tpanel" data-panel="headers">
+                <section class="tpanel" data-panel="headers">
+          <input class="hdr-check" type="checkbox" id="hdr-hidden">
           <div class="hdr-toolbar">
-            <div class="hdr-filter">
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.4"/><path d="m13.5 13.5-3.2-3.2"/></svg>
-              <input placeholder="Filter header">
-            </div>
-            <details class="dd">
-              <summary>Hidden headers <span class="count">6</span>
-                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
-              </summary>
-              <div class="dd-menu">
-                <label class="dd-item"><span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span> Tampilkan header otomatis</label>
-                <label class="dd-item"><span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span> Tampilkan nama header tersembunyi</label>
-                <label class="dd-item"><span class="check"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span> Tampilkan header warisan collection</label>
+            <span class="hdr-lbl">Headers</span>
+            <label class="hidden-toggle" for="hdr-hidden">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 8S4 3.8 8 3.8 14.5 8 14.5 8 12 12.2 8 12.2 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="1.9"/></svg>
+              <span class="closed-txt">10 hidden</span>
+              <span class="open-txt">Hide auto-generated headers</span>
+            </label>
+            <span class="hdr-spacer"></span>
+            <button class="p-bulk">Bulk Edit</button>
+            <details class="dd-mini">
+              <summary>Presets <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg></summary>
+              <div class="combo-menu">
+                <button class="combo-item">None</button>
+                <button class="combo-item">JSON <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                <button class="combo-item">XML</button>
+                <button class="combo-item">Text</button>
+                <button class="combo-item">Form URL Encoded</button>
               </div>
             </details>
-            <button class="hdr-bulk">Bulk Edit</button>
+            <details class="dd-mini p-more">
+              <summary aria-label="Opsi kolom">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/></svg>
+              </summary>
+              <div class="combo-menu">
+                <div class="p-menu-label">Show columns</div>
+                <button class="combo-item"><span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span> Value</button>
+                <button class="combo-item"><span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span> Description</button>
+              </div>
+            </details>
           </div>
           <div class="kv">
-            <div class="kv-head"><span></span><span>Key</span><span>Value</span><span>Deskripsi</span><span></span></div>
+            <div class="kv-head"><span></span><span>Key</span><span>Value</span><span>Description</span><span></span></div>
             <div class="kv-row">
               <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
               <details class="combo">
@@ -960,98 +968,81 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
                   <button class="combo-item">Authorization</button>
                   <button class="combo-item">Cache-Control</button>
                   <button class="combo-item">Content-Type <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
-                  <button class="combo-item">Origin</button>
+                  <button class="combo-item">Host</button>
                   <button class="combo-item">X-Request-ID</button>
                 </div>
               </details>
               <input value="application/json">
-              <span class="desc">wajib untuk body raw JSON</span>
+              <span class="desc"></span>
             </div>
-            <div class="kv-row">
+            <div class="kv-row auto">
               <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
-              <details class="combo">
-                <summary><span class="val">X-Client-ID</span>
-                  <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
-                </summary>
-                <div class="combo-menu">
-                  <button class="combo-item">Accept</button>
-                  <button class="combo-item">Authorization</button>
-                  <button class="combo-item">Content-Type</button>
-                  <button class="combo-item">Origin</button>
-                  <button class="combo-item">X-Client-ID <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
-                  <button class="combo-item">X-Request-ID</button>
-                </div>
-              </details>
-              <input value="{{client_id}}">
-              <span class="desc">versi remote konflik</span>
+              <input value="Authorization" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span class="masked">••••••••••••••••••••••••••••••••</span></span>
+              <span class="desc"></span>
+            </div>
+            <div class="kv-row auto">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="Cache-Control" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span>no-cache</span></span>
+              <span class="desc"></span>
+            </div>
+            <div class="kv-row auto">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="Rustman-Token" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span class="calc"><calculated when request is sent></span></span>
+              <span class="desc"></span>
+            </div>
+            <div class="kv-row auto">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="Content-Type" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span>text/plain</span></span>
+              <span class="desc"></span>
+            </div>
+            <div class="kv-row auto">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="Content-Length" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span class="calc"><calculated when request is sent></span></span>
+              <span class="desc"></span>
+            </div>
+            <div class="kv-row auto">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="Host" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span class="calc"><calculated when request is sent></span></span>
+              <span class="desc"></span>
+            </div>
+            <div class="kv-row auto">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="User-Agent" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span>RustmanRuntime/0.1</span></span>
+              <span class="desc"></span>
+            </div>
+            <div class="kv-row auto">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="Accept" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span>*/*</span></span>
+              <span class="desc"></span>
+            </div>
+            <div class="kv-row auto">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="Accept-Encoding" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span>gzip, deflate, br</span></span>
+              <span class="desc"></span>
+            </div>
+            <div class="kv-row auto">
+              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              <input value="Connection" readonly>
+              <span class="val-cell"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7.2V11M8 5.2v.01"/></svg> <span>keep-alive</span></span>
+              <span class="desc"></span>
             </div>
             <div class="kv-row off">
               <span class="check"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
-              <details class="combo">
-                <summary><span class="val">User-Agent</span>
-                  <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
-                </summary>
-                <div class="combo-menu">
-                  <button class="combo-item">Accept</button>
-                  <button class="combo-item">Connection</button>
-                  <button class="combo-item">Content-Type</button>
-                  <button class="combo-item">User-Agent <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
-                  <button class="combo-item">X-Request-ID</button>
-                </div>
-              </details>
-              <input value="rustman-company/0.1">
-              <span class="desc">nonaktif</span>
+              <input value="Key" readonly>
+              <input value="Value" readonly>
+              <input value="Description" readonly>
+              <span></span>
             </div>
           </div>
-          <button class="kv-add">
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg>
-            Tambah header
-          </button>
-          <div class="hidden-head">
-            <span>Auto-generated saat Send</span>
-            <span class="pill">hidden</span>
-            <span class="n">6 header</span>
-          </div>
-          <div class="kv">
-            <div class="kv-head"><span></span><span>Key</span><span>Value</span><span>Deskripsi</span><span></span></div>
-            <div class="kv-row hidden">
-              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
-              <input value="Host" readonly>
-              <input value="staging.api.company.com" readonly>
-              <span class="desc">dari URL</span>
-            </div>
-            <div class="kv-row hidden">
-              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
-              <input value="Accept-Encoding" readonly>
-              <input value="gzip, deflate, br" readonly>
-              <span class="desc">runtime</span>
-            </div>
-            <div class="kv-row hidden">
-              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
-              <input value="Connection" readonly>
-              <input value="keep-alive" readonly>
-              <span class="desc">runtime</span>
-            </div>
-            <div class="kv-row hidden">
-              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
-              <input value="User-Agent" readonly>
-              <input value="RustmanRuntime/0.1" readonly>
-              <span class="desc">runtime</span>
-            </div>
-            <div class="kv-row hidden">
-              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
-              <input value="Authorization" readonly>
-              <input value="Bearer {{SECRET_ACCESS_TOKEN}}" readonly>
-              <span class="desc">dari tab Authorization</span>
-            </div>
-            <div class="kv-row hidden">
-              <span class="lock"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
-              <input value="Rustman-Token" readonly>
-              <input value="01JBN9…7F" readonly>
-              <span class="desc">unik per request</span>
-            </div>
-          </div>
-          <p class="kv-note">Header tersembunyi dihitung saat Send dan tidak di-commit. Nilai secret tetap lokal; dropdown mengatur header mana yang ikut ditampilkan di tabel.</p>
         </section>
 
         <section class="tpanel" data-panel="body">
