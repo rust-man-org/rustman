@@ -2,6 +2,15 @@ use iced::{Background, Border, Color};
 
 use crate::ui::theme::Palette;
 
+/// Content surface shared by workspace organisms.
+pub fn content_surface(_theme: &iced::Theme) -> iced::widget::container::Style {
+    iced::widget::container::Style {
+        background: Some(Palette::surface().into()),
+        text_color: Some(Palette::text()),
+        ..Default::default()
+    }
+}
+
 // ── Text input ────────────────────────────────────────────────────────────────
 
 /// For kv-table cells (params, headers, cookies).
@@ -36,6 +45,19 @@ pub fn cell_input(
             a: 0.25,
         },
     }
+}
+
+/// Borderless spreadsheet field; only keyboard/edit focus draws an outline.
+pub fn table_cell_input(
+    theme: &iced::Theme,
+    status: iced::widget::text_input::Status,
+) -> iced::widget::text_input::Style {
+    let mut style = cell_input(theme, status);
+    style.border.radius = 0.0.into();
+    if !matches!(status, iced::widget::text_input::Status::Focused { .. }) {
+        style.border.color = Color::TRANSPARENT;
+    }
+    style
 }
 
 /// For form fields (auth inputs, sidebar inputs, URL bar).

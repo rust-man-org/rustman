@@ -1,5 +1,31 @@
 use iced::Task;
 
+fn open_terminal(dir: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("powershell.exe")
+            .args(["-NoLogo", "-NoExit"])
+            .current_dir(dir)
+            .creation_flags(0x00000010)
+            .spawn()?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-a", "Terminal"])
+            .arg(dir)
+            .spawn()?;
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        std::process::Command::new("x-terminal-emulator")
+            .current_dir(dir)
+            .spawn()?;
+    }
+    Ok(())
+}
+
 use crate::app::AppState;
 use crate::app::session::persist_session;
 use crate::domain::history::HistoryEntry;
@@ -16,6 +42,20 @@ const PREVIEW_BYTE_LIMIT: usize = 32 * 1024 * 1024;
 
 pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
     match msg {
+        AppMsg::OpenTerminal => {
+            if let Err(error) = open_terminal(&state.data_dir) {
+                state.status_message = Some(format!("Could not open terminal: {error}"));
+            }
+        }
+        AppMsg::ToastDismissed(id) => {
+            if state
+                .notification
+                .as_ref()
+                .is_some_and(|toast| toast.id == id)
+            {
+                state.notification = None;
+            }
+        }
         AppMsg::HttpResponse { generation, result } => {
             if let Some(tab) = state.tabs.tabs.iter_mut().find(|t| t.id == result.tab_id) {
                 if !tab.jobs.is_current(JobKind::Request, generation) {

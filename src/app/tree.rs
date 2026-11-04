@@ -114,6 +114,15 @@ fn direct_requests(
 /// and group/collection links matching the tree. Re-applying the same
 /// collection replaces its old subtree (idempotent).
 pub fn insert_collection(state: &mut AppState, imported: ImportedCollection) {
+    if let Err(error) = try_insert_collection(state, imported) {
+        state.status_message = Some(format!("Could not replace collection contents: {error}"));
+    }
+}
+
+pub(crate) fn try_insert_collection(
+    state: &mut AppState,
+    imported: ImportedCollection,
+) -> Result<(), String> {
     let col = imported.collection.clone();
     let group_refs = imported.all_groups();
     // Importers carry ownership in the nested tree; leaf group_id values may
@@ -149,17 +158,8 @@ pub fn insert_collection(state: &mut AppState, imported: ImportedCollection) {
 
     let exists = state.collections.iter().any(|c| c.id == col.id);
 
-    if let Some(db) = &state.db {
-        if exists {
-            let _ = storage::update_collection(db, &col.id, &col.name);
-        } else {
-            let _ = storage::create_collection(db, &col);
-        }
-        if let Err(error) = storage::replace_collection_contents(db, &col.id, &groups, &requests) {
-            state.status_message = Some(format!("Could not replace collection contents: {error}"));
-            return;
-        }
-    }
+    let db = state.db.as_ref().ok_or("Local storage is unavailable.")?;
+    storage::replace_collection_contents(db, &col, &groups, &requests)?;
 
     if exists {
         if let Some(existing) = state.collections.iter_mut().find(|c| c.id == col.id) {
@@ -187,6 +187,7 @@ pub fn insert_collection(state: &mut AppState, imported: ImportedCollection) {
         .examples
         .items
         .retain(|id, _| ids.contains(id.as_str()));
+    Ok(())
 }
 
 /// All ids of groups that live anywhere under `collection_id` (for cascade

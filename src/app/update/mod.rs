@@ -7,6 +7,7 @@ use super::AppState;
 mod app_msg;
 mod auth;
 mod drafts;
+mod environment_cell;
 mod examples;
 mod git;
 mod import;
@@ -19,6 +20,10 @@ mod save_dialog;
 mod secrets;
 mod settings;
 mod sidebar;
+#[cfg(test)]
+mod sidebar_environments_tests;
+#[cfg(test)]
+mod sidebar_feedback_tests;
 mod sidebar_search;
 #[cfg(feature = "self-update")]
 mod updater;
@@ -30,7 +35,7 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
         &message,
         Message::Sidebar(
             crate::message::SidebarMsg::DeleteRequest { .. }
-                | crate::message::SidebarMsg::DeleteCollection(_)
+                | crate::message::SidebarMsg::CollectionDeleteConfirmed
                 | crate::message::SidebarMsg::DeleteGroup(_)
         )
     );
@@ -63,6 +68,26 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
 /// Expanded editors DO dirty on content edits (their write-back mutates the
 /// snapshot); navigation/selection/search inside them does not.
 pub(crate) fn marks_session_dirty(message: &Message) -> bool {
+    if matches!(
+        message,
+        Message::Sidebar(
+            crate::message::SidebarMsg::EnvironmentCellOpened { .. }
+                | crate::message::SidebarMsg::EnvironmentCellEdited { .. }
+                | crate::message::SidebarMsg::EnvironmentCellPageChanged(_)
+                | crate::message::SidebarMsg::EnvironmentCellClosed
+        )
+    ) {
+        return false;
+    }
+    if matches!(
+        message,
+        Message::Layout(LayoutMsg::ConsoleToggled)
+            | Message::Sidebar(crate::message::SidebarMsg::EnvironmentPageClosed)
+            | Message::App(crate::message::AppMsg::OpenTerminal)
+            | Message::Response(crate::message::ResponseMsg::ConsoleEdited(_))
+    ) {
+        return false;
+    }
     if matches!(message, Message::Example(_)) {
         return false;
     }
@@ -82,6 +107,7 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
         message,
         Message::App(
             crate::message::AppMsg::AutoSaveSession
+                | crate::message::AppMsg::ToastDismissed(_)
                 | crate::message::AppMsg::Noop
                 | crate::message::AppMsg::SpinnerTick
         )
@@ -92,9 +118,15 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
         // The tree search box is view state; nothing persisted changes.
         | Message::Sidebar(
             crate::message::SidebarMsg::FilterChanged(_)
+                | crate::message::SidebarMsg::CollectionsSectionToggled
+                | crate::message::SidebarMsg::EnvironmentsSectionToggled
+                | crate::message::SidebarMsg::CollectionDeleteTextChanged(_)
+                | crate::message::SidebarMsg::CollectionDeleteCancelled
+                | crate::message::SidebarMsg::DeleteCollection(_)
                 | crate::message::SidebarMsg::SearchMove(_)
                 | crate::message::SidebarMsg::SearchClose
                 | crate::message::SidebarMsg::RowHoverEnd(_)
+                | crate::message::SidebarMsg::EnvironmentVariableHover(_, _, _)
                 // Hover; a drag's new order is persisted on ItemDragEnd.
                 | crate::message::SidebarMsg::ItemDragOver(_)
         )
@@ -121,8 +153,37 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
 }
 
 fn dispatch(state: &mut AppState, message: Message) -> Task<Message> {
+    if state.sidebar.collection_delete_id.is_some()
+        && matches!(&message, Message::Request(_) | Message::Palette(_))
+    {
+        return Task::none();
+    }
     if blocks_example_exit(state, &message) {
         return Task::none();
+    }
+    if state.sidebar.environment_page.is_some() {
+        if let Message::Request(msg) = &message {
+            use crate::message::RequestMsg;
+            match msg {
+                RequestMsg::CloseCurrentTab => {
+                    state.close_environment_workspace();
+                    return Task::none();
+                }
+                RequestMsg::SwitchTab(_)
+                | RequestMsg::NewTab
+                | RequestMsg::NewWsTab
+                | RequestMsg::CloseTab(_) => {
+                    state.close_environment_workspace();
+                }
+                _ => return Task::none(),
+            }
+        }
+        if matches!(
+            &message,
+            Message::Draft(crate::message::draft::DraftMsg::Open(_))
+        ) {
+            state.close_environment_workspace();
+        }
     }
     if state.examples.editor.is_some() {
         if let Message::Request(msg) = &message {
@@ -153,6 +214,7 @@ fn dispatch(state: &mut AppState, message: Message) -> Task<Message> {
             &message,
             Message::Sidebar(
                 crate::message::SidebarMsg::RequestOpened(_)
+                    | crate::message::SidebarMsg::EnvironmentOpened(_)
                     | crate::message::SidebarMsg::HistoryEntryOpened(_)
                     | crate::message::SidebarMsg::DeleteRequest { .. }
                     | crate::message::SidebarMsg::DeleteCollection(_)
@@ -209,6 +271,7 @@ fn blocks_example_exit(state: &mut AppState, message: &Message) -> bool {
 
 fn handle_layout(state: &mut AppState, msg: LayoutMsg) -> Task<Message> {
     match msg {
+        LayoutMsg::ConsoleToggled => state.console_open = !state.console_open,
         LayoutMsg::ZoomIn => state.ui_scale = (state.ui_scale + 0.1).min(2.0),
         LayoutMsg::ZoomOut => state.ui_scale = (state.ui_scale - 0.1).max(0.5),
         LayoutMsg::ZoomReset => state.ui_scale = 1.0,

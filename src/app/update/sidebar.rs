@@ -7,6 +7,89 @@ use crate::services::storage;
 
 pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
     match msg {
+        msg @ (SidebarMsg::EnvironmentCellOpened { .. }
+        | SidebarMsg::EnvironmentCellEdited { .. }
+        | SidebarMsg::EnvironmentCellPageChanged(_)
+        | SidebarMsg::EnvironmentCellClosed) => return super::environment_cell::handle(state, msg),
+        SidebarMsg::EnvironmentPageClosed => {
+            state.close_environment_workspace();
+            state.sidebar.env_editing = None;
+            state.sidebar.env_edit_rows.clear();
+        }
+        SidebarMsg::CollectionDeleteTextChanged(text) => {
+            if state.sidebar.collection_delete_id.is_some() {
+                state.sidebar.collection_delete_text =
+                    crate::services::format::head_capped(&text, 32).to_owned();
+            }
+        }
+        SidebarMsg::CollectionDeleteCancelled => {
+            state.sidebar.collection_delete_id = None;
+            state.sidebar.collection_delete_text.clear();
+            state.status_message = None;
+        }
+        SidebarMsg::CollectionDeleteConfirmed => {
+            if state.sidebar.collection_delete_text != "delete" {
+                return Task::none();
+            }
+            let Some(id) = state.sidebar.collection_delete_id.clone() else {
+                return Task::none();
+            };
+            if !state.collections.iter().any(|c| c.id == id) {
+                state.sidebar.collection_delete_id = None;
+                return Task::none();
+            }
+            let result = state
+                .db
+                .as_ref()
+                .ok_or("Local storage is unavailable.".to_owned())
+                .and_then(|db| storage::delete_collection(db, &id));
+            if let Err(error) = result {
+                state.status_message = Some(format!("Could not delete collection: {error}"));
+                return Task::none();
+            }
+            let group_ids = crate::app::tree::groups_under(state, &id);
+            state.groups.retain(|g| !group_ids.contains(&g.id));
+            state.collections.retain(|c| c.id != id);
+            state.requests.remove(&id);
+            state.sidebar.collection_delete_id = None;
+            state.sidebar.collection_delete_text.clear();
+            state.status_message = Some("Collection deleted".into());
+            crate::app::drafts::mark_orphans(state);
+            return crate::app::notifications::success(
+                state,
+                "Collection deleted",
+                None,
+                crate::state::notifications::ToastPlacement::BottomLeft,
+            );
+        }
+        SidebarMsg::CollectionsSectionToggled => {
+            state.sidebar.collections_collapsed = !state.sidebar.collections_collapsed;
+        }
+        SidebarMsg::EnvironmentsSectionToggled => {
+            state.sidebar.environments_collapsed = !state.sidebar.environments_collapsed;
+        }
+        SidebarMsg::EnvironmentOpened(id) => {
+            if super::examples::protect(state) {
+                return Task::none();
+            }
+            if !state.environments.iter().any(|env| env.id == id) {
+                return Task::none();
+            }
+            state.examples.editor = None;
+            state.sidebar.panel = crate::message::SidebarPanel::Collections;
+            state.sidebar.collapsed = false;
+            state.sidebar.environments_collapsed = false;
+            if state.sidebar.environment_page.as_deref() == Some(id.as_str())
+                && state.sidebar.env_editing.as_deref() == Some(id.as_str())
+            {
+                return Task::none();
+            }
+            state.sidebar.environment_page = Some(id.clone());
+            state.sidebar.env_editing = None;
+            state.sidebar.context_menu = None;
+            state.sidebar.search_open = false;
+            return handle(state, SidebarMsg::EnvironmentToggleEdit(id));
+        }
         SidebarMsg::ToggleCollapsed => {
             state.sidebar.search_open = false;
             state.sidebar.collapsed = !state.sidebar.collapsed;
@@ -38,11 +121,13 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             }
         }
         SidebarMsg::RequestOpened(req) => {
+            state.close_environment_workspace();
             state.sidebar.selected_request = Some(req.id.clone());
             let req = crate::app::drafts::effective_request(state, &req);
             state.tabs.open_request(&req);
         }
         SidebarMsg::HistoryEntryOpened(entry) => {
+            state.close_environment_workspace();
             state.tabs.open_request(&entry.request);
         }
         SidebarMsg::ClearHistory => {
@@ -65,22 +150,15 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             state.collections.push(col);
         }
         SidebarMsg::DeleteCollection(id) => {
-            let group_ids = crate::app::tree::groups_under(state, &id);
-            if let Some(db) = &state.db {
-                for gid in &group_ids {
-                    let _ = storage::delete_group(db, gid);
-                }
+            if !state.collections.iter().any(|c| c.id == id) {
+                return Task::none();
             }
-            if state.sidebar.context_menu.as_deref() == Some(&id) {
-                state.sidebar.context_menu = None;
-            }
-            state.groups.retain(|g| !group_ids.contains(&g.id));
-            state.collections.retain(|c| c.id != id);
-            state.requests.remove(&id);
-            if let Some(db) = &state.db {
-                let _ = storage::delete_collection(db, &id);
-            }
-            crate::app::drafts::mark_orphans(state);
+            state.sidebar.collection_delete_id = Some(id);
+            state.sidebar.collection_delete_text.clear();
+            state.sidebar.context_menu = None;
+            state.notification = None;
+            state.status_message = None;
+            return iced::widget::operation::focus("collection-delete-confirm");
         }
         SidebarMsg::DeleteRequest { id, collection_id } => {
             if let Some(reqs) = state.requests.get_mut(&collection_id) {
@@ -408,6 +486,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
                     .find(|r| r.id == id)
                     .cloned();
                 if let Some(req) = opened {
+                    state.close_environment_workspace();
                     let req = crate::app::drafts::effective_request(state, &req);
                     state.sidebar.selected_request = Some(req.id.clone());
                     state.sidebar.dragging_item = Some(id.clone());
@@ -471,7 +550,84 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
                 }
             }
         }
+        SidebarMsg::EnvironmentVariableHover(id, row, over) => {
+            if over {
+                state.sidebar.env_variable_hover = Some((id, row));
+            } else if state.sidebar.env_variable_hover.as_ref() == Some(&(id, row)) {
+                state.sidebar.env_variable_hover = None;
+            }
+        }
+        SidebarMsg::EnvironmentRenameStarted(id) => {
+            state.sidebar.context_menu = None;
+            let open = handle(state, SidebarMsg::EnvironmentOpened(id.clone()));
+            if state.sidebar.environment_page.as_deref() == Some(id.as_str()) {
+                return Task::batch([open, iced::widget::operation::focus("environment-name")]);
+            }
+            return open;
+        }
+        SidebarMsg::EnvironmentDuplicated(id) => {
+            state.sidebar.context_menu = None;
+            let Some(mut copy) = state.environments.iter().find(|e| e.id == id).cloned() else {
+                return Task::none();
+            };
+            copy.id = uuid::Uuid::new_v4().to_string();
+            copy.name = format!("{} Copy", copy.name);
+            copy.is_active = false;
+            let result = state
+                .db
+                .as_ref()
+                .ok_or("Local storage unavailable".to_owned())
+                .and_then(|db| storage::save_environment(db, &copy).map_err(|e| e.to_string()));
+            if let Err(error) = result {
+                state.status_message = Some(format!("Could not duplicate environment: {error}"));
+                return Task::none();
+            }
+            state.environments.push(copy);
+        }
+        SidebarMsg::EnvironmentExport(id) => {
+            state.sidebar.context_menu = None;
+            let Some(env) = state.environments.iter().find(|e| e.id == id).cloned() else {
+                return Task::none();
+            };
+            return Task::perform(
+                async move {
+                    let values: Vec<_> = env
+                        .variables
+                        .iter()
+                        .map(|(key, value)| {
+                            serde_json::json!({
+                                "key": key, "value": value, "type": "default", "enabled": true
+                            })
+                        })
+                        .collect();
+                    let json = serde_json::to_vec_pretty(&serde_json::json!({
+                    "id": env.id, "name": env.name, "values": values, "_postman_variable_scope": "environment"
+                })).map_err(|e| e.to_string())?;
+                    let Some(file) = rfd::AsyncFileDialog::new()
+                        .set_title("Export Postman Environment")
+                        .add_filter("JSON", &["json"])
+                        .set_file_name("environment.postman_environment.json")
+                        .save_file()
+                        .await
+                    else {
+                        return Ok(None);
+                    };
+                    tokio::fs::write(file.path(), json)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    Ok::<_, String>(Some(file.path().display().to_string()))
+                },
+                |result| match result {
+                    Ok(Some(path)) => Message::Import(crate::message::ImportMsg::ExportDone(path)),
+                    Ok(None) => Message::Sidebar(SidebarMsg::ContextMenuClosed),
+                    Err(error) => Message::Import(crate::message::ImportMsg::Error(error)),
+                },
+            );
+        }
         SidebarMsg::EnvironmentCreated => {
+            if super::examples::protect(state) {
+                return Task::none();
+            }
             let id = uuid::Uuid::new_v4().to_string();
             let env = AppEnvironment {
                 id: id.clone(),
@@ -483,8 +639,13 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
                 let _ = storage::save_environment(db, &env);
             }
             state.environments.push(env);
+            return handle(state, SidebarMsg::EnvironmentOpened(id));
         }
         SidebarMsg::EnvironmentSelected(id) => {
+            state.sidebar.context_menu = None;
+            if !id.is_empty() && !state.environments.iter().any(|e| e.id == id) {
+                return Task::none();
+            }
             for env in &mut state.environments {
                 env.is_active = env.id == id;
             }
@@ -495,6 +656,11 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             }
         }
         SidebarMsg::EnvironmentDeleted(id) => {
+            state.sidebar.context_menu = None;
+            if state.sidebar.environment_page.as_deref() == Some(id.as_str()) {
+                state.close_environment_workspace();
+                state.sidebar.env_edit_rows.clear();
+            }
             if state.sidebar.env_editing.as_deref() == Some(&id) {
                 state.sidebar.env_editing = None;
             }
@@ -504,8 +670,11 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             }
         }
         SidebarMsg::EnvironmentToggleEdit(id) => {
+            state.sidebar.env_variable_hover = None;
+            state.environment_cell = None;
             if state.sidebar.env_editing.as_deref() == Some(&id) {
                 state.sidebar.env_editing = None;
+                state.close_environment_workspace();
                 state.sidebar.env_edit_rows.clear();
             } else {
                 let mut rows: Vec<(String, String)> = state
@@ -520,6 +689,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
                     })
                     .unwrap_or_default();
                 rows.sort();
+                state.sidebar.environment_page = Some(id.clone());
                 state.sidebar.env_editing = Some(id);
                 state.sidebar.env_edit_rows = rows;
             }
@@ -541,6 +711,22 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             }
         }
         SidebarMsg::EnvironmentVarKeyChanged(env_id, idx, new_key) => {
+            if state
+                .environment_cell
+                .as_ref()
+                .is_some_and(|c| c.environment_id == env_id && c.row == idx && !c.value)
+            {
+                state.environment_cell = None;
+            }
+            if state.sidebar.env_editing.as_deref() != Some(env_id.as_str()) {
+                return Task::none();
+            }
+            if idx == state.sidebar.env_edit_rows.len() && !new_key.is_empty() {
+                state
+                    .sidebar
+                    .env_edit_rows
+                    .push((String::new(), String::new()));
+            }
             if let Some(row) = state.sidebar.env_edit_rows.get_mut(idx) {
                 let old_key = std::mem::replace(&mut row.0, new_key);
                 if let Some(env) = state.environments.iter_mut().find(|e| e.id == env_id) {
@@ -559,6 +745,22 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             }
         }
         SidebarMsg::EnvironmentVarValueChanged(env_id, idx, new_val) => {
+            if state
+                .environment_cell
+                .as_ref()
+                .is_some_and(|c| c.environment_id == env_id && c.row == idx && c.value)
+            {
+                state.environment_cell = None;
+            }
+            if state.sidebar.env_editing.as_deref() != Some(env_id.as_str()) {
+                return Task::none();
+            }
+            if idx == state.sidebar.env_edit_rows.len() && !new_val.is_empty() {
+                state
+                    .sidebar
+                    .env_edit_rows
+                    .push((String::new(), String::new()));
+            }
             if let Some(row) = state.sidebar.env_edit_rows.get_mut(idx) {
                 row.1 = new_val;
                 if let Some(env) = state.environments.iter_mut().find(|e| e.id == env_id) {
@@ -573,6 +775,17 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             }
         }
         SidebarMsg::EnvironmentVarRemoved(env_id, idx) => {
+            state.sidebar.env_variable_hover = None;
+            if state
+                .environment_cell
+                .as_ref()
+                .is_some_and(|c| c.environment_id == env_id)
+            {
+                state.environment_cell = None;
+            }
+            if state.sidebar.env_editing.as_deref() != Some(env_id.as_str()) {
+                return Task::none();
+            }
             if idx < state.sidebar.env_edit_rows.len() {
                 state.sidebar.env_edit_rows.remove(idx);
             }
@@ -833,7 +1046,7 @@ fn clone_name(name: &str, existing: &[String]) -> String {
         .expect("an unbounded range always yields a free name")
 }
 
-fn rebuild_env_vars(state: &mut AppState, env_id: &str) {
+pub(super) fn rebuild_env_vars(state: &mut AppState, env_id: &str) {
     let vars: std::collections::HashMap<String, String> = state
         .sidebar
         .env_edit_rows

@@ -91,6 +91,22 @@ pub fn braces() -> Text<'static> {
     glyph('\u{e36a}')
 } // braces
 
+/// Saved request/response example (Lucide file-code).
+pub fn example() -> Text<'static> {
+    glyph('\u{e0c3}')
+}
+
+pub fn check_circle() -> Text<'static> {
+    glyph('\u{e07c}')
+}
+
+pub fn panel_left_close() -> Text<'static> {
+    glyph('\u{e21c}')
+}
+pub fn panel_left_open() -> Text<'static> {
+    glyph('\u{e21d}')
+}
+
 // ── Tree / disclosure ─────────────────────────────────────────────────────────────
 pub fn chevron_down() -> Text<'static> {
     glyph('\u{e06d}')

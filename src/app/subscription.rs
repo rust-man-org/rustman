@@ -44,6 +44,9 @@ pub(crate) fn subscription(state: &AppState) -> Subscription<Message> {
         .collect();
 
     let mut all = vec![kbd];
+    if state.sidebar.collection_delete_id.is_some() {
+        all.push(event::listen_with(collection_delete_keys));
+    }
     if state.sidebar.search_open && !state.palette_open {
         all.push(event::listen_with(sidebar_search_keys));
     }
@@ -78,6 +81,22 @@ pub(crate) fn subscription(state: &AppState) -> Subscription<Message> {
     }
     all.extend(ws_subs);
     Subscription::batch(all)
+}
+
+fn collection_delete_keys(
+    event: Event,
+    _status: event::Status,
+    _window: window::Id,
+) -> Option<Message> {
+    match event {
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(keyboard::key::Named::Escape),
+            ..
+        }) => Some(Message::Sidebar(
+            crate::message::SidebarMsg::CollectionDeleteCancelled,
+        )),
+        _ => None,
+    }
 }
 
 /// Identity + inputs for a tab's WebSocket subscription. `Hash` drives subscription

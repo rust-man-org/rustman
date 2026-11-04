@@ -656,6 +656,11 @@ impl FormValueEditor {
         &self.editor
     }
 
+    pub fn sync_theme(&mut self) {
+        self.editor
+            .set_theme(crate::ui::theme::Palette::code_editor_style());
+    }
+
     /// Forward an editor event, writing content edits back into the field
     /// value. Returns the editor's task and whether the value changed.
     ///

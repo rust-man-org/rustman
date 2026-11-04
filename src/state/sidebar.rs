@@ -36,6 +36,10 @@ pub fn collection_rename_input_id(collection_id: &str) -> iced::widget::Id {
 
 #[derive(Debug, Clone)]
 pub struct SidebarState {
+    pub collection_delete_id: Option<String>,
+    pub collection_delete_text: String,
+    pub collections_collapsed: bool,
+    pub environments_collapsed: bool,
     pub panel: SidebarPanel,
     pub expanded: std::collections::HashSet<String>,
     pub selected_request: Option<String>,
@@ -53,7 +57,10 @@ pub struct SidebarState {
     /// on every keystroke, so Escape-cancel has to write this back.
     pub rename_backup: Option<RenameBackup>,
     pub env_editing: Option<String>,
+    /// Environment shown in the main workspace; the sidebar tree stays visible.
+    pub environment_page: Option<String>,
     pub env_edit_rows: Vec<(String, String)>,
+    pub env_variable_hover: Option<(String, usize)>,
     pub collapsed: bool,
     /// Collection tree search box text (not persisted).
     pub filter: String,
@@ -68,6 +75,10 @@ pub struct SidebarState {
 impl Default for SidebarState {
     fn default() -> Self {
         Self {
+            collection_delete_id: None,
+            collection_delete_text: String::new(),
+            collections_collapsed: false,
+            environments_collapsed: false,
             panel: SidebarPanel::Collections,
             expanded: std::collections::HashSet::new(),
             selected_request: None,
@@ -79,7 +90,9 @@ impl Default for SidebarState {
             last_press: None,
             rename_backup: None,
             env_editing: None,
+            environment_page: None,
             env_edit_rows: Vec::new(),
+            env_variable_hover: None,
             collapsed: false,
             filter: String::new(),
             search_open: false,

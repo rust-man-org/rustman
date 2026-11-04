@@ -172,6 +172,9 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
     let git_identity = crate::services::vcs::resolve_identity(&data_dir.join("collections"));
 
     let state = AppState {
+        environment_cell: None,
+        console_open: false,
+        notification: None,
         examples: {
             let mut examples = crate::state::examples::ExamplesState::default();
             if let Some(db) = &db {

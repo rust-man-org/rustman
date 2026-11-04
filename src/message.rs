@@ -95,8 +95,30 @@ pub enum SidebarMsg {
     CancelRename,
     HistoryEntryOpened(HistoryEntry),
     ClearHistory,
+    CollectionsSectionToggled,
+    CollectionDeleteTextChanged(String),
+    CollectionDeleteCancelled,
+    CollectionDeleteConfirmed,
+    EnvironmentsSectionToggled,
+    EnvironmentOpened(String),
+    EnvironmentPageClosed,
+    EnvironmentCellOpened {
+        environment_id: String,
+        row: usize,
+        value: bool,
+    },
+    EnvironmentCellEdited {
+        token: String,
+        message: iced_code_editor::Message,
+    },
+    EnvironmentCellPageChanged(bool),
+    EnvironmentCellClosed,
     EnvironmentSelected(String),
     EnvironmentCreated,
+    EnvironmentRenameStarted(String),
+    EnvironmentDuplicated(String),
+    EnvironmentExport(String),
+    EnvironmentVariableHover(String, usize, bool),
     EnvironmentDeleted(String),
     EnvironmentToggleEdit(String),
     EnvironmentNameChanged(String, String),
@@ -410,6 +432,7 @@ pub enum ImportMsg {
 
 #[derive(Debug, Clone)]
 pub enum LayoutMsg {
+    ConsoleToggled,
     ZoomIn,
     ZoomOut,
     ZoomReset,
@@ -420,6 +443,8 @@ pub enum LayoutMsg {
 
 #[derive(Debug, Clone)]
 pub enum AppMsg {
+    OpenTerminal,
+    ToastDismissed(String),
     HttpResponse {
         generation: u64,
         result: HttpResult,

@@ -9,6 +9,9 @@ pub(super) fn handle(state: &mut AppState, msg: SettingsMsg) -> Task<Message> {
         SettingsMsg::ThemeChanged(idx) => {
             state.theme_idx = idx;
             crate::ui::theme::Palette::set_theme_idx(idx);
+            if let Some(cell) = &mut state.environment_cell {
+                cell.editor.sync_theme();
+            }
             for tab in &mut state.tabs.tabs {
                 tab.sync_editor_themes();
             }

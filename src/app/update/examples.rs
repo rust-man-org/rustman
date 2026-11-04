@@ -63,6 +63,7 @@ fn open(state: &mut AppState, data: RequestExample) -> Result<(), String> {
         return Err("Example bodies are limited to 256 KiB each.".into());
     }
     state.examples.expanded.insert(data.request_id.clone());
+    state.close_environment_workspace();
     state.sidebar.selected_request = Some(data.request_id.clone());
     state.examples.editor = Some(ExampleEditor::new(data));
     state.sidebar.context_menu = None;

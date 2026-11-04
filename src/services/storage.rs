@@ -130,17 +130,19 @@ pub fn update_collection(conn: &Connection, id: &str, name: &str) -> Result<(), 
 }
 
 pub fn delete_collection(conn: &Connection, id: &str) -> Result<(), String> {
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     // Cascade: the collection's requests and every group underneath it go
     // with it. (Requests used to be orphaned here; groups are new.)
-    conn.execute("DELETE FROM requests WHERE collection_id=?1", params![id])
+    tx.execute("DELETE FROM requests WHERE collection_id=?1", params![id])
         .map_err(|e| e.to_string())?;
-    let groups = get_groups(conn).unwrap_or_default();
+    let groups = get_groups(&tx)?;
     for g in descendant_groups(&groups, id, true) {
-        let _ = conn.execute("DELETE FROM groups WHERE id=?1", params![g]);
+        tx.execute("DELETE FROM groups WHERE id=?1", params![g])
+            .map_err(|e| e.to_string())?;
     }
-    conn.execute("DELETE FROM collections WHERE id=?1", params![id])
+    tx.execute("DELETE FROM collections WHERE id=?1", params![id])
         .map_err(|e| e.to_string())?;
-    Ok(())
+    tx.commit().map_err(|e| e.to_string())
 }
 
 /// All groups transitively under `parent_id`, ordered parents-first so a
@@ -478,11 +480,18 @@ pub fn delete_request(conn: &Connection, id: &str) -> Result<(), String> {
 /// examples must survive a pull or an idempotent import with the same IDs.
 pub fn replace_collection_contents(
     conn: &Connection,
-    collection_id: &str,
+    collection: &Collection,
     groups: &[Group],
     requests: &[SavedRequest],
 ) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let collection_id = &collection.id;
+    tx.execute(
+        "INSERT INTO collections (id,name,created_at) VALUES (?1,?2,?3)
+        ON CONFLICT(id) DO UPDATE SET name=excluded.name",
+        params![collection.id, collection.name, collection.created_at],
+    )
+    .map_err(|e| e.to_string())?;
     let old_requests = get_requests(&tx, collection_id)?;
     let old_groups = get_groups(&tx)?;
     for id in descendant_groups(&old_groups, collection_id, true) {

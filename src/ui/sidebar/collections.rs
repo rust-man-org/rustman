@@ -6,7 +6,7 @@
 
 use iced::{
     Element, Length, Padding,
-    widget::{column, container, mouse_area, row, scrollable, text, text_input},
+    widget::{Space, button, column, container, mouse_area, row, scrollable, text, text_input},
 };
 
 use super::tree::TreeIndex;
@@ -26,14 +26,15 @@ use crate::{
         icons,
         theme::{MONO, Palette, TEXT_XS, UI_FONT_MEDIUM},
         tree_label::{tree_label_styled, tree_label_weighted},
-        widgets::{kv_table, popup::popup},
+        widgets::popup::popup,
     },
 };
 
 /// Horizontal padding of the tree body (mockup `.tree{padding:4px 6px 12px}`).
 const TREE_PAD_X: f32 = 6.0;
 /// Left padding of the section label and collection rows (aligned).
-const SECTION_INDENT: f32 = 8.0;
+/// Mockup `.wf-heading`: 10px either side of the section label.
+const SECTION_INDENT: f32 = 10.0;
 const BASE_INDENT: f32 = 8.0;
 /// Each nesting level: folder rows sit at 22px under a collection.
 const STEP: f32 = 14.0;
@@ -85,75 +86,114 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
 }
 
 fn panel(state: &AppState) -> Element<'_, Message> {
-    let mut col = column![top_bar(state)].spacing(0);
-
-    // Local drafts (01): the Drafts view is a flat list.
-    if state.drafts.only_drafts {
-        return column![
-            col,
-            scrollable(super::drafts::list(state))
-                .height(Length::Fill)
-                .style(crate::ui::theme::thin_scrollbar),
-        ]
-        .into();
+    let header = container(section_header(
+        "Collections",
+        state.sidebar.collections_collapsed,
+        SidebarMsg::CollectionsSectionToggled,
+    ))
+    .padding(Padding {
+        top: 10.0,
+        right: TREE_PAD_X,
+        bottom: 2.0,
+        left: TREE_PAD_X,
+    });
+    let mut tree = column![].spacing(0);
+    if !state.sidebar.collections_collapsed {
+        if state.drafts.only_drafts {
+            tree = tree.push(super::drafts::list(state));
+        } else if state.collections.is_empty() {
+            tree = tree.push(empty_state("No collections yet. Click + to create one.", 0));
+        } else {
+            let all: Vec<&SavedRequest> = state.requests.values().flatten().collect();
+            let index = TreeIndex::build(&state.collections, &state.groups, &all, "");
+            let mut any = false;
+            for collection in state.collections.iter().filter(|c| index.shows(&c.id)) {
+                any = true;
+                tree = tree.push(collection_view(state, &index, collection));
+            }
+            if !any {
+                tree = tree.push(empty_state("No requests or folders match.", 0));
+            }
+        }
     }
-
-    if state.collections.is_empty() {
-        return col
-            .push(kv_table::empty_state(
-                "No collections yet.\nClick + to create one.",
-            ))
-            .height(Length::Fill)
-            .into();
-    }
-
-    let all: Vec<&SavedRequest> = state.requests.values().flatten().collect();
-    let index = TreeIndex::build(&state.collections, &state.groups, &all, "");
-
-    let mut tree = column![section_header("Collections")].spacing(0);
-    let mut any = false;
-    for collection in state.collections.iter().filter(|c| index.shows(&c.id)) {
-        any = true;
-        tree = tree.push(collection_view(state, &index, collection));
-    }
-    if !any {
-        tree = tree.push(empty_state("No requests or folders match.", 0));
-    }
-    col = col.push(container(tree).padding(Padding {
-        top: 4.0,
+    let tree = container(tree).padding(Padding {
+        top: 0.0,
         right: TREE_PAD_X,
         bottom: 12.0,
         left: TREE_PAD_X,
-    }));
+    });
+    let environments = container(super::environment_list::view(state)).padding(Padding {
+        left: TREE_PAD_X,
+        right: TREE_PAD_X,
+        bottom: 12.0,
+        ..Padding::ZERO
+    });
+    let body = if state.sidebar.collections_collapsed {
+        None
+    } else {
+        Some(
+            scrollable(tree)
+                .height(Length::Fill)
+                .direction(iced::widget::scrollable::Direction::Vertical(
+                    crate::ui::theme::grabbable_scrollbar(),
+                ))
+                .style(crate::ui::theme::thin_scrollbar)
+                .into(),
+        )
+    };
+    let sections = crate::ui::components::molecules::sidebar_sections(
+        header.into(),
+        body,
+        environments.into(),
+    );
 
     // Releasing the mouse anywhere over the tree ends any running drag.
     mouse_area(
-        scrollable(col)
-            .height(Length::Fill)
-            .direction(iced::widget::scrollable::Direction::Vertical(
-                crate::ui::theme::grabbable_scrollbar(),
-            ))
-            .style(crate::ui::theme::thin_scrollbar),
+        column![top_bar(state), sections]
+            .spacing(0)
+            .height(Length::Fill),
     )
     .on_release(Message::Sidebar(SidebarMsg::ItemDragEnd))
     .into()
 }
 
 /// Mockup `.side-section`: the `COLLECTIONS` label above the tree.
-fn section_header(label: &str) -> Element<'static, Message> {
-    container(
-        row![
-            icons::chevron_down().size(10).color(Palette::text_subtle()),
-            text(label.to_uppercase())
-                .size(11)
-                .font(UI_FONT_MEDIUM)
+pub(super) fn section_header(
+    label: &str,
+    collapsed: bool,
+    message: SidebarMsg,
+) -> Element<'static, Message> {
+    // A fixed-height button top-aligns its content; center the label in the
+    // 24px hover band explicitly (mockup `.wf-heading`: align-items center).
+    button(
+        container(
+            row![
+                (if collapsed {
+                    icons::chevron_right()
+                } else {
+                    icons::chevron_down()
+                })
+                .size(10)
                 .color(Palette::text_muted()),
-        ]
-        .spacing(6)
-        .align_y(iced::Alignment::Center),
+                text(label.to_uppercase())
+                    .size(10)
+                    .font(UI_FONT_MEDIUM)
+                    .color(Palette::text_muted()),
+            ]
+            .spacing(6)
+            .align_y(iced::Alignment::Center),
+        )
+        .center_y(Length::Fill),
     )
-    .height(28)
-    .center_y(28)
+    .on_press(Message::Sidebar(message))
+    .height(24)
+    .width(Length::Fill)
+    .style(|_, status| button::Style {
+        background: matches!(status, button::Status::Hovered | button::Status::Pressed)
+            .then(|| Palette::hover().into()),
+        text_color: Palette::text(),
+        ..Default::default()
+    })
     .padding(Padding {
         top: 0.0,
         right: 8.0,
@@ -469,7 +509,20 @@ fn request_view<'a>(
     req: &'a SavedRequest,
     depth: usize,
 ) -> Element<'a, Message> {
-    let selected = state.sidebar.selected_request.as_deref() == Some(req.id.as_str());
+    let selected = state.examples.editor.is_none()
+        && state.sidebar.environment_page.is_none()
+        && state.sidebar.selected_request.as_deref() == Some(req.id.as_str());
+    let active_parent = state
+        .examples
+        .editor
+        .as_ref()
+        .is_some_and(|e| e.data.request_id == req.id);
+    let examples = state
+        .examples
+        .items
+        .get(&req.id)
+        .filter(|items| !items.is_empty());
+    let expanded = state.examples.expanded.contains(&req.id);
     let dragging = state.sidebar.dragging_item.as_deref() == Some(req.id.as_str());
     let renaming = state.sidebar.req_renaming.as_deref() == Some(req.id.as_str());
     let menu_open = state.sidebar.context_menu.as_deref() == Some(req.id.as_str());
@@ -510,7 +563,7 @@ fn request_view<'a>(
             - actions_w;
         // Mockup `.req-row`: names are secondary text; the selected one
         // reads as primary, medium weight, on the accent tint.
-        let name = if selected {
+        let name = if selected || active_parent {
             tree_label_weighted(
                 req.name.clone(),
                 12.0,
@@ -521,7 +574,26 @@ fn request_view<'a>(
         } else {
             tree_label_styled(req.name.clone(), 12.0, avail, None, Palette::text_muted())
         };
+        let disclosure: Element<Message> = if examples.is_some() {
+            compact_icon_button(
+                if expanded {
+                    icons::chevron_down()
+                } else {
+                    icons::chevron_right()
+                },
+                if expanded {
+                    "Collapse examples"
+                } else {
+                    "Expand examples"
+                },
+                Message::Example(crate::message::example::ExampleMsg::Toggle(req.id.clone())),
+                16.0,
+            )
+        } else {
+            Space::new().width(16).into()
+        };
         let content = row![
+            disclosure,
             container(
                 text(method_label(req.method.as_str()))
                     .size(TEXT_XS)
@@ -535,15 +607,17 @@ fn request_view<'a>(
         .push(actions)
         .spacing(7)
         .align_y(iced::Alignment::Center);
+        // Updated mockup (frames 32/33): the active row is a neutral square
+        // band, the same as the selected example and environment rows.
         let fill = if selected {
-            RowFill::Selected
+            RowFill::NeutralSelected
         } else {
             drag_fill(dragging || state.sidebar.hovered_row.as_deref() == Some(req.id.as_str()))
         };
         draggable(
             tree_row(
                 content,
-                indent,
+                (indent - 23.0).max(0.0),
                 ROW_H,
                 fill,
                 Message::Sidebar(SidebarMsg::ItemDragStart(req.id.clone())),
@@ -561,32 +635,10 @@ fn request_view<'a>(
     } else {
         row_el
     };
-    let Some(examples) = state
-        .examples
-        .items
-        .get(&req.id)
-        .filter(|items| !items.is_empty())
-    else {
+    let Some(examples) = examples else {
         return row_el;
     };
-    let expanded = state.examples.expanded.contains(&req.id);
-    let toggle = crate::ui::components::atoms::Button::new(format!(
-        "{} {} example{}",
-        if expanded { "▾" } else { "▸" },
-        examples.len(),
-        if examples.len() == 1 { "" } else { "s" },
-    ))
-    .ghost()
-    .on_press(Message::Example(
-        crate::message::example::ExampleMsg::Toggle(req.id.clone()),
-    ));
-    let mut children = column![
-        row_el,
-        container(toggle).padding(Padding {
-            left: indent + METHOD_W,
-            ..Padding::ZERO
-        })
-    ];
+    let mut children = column![row_el];
     if expanded {
         for example in examples {
             let selected = state
@@ -594,32 +646,25 @@ fn request_view<'a>(
                 .editor
                 .as_ref()
                 .is_some_and(|e| e.data.id == example.id);
-            let label = tree_label_styled(
+            let label = tree_label_weighted(
                 example.name.clone(),
-                11.0,
-                (state.sidebar_width - indent - 65.0).max(45.0),
-                None,
-                if selected {
-                    Palette::text()
-                } else {
-                    Palette::text_muted()
-                },
+                12.0,
+                (state.sidebar_width - 2.0 * TREE_PAD_X - indent - METHOD_W - 20.0).max(45.0),
+                UI_FONT_MEDIUM,
+                Palette::text(),
             );
             let content = row![
+                icons::example().size(12).color(Palette::text_muted()),
                 label,
-                text(example.response.status.to_string())
-                    .size(10)
-                    .font(MONO)
-                    .color(Palette::text_muted())
             ]
-            .spacing(8)
+            .spacing(6)
             .align_y(iced::Alignment::Center);
             children = children.push(tree_row(
                 content,
-                indent + 24.0,
-                ROW_H,
+                indent + METHOD_W - 8.0,
+                24.0,
                 if selected {
-                    RowFill::Selected
+                    RowFill::NeutralSelected
                 } else {
                     RowFill::None
                 },

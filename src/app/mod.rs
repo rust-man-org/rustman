@@ -17,6 +17,7 @@ use crate::{
 
 mod boot;
 mod drafts;
+pub(crate) mod notifications;
 mod request_ops;
 mod sample;
 mod scripting;
@@ -26,6 +27,9 @@ mod tree;
 mod update;
 
 pub struct AppState {
+    pub environment_cell: Option<crate::state::environment_cell::EnvironmentCellEditor>,
+    pub console_open: bool,
+    pub notification: Option<crate::state::notifications::Toast>,
     pub examples: crate::state::examples::ExamplesState,
     pub tabs: TabManager,
     pub sidebar: SidebarState,
@@ -157,6 +161,13 @@ pub enum UpdateState {
 }
 
 impl AppState {
+    pub(crate) fn close_environment_workspace(&mut self) {
+        self.sidebar.env_variable_hover = None;
+        self.sidebar.environment_page = None;
+        self.environment_cell = None;
+        self.sidebar.env_editing = None;
+        self.sidebar.env_edit_rows.clear();
+    }
     pub(crate) fn active_env(&self) -> Option<&AppEnvironment> {
         self.environments.iter().find(|e| e.is_active)
     }
@@ -204,6 +215,12 @@ impl AppState {
         // which the user can't even see right now.
         if self.global_scripts_modal_open {
             return true;
+        }
+        if self.sidebar.environment_page.is_some() {
+            return self
+                .environment_cell
+                .as_ref()
+                .is_some_and(|cell| cell.editor.editor().has_keyboard_focus());
         }
 
         if let Some(editor) = &self.examples.editor {
