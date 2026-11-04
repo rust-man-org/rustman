@@ -427,7 +427,14 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
         SidebarMsg::ContextMenuClosed => {
             state.sidebar.context_menu = None;
         }
+        SidebarMsg::RowHoverEnd(id) => {
+            if state.sidebar.hovered_row.as_deref() == Some(id.as_str()) {
+                state.sidebar.hovered_row = None;
+            }
+        }
         SidebarMsg::ItemDragOver(id) => {
+            // Entering a row also marks it hovered (inline row actions).
+            state.sidebar.hovered_row = Some(id.clone());
             let Some(from) = state.sidebar.dragging_item.clone() else {
                 return Task::none();
             };

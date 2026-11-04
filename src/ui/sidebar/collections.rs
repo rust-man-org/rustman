@@ -1,7 +1,7 @@
 //! Collections panel, laid out like Postman's sidebar so it feels familiar:
 //! filter box + `+` / import / `⋯` on top, a COLLECTIONS section, then the
-//! collection → folder → request tree. Rows carry no inline buttons; adding,
-//! renaming, duplicating and deleting live in the `+` and right-click menus.
+//! collection → folder → request tree. Hovering a row shows `+` / `⋯`
+//! (Postman); the same actions are in the `+` and right-click menus.
 
 use iced::{
     Element, Length, Padding,
@@ -16,20 +16,20 @@ use crate::{
     message::{ImportMsg, Message, RequestMsg, SidebarMsg},
     ui::{
         components::{
-            atoms::{icon_button, search_input, text as t},
+            atoms::{icon_button, row_action, search_input, text as t},
             molecules::{
-                menu, menu_divider, menu_item, tree_row, tree_row::COLLECTION_ROW_H,
+                menu, menu_divider, menu_item, tree_row,
                 tree_row::ROW_H,
             },
         },
         icons,
         theme::{MONO, Palette, TEXT_XS},
-        tree_label::{tree_label, tree_label_styled},
+        tree_label::tree_label,
         widgets::kv_table,
     },
 };
 
-/// Tree body padding (mockup `.tree{padding:8px 6px 12px}`).
+/// Horizontal padding of the tree body.
 const TREE_PAD_X: f32 = 6.0;
 /// Left padding of the `COLLECTIONS` section label.
 const SECTION_INDENT: f32 = 8.0;
@@ -40,8 +40,7 @@ const STEP: f32 = 14.0;
 /// Requests sit a little right of folders so the method lines up under
 /// the folder name rather than its chevron.
 const REQ_EXTRA: f32 = 6.0;
-const METHOD_W: f32 = 34.0;
-const COUNT_W: f32 = 28.0;
+const METHOD_W: f32 = 30.0;
 
 fn folder_indent(depth: usize) -> f32 {
     BASE_INDENT + STEP * depth as f32
@@ -250,13 +249,26 @@ fn collection_view<'a>(
             BASE_INDENT,
         )
     } else {
-        // Label room: sidebar minus tree padding, row padding, chevron and count.
-        let avail = state.sidebar_width - 2.0 * TREE_PAD_X - BASE_INDENT - 8.0 - 16.0 - COUNT_W;
+        let (actions, actions_w) = row_actions(
+            state,
+            &collection.id,
+            Some(Message::Sidebar(SidebarMsg::NewRequestIn {
+                parent_id: collection.id.clone(),
+                parent_is_collection: true,
+            })),
+        );
+        // Label room: sidebar minus tree padding, row padding, chevron, actions.
+        let avail = state.sidebar_width
+            - 2.0 * TREE_PAD_X
+            - BASE_INDENT
+            - 8.0
+            - 16.0
+            - actions_w;
         let content = row![
             chevron(expanded, 10.0),
             tree_label(collection.name.clone(), 12.0, avail),
-            count(index.count(&collection.id)),
         ]
+        .push(actions)
         .spacing(6)
         .align_y(iced::Alignment::Center);
         // Press both opens the folder and begins tracking for reorder —
@@ -267,7 +279,7 @@ fn collection_view<'a>(
             tree_row(
                 content,
                 BASE_INDENT,
-                COLLECTION_ROW_H,
+                ROW_H,
                 dragging,
                 Message::Sidebar(SidebarMsg::ItemDragStart(collection.id.clone())),
             ),
@@ -371,12 +383,25 @@ fn group_view<'a>(
             indent,
         )
     } else {
-        let avail = state.sidebar_width - 2.0 * TREE_PAD_X - indent - 8.0 - 15.0 - COUNT_W;
+        let (actions, actions_w) = row_actions(
+            state,
+            &group.id,
+            Some(Message::Sidebar(SidebarMsg::NewRequestIn {
+                parent_id: group.id.clone(),
+                parent_is_collection: false,
+            })),
+        );
+        let avail = state.sidebar_width
+            - 2.0 * TREE_PAD_X
+            - indent
+            - 8.0
+            - 15.0
+            - actions_w;
         let content = row![
             chevron(expanded, 9.0),
             tree_label(group.name.clone(), 12.0, avail),
-            count(index.count(&group.id)),
         ]
+        .push(actions)
         .spacing(6)
         .align_y(iced::Alignment::Center);
         draggable(
@@ -436,30 +461,32 @@ fn request_view<'a>(
     } else {
         let mark = super::drafts::mark_for(state, &req.id);
         let mark_w = if mark.is_some() {
-            super::drafts::MARK_WIDTH + 7.0
+            super::drafts::MARK_WIDTH + 6.0
         } else {
             0.0
         };
-        let avail =
-            state.sidebar_width - 2.0 * TREE_PAD_X - indent - 8.0 - METHOD_W - 7.0 - mark_w;
-        // Mockup: names are secondary text; the selected one reads as primary.
-        let name_color = if selected {
-            Palette::text()
-        } else {
-            Palette::text_muted()
-        };
+        let (actions, actions_w) = row_actions(state, &req.id, None);
+        let avail = state.sidebar_width
+            - 2.0 * TREE_PAD_X
+            - indent
+            - 8.0
+            - METHOD_W
+            - 6.0
+            - mark_w
+            - actions_w;
         let content = row![
             container(
-                text(req.method.as_str())
-                    .size(TEXT_XS)
+                text(method_label(req.method.as_str()))
+                    .size(9)
                     .font(MONO)
                     .color(super::drafts::method_color(req.method.as_str())),
             )
             .width(METHOD_W),
-            tree_label_styled(req.name.clone(), 12.0, avail, None, name_color),
+            tree_label(req.name.clone(), 12.0, avail),
         ]
         .push(mark)
-        .spacing(7)
+        .push(actions)
+        .spacing(6)
         .align_y(iced::Alignment::Center);
         draggable(
             tree_row(
@@ -483,13 +510,53 @@ fn request_view<'a>(
     }
 }
 
-/// Every tree row: hovering during a drag reorders onto it, right-click
-/// toggles its menu.
+/// Every tree row: entering marks it hovered (and reorders onto it during a
+/// drag), leaving clears that, right-click toggles its menu.
 fn draggable<'a>(row_el: Element<'a, Message>, id: &str) -> Element<'a, Message> {
     mouse_area(row_el)
         .on_enter(Message::Sidebar(SidebarMsg::ItemDragOver(id.to_owned())))
+        .on_exit(Message::Sidebar(SidebarMsg::RowHoverEnd(id.to_owned())))
         .on_right_press(Message::Sidebar(SidebarMsg::ContextMenuOpened(id.to_owned())))
         .into()
+}
+
+const ACTION_W: f32 = 22.0;
+
+/// Postman's inline row actions, shown while the row is hovered or its
+/// menu is open: optional `+` (add request), then `⋯` (the row's menu).
+/// Returns the element and the width it takes from the label.
+fn row_actions<'a>(
+    state: &AppState,
+    id: &str,
+    add: Option<Message>,
+) -> (Option<Element<'a, Message>>, f32) {
+    let active = state.sidebar.hovered_row.as_deref() == Some(id)
+        || state.sidebar.context_menu.as_deref() == Some(id);
+    if !active || state.sidebar.dragging_item.is_some() {
+        return (None, 0.0);
+    }
+    let mut actions = row![].spacing(2).align_y(iced::Alignment::Center);
+    let mut n = 1.0;
+    if let Some(msg) = add {
+        actions = actions.push(row_action(icons::plus(), "Add request", msg));
+        n += 1.0;
+    }
+    actions = actions.push(row_action(
+        icons::more(),
+        "More actions",
+        Message::Sidebar(SidebarMsg::ContextMenuOpened(id.to_owned())),
+    ));
+    // Each button plus the spacing in front of the group.
+    (Some(actions.into()), n * (ACTION_W + 2.0) + 6.0)
+}
+
+/// Postman shortens the long verbs so names line up.
+fn method_label(method: &str) -> &str {
+    match method {
+        "DELETE" => "DEL",
+        "OPTIONS" => "OPT",
+        other => other,
+    }
 }
 
 fn rename_input<'a>(
@@ -515,19 +582,6 @@ fn chevron(expanded: bool, size: f32) -> Element<'static, Message> {
     container(icon.size(size).color(Palette::text_subtle()))
         .width(10)
         .into()
-}
-
-/// Mockup `.count` / `.f-mini`: request total, right-aligned.
-fn count(n: usize) -> Element<'static, Message> {
-    container(
-        text(n.to_string())
-            .size(TEXT_XS)
-            .font(MONO)
-            .color(Palette::text_subtle()),
-    )
-    .width(COUNT_W)
-    .align_x(iced::alignment::Horizontal::Right)
-    .into()
 }
 
 fn empty_state<'a>(label: &'static str, depth: usize) -> Element<'a, Message> {

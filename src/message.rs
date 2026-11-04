@@ -105,6 +105,8 @@ pub enum SidebarMsg {
     ToggleCollapsed,
     /// Collection tree search box.
     FilterChanged(String),
+    /// Cursor left a tree row (entering one is `ItemDragOver`).
+    RowHoverEnd(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

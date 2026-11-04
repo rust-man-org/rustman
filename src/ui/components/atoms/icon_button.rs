@@ -34,3 +34,37 @@ pub fn icon_button<'a, M: Clone + 'a>(
     });
     tooltip(btn, label)
 }
+
+/// Compact 22×22 icon button for inline row actions (tree rows on hover).
+pub fn row_action<'a, M: Clone + 'a>(
+    icon: Text<'static>,
+    label: impl Into<String>,
+    msg: M,
+) -> Element<'a, M> {
+    let icon: Element<'a, M> = icon.size(13).color(Palette::text_muted()).into();
+    let btn = button(
+        container(icon)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill),
+    )
+    .on_press(msg)
+    .width(22)
+    .height(22)
+    .padding(0)
+    .style(|_t, s| button::Style {
+        // Sits on an already-hovered row: tint relative to the text color
+        // so it reads as one step stronger in both themes.
+        background: matches!(s, button::Status::Hovered).then(|| {
+            Background::Color(iced::Color {
+                a: 0.10,
+                ..Palette::text()
+            })
+        }),
+        border: Border {
+            radius: 4.0.into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    tooltip(btn, label)
+}

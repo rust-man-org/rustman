@@ -1,6 +1,6 @@
-//! Tree row molecule (mockup `.col-row` / `.folder-row` / `.req-row`): a
-//! fixed-height, indented, full-width pressable row. Hover fills it,
-//! selection tints it with the accent; no borders, so rows never shift.
+//! Tree row molecule: a fixed-height, indented, full-width pressable row
+//! (Postman-style). Hover and selection share one neutral fill; no
+//! borders, so rows never shift.
 
 use iced::{
     Background, Border, Element, Length, Padding,
@@ -9,9 +9,8 @@ use iced::{
 
 use crate::ui::theme::Palette;
 
-/// Collection rows are a touch taller than folder and request rows.
-pub const COLLECTION_ROW_H: f32 = 30.0;
-pub const ROW_H: f32 = 28.0;
+/// Postman's compact tree rhythm.
+pub const ROW_H: f32 = 26.0;
 
 pub fn tree_row<'a, M: Clone + 'a>(
     content: impl Into<Element<'a, M>>,
@@ -32,13 +31,9 @@ pub fn tree_row<'a, M: Clone + 'a>(
             left: indent,
         })
         .style(move |_t, status| button::Style {
-            background: if selected {
-                Some(Background::Color(Palette::accent_soft()))
-            } else if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-                Some(Background::Color(Palette::hover()))
-            } else {
-                None
-            },
+            background: (selected
+                || matches!(status, button::Status::Hovered | button::Status::Pressed))
+            .then(|| Background::Color(Palette::hover())),
             text_color: Palette::text(),
             border: Border {
                 radius: 4.0.into(),
