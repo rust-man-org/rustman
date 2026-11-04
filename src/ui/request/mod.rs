@@ -2,6 +2,7 @@ pub mod auth;
 pub mod body;
 pub mod cell;
 pub mod draft_banner;
+pub mod header;
 pub mod headers;
 pub mod meta_bar;
 pub mod params;

@@ -218,7 +218,18 @@ fn icon_btn(
 fn main_area(state: &AppState) -> Element<'_, Message> {
     let active_tab = state.tabs.active_tab();
     let active_env = state.environments.iter().find(|e| e.is_active);
-    let url_bar = request::url_bar::view(active_tab, active_env);
+    // Mockup `.req-bar`: breadcrumb/name/actions row above the URL row.
+    let url_bar: Element<Message> = container(
+        column![
+            request::header::view(state),
+            request::url_bar::view(active_tab, active_env)
+        ]
+        .spacing(8),
+    )
+    .padding([10, 16])
+    .width(Length::Fill)
+    .style(surface_content_style)
+    .into();
     let req_tabs = request::tabs::view(active_tab);
 
     let req_body: Element<Message> = match active_tab.active_request_tab {

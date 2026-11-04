@@ -3,7 +3,7 @@
 
 use iced::{
     Alignment, Background, Border, Element, Length,
-    widget::{Space, button, row, text},
+    widget::{Space, button, container, row, text},
 };
 
 use crate::ui::{
@@ -28,7 +28,8 @@ pub fn search_field<'a, M: Clone + 'a>(
     if let Some(keys) = shortcut {
         content = content.push(text(keys).size(TEXT_XS).font(MONO).color(Palette::text_subtle()));
     }
-    button(content)
+    // A fixed-height button top-aligns its content; center it explicitly.
+    button(container(content).center_y(Length::Fill))
         .on_press(msg)
         .width(width)
         .height(32)

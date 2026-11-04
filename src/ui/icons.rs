@@ -58,9 +58,6 @@ pub fn folder_plus() -> Text<'static> {
 pub fn send() -> Text<'static> {
     glyph('\u{e152}')
 } // send
-pub fn curl() -> Text<'static> {
-    glyph('\u{e245}')
-}
 pub fn eye() -> Text<'static> {
     glyph('\u{e0ba}')
 }
