@@ -1,12 +1,12 @@
 //! Right "Code snippet" panel (mockup `rustman-requester-snippet.html`,
 //! `.rightbar`): the active request as code in the chosen language, with
-//! line numbers and green strings. Hide from its header or the footer; a 26px strip on
-//! the right edge (`.rb-reopen`) brings it back. The left edge drags to
+//! line numbers and green strings. Hide from its header or the footer:
+//! it closes flush, and the footer toggle brings it back. The left edge drags to
 //! resize. The text is `AppState::snippet`, cached and secret-masked.
 
 use iced::{
     Alignment, Background, Border, Element, Length,
-    widget::{Space, button, column, container, pick_list, rich_text, row, scrollable, span, text},
+    widget::{Space, column, container, pick_list, rich_text, row, scrollable, span, text},
 };
 
 use crate::{
@@ -20,13 +20,9 @@ use crate::{
     },
 };
 
-/// `.rb-reopen`: the strip shown while the panel is hidden.
-const REOPEN_W: f32 = 26.0;
-
+/// Only called while the panel is shown: hidden, it closes flush (no edge
+/// strip) and comes back from the footer toggle.
 pub fn view(state: &AppState) -> Element<'_, Message> {
-    if !state.snippet_open {
-        return reopen_strip();
-    }
     let width = state
         .snippet_width
         .clamp(crate::app::snippet::MIN_W, crate::app::snippet::MAX_W);
@@ -233,41 +229,6 @@ fn code_lines(snippet: &str, quote: Option<char>) -> Element<'_, Message> {
     col.into()
 }
 
-/// `.rb-reopen`: thin strip on the right edge that shows the panel again.
-fn reopen_strip() -> Element<'static, Message> {
-    let btn = button(container(icons::panel_right_open().size(14)).center(Length::Fill))
-        .on_press(Message::Layout(LayoutMsg::SnippetToggled))
-        .width(REOPEN_W)
-        .height(Length::Fill)
-        .padding(0)
-        .style(|_t, status| {
-            let hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
-            button::Style {
-                background: Some(Background::Color(if hovered {
-                    Palette::surface_high()
-                } else {
-                    Palette::background()
-                })),
-                text_color: if hovered {
-                    Palette::text()
-                } else {
-                    Palette::text_subtle()
-                },
-                border: Border {
-                    color: Palette::border_subtle(),
-                    width: 0.0,
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            }
-        });
-    row![
-        iced::widget::rule::vertical(1).style(crate::ui::styles::divider),
-        btn,
-    ]
-    .height(Length::Fill)
-    .into()
-}
 
 #[cfg(test)]
 mod tests {

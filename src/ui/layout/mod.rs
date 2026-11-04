@@ -28,7 +28,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     let request_view =
         state.sidebar.environment_page.is_none() && state.examples.editor.is_none();
     let mut columns = row![left_panel(state), main_area(state)].height(Length::Fill);
-    if request_view {
+    if request_view && state.snippet_open {
         columns = columns.push(crate::ui::snippet_panel::view(state));
     }
     let shell: Element<Message> =
