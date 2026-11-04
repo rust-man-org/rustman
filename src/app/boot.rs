@@ -16,6 +16,12 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
     let data_dir = dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("rustman");
+    init_at(data_dir)
+}
+
+/// Boot from an explicit data directory. `init` passes the user's data dir;
+/// tests pass a throwaway one so they never touch real data.
+pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
 
     let db = storage::open(&data_dir).ok();
 
@@ -47,6 +53,14 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
             }
         }
     }
+
+    // Local drafts (01, C9): loaded after base rows so orphans are known.
+    let drafts = crate::state::drafts::DraftsState::from_loaded(
+        db.as_ref()
+            .and_then(|c| storage::drafts::get_drafts(c).ok())
+            .unwrap_or_default(),
+        &requests,
+    );
 
     let session: Option<AppSession> = db
         .as_ref()
@@ -210,7 +224,7 @@ pub(crate) fn init() -> (AppState, Task<Message>) {
         global_scripts_modal_open: false,
         tls_options,
         session_dirty: false,
-        drafts: Default::default(),
+        drafts,
         meta: Default::default(),
         auth: Default::default(),
         secrets: Default::default(),

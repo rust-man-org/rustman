@@ -8,7 +8,6 @@ impl AuthSession {
     /// C10 permission gate. Every shared write path (Publish, metadata,
     /// comments, commit/push, Create Review) must call this. Until 05 wires
     /// GitHub repository permission in, everyone is treated as Write.
-    #[allow(dead_code)] // first caller: 01 Publish
     pub fn can_write(&self) -> bool {
         true
     }

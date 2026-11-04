@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod command_palette;
+pub mod components;
 pub mod icons;
 pub mod layout;
 pub mod request;

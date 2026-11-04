@@ -24,6 +24,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
         }
         SidebarMsg::RequestOpened(req) => {
             state.sidebar.selected_request = Some(req.id.clone());
+            let req = crate::app::drafts::effective_request(state, &req);
             state.tabs.open_request(&req);
         }
         SidebarMsg::HistoryEntryOpened(entry) => {
@@ -64,6 +65,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             if let Some(db) = &state.db {
                 let _ = storage::delete_collection(db, &id);
             }
+            crate::app::drafts::mark_orphans(state);
         }
         SidebarMsg::DeleteRequest { id, collection_id } => {
             if let Some(reqs) = state.requests.get_mut(&collection_id) {
@@ -75,6 +77,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             if let Some(db) = &state.db {
                 let _ = storage::delete_request(db, &id);
             }
+            crate::app::drafts::mark_orphans(state);
         }
         SidebarMsg::RenameCollection { id, name } => {
             if let Some(c) = state.collections.iter_mut().find(|c| c.id == id) {
@@ -390,6 +393,7 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
                     .find(|r| r.id == id)
                     .cloned();
                 if let Some(req) = opened {
+                    let req = crate::app::drafts::effective_request(state, &req);
                     state.sidebar.selected_request = Some(req.id.clone());
                     state.sidebar.dragging_item = Some(id.clone());
                     state.tabs.open_request(&req);

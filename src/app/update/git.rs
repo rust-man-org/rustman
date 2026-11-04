@@ -114,7 +114,9 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
                 .iter()
                 .map(|ic| ic.collection.id.clone())
                 .collect();
-            apply_sync(state, collections);
+            if let Err(e) = apply_sync(state, collections) {
+                state.status_message = Some(format!("Some local drafts could not be saved: {e}"));
+            }
             apply_global_script(state, global_script);
             let id = uuid::Uuid::new_v4().to_string();
             state.git_repos.push(GitRepo {
@@ -300,6 +302,18 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
                 label,
                 global_script,
             } = *payload;
+            // Save in-flight edits of open shared tabs as drafts before any
+            // base row is replaced (01, C9). On failure apply nothing: tabs
+            // and base stay as they are, and the next sync re-applies the
+            // pulled tree. (No refresh_task here — it would write the stale
+            // state back over the freshly pulled working tree.)
+            if let Err(e) = crate::app::drafts::capture_tabs(state) {
+                state.status_message = Some(format!(
+                    "Sync not applied: could not save your local edits ({e}). Sync again to retry."
+                ));
+                state.git_busy = false;
+                return Task::none();
+            }
             let ids: Vec<String> = collections
                 .iter()
                 .map(|ic| ic.collection.id.clone())
@@ -312,14 +326,17 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
                 }
             }
 
-            apply_sync(state, collections);
+            let draft_err = apply_sync(state, collections).err();
             apply_global_script(state, global_script);
-            resync_open_tabs(state);
+            crate::app::drafts::refresh_open_tabs(state);
             if let Some(repo) = state.git_repos.iter_mut().find(|r| r.id == repo_id) {
                 repo.collection_ids = ids;
             }
             repos::save(&state.data_dir, &state.git_repos);
-            state.status_message = Some(label);
+            state.status_message = Some(match draft_err {
+                Some(e) => format!("{label} — some local drafts could not be saved: {e}"),
+                None => label,
+            });
             state.git_busy = false;
             return refresh_task(state);
         }
@@ -547,25 +564,6 @@ fn owned_ids(repos: &[GitRepo], all_collection_ids: &[String], repo_id: &str) ->
     }
 }
 
-fn resync_open_tabs(state: &mut AppState) {
-    use crate::state::tabs::RequestTabState;
-    for tab in &mut state.tabs.tabs {
-        let Some((col_id, req_id)) = tab.saved_as.clone() else {
-            continue;
-        };
-        let restored = state
-            .requests
-            .get(&col_id)
-            .and_then(|reqs| reqs.iter().find(|r| r.id == req_id))
-            .cloned();
-        if let Some(req) = restored {
-            let mut fresh = RequestTabState::from_saved(&req);
-            fresh.active_request_tab = tab.active_request_tab.clone(); // keep the open sub-panel
-            fresh.response = tab.response.take(); // keep the last response visible
-            *tab = fresh;
-        }
-    }
-}
 
 /// Remove a collection, its folders and its requests from state and the DB.
 fn remove_collection(state: &mut AppState, id: &str) {
@@ -584,10 +582,13 @@ fn remove_collection(state: &mut AppState, id: &str) {
     }
 }
 
-fn apply_sync(state: &mut AppState, collections: Vec<ImportedCollection>) {
+/// Replace base rows with the pulled collections, then merge every local
+/// draft onto its new base (01, C9). Drafts are never dropped here.
+fn apply_sync(state: &mut AppState, collections: Vec<ImportedCollection>) -> Result<(), String> {
     for imported in collections {
         crate::app::tree::insert_collection(state, imported);
     }
+    crate::app::drafts::rebase_all_after_sync(state)
 }
 
 /// Applies a repo's saved global script (if it has one) to live app state —
