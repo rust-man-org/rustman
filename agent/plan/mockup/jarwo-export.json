@@ -163,25 +163,25 @@
       "y": 4900.0
     },
     {
-      "file": "mockups/rustman-endpoint-examples.html",
-      "page": "pages/rustman-endpoint-examples.html",
-      "png": "png/23-rustman-endpoint-examples.png",
-      "w": 1280,
+      "file": "mockups/rustman-requester-search-dark.html",
       "h": 800,
+      "page": "pages/rustman-requester-search-dark.html",
+      "png": "png/19-rustman-requester-search-dark.png",
+      "w": 1280,
       "x": 0.0,
       "y": 5880.0
     },
     {
-      "file": "mockups/rustman-endpoint-examples-dark.html",
-      "page": "pages/rustman-endpoint-examples.html?theme=dark",
-      "png": "png/24-rustman-endpoint-examples-dark.png",
-      "w": 1280,
+      "file": "mockups/rustman-requester-search.html",
       "h": 800,
+      "page": "pages/rustman-requester-search.html",
+      "png": "png/20-rustman-requester-search.png",
+      "w": 1280,
       "x": 1400.0,
       "y": 5880.0
     }
   ],
-  "exported": "2026-11-04_100647",
+  "exported": "2026-11-04_203121",
   "title": "postman-clone",
   "workspace": "postman-clone"
 }

@@ -5,7 +5,7 @@ Updated: 2026-11-04 (Asia/Jakarta).
 ## Resume checkpoint
 
 - Current scope: endpoint examples mockup on `feat/endpoint-examples`, branched from development (`a39ddd5`).
-- Active task: native endpoint examples implementation and verification.
+- Active task: bottom-anchored Environments and hover-only active action; release verification.
 - Completed: Windows baseline/launch green (zip 9 fix); parallel rules and 09 plan written.
 - Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
   Local scaffold/CI commit: `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
@@ -43,29 +43,44 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 | [ ] | 06 | Secrets / scanner | — | Audit redaction, re-merge and write guards. |
 | [ ] | 07 | Self-update integrity | — | Audit existing verification and tests. |
 | [ ] | 08 | PR / company CI | — | Audit review flow and validator. |
-| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header (`a488b7f`), t2 request header + URL row (`1a494f2`), seams (`9846277`) and t5 sidebar (`d382c1c`, `dc731ca`, hover actions, then aligned to the updated mockup `0976b17`; sample workspace via `scripts/ui.sh -x`) done and merged. Sidebar is made as close to Postman as possible (user decision 2026-11-04): filter box, `+` menu incl. Folder, import, `⋯`, COLLECTIONS section; full suite 203/195. Next: t3 tab bar, t4 sub-tabs, t6 response pane. |
+| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header (`a488b7f`), t2 request header + URL row (`1a494f2`), seams (`9846277`) and t5 sidebar (`d382c1c`, `dc731ca`, hover actions, then aligned to the updated mockup `0976b17`; sample workspace via `scripts/ui.sh -x`) done and merged. Sidebar is made as close to Postman as possible (user decision 2026-11-04): filter box, `+` menu incl. Folder, import, `⋯`, COLLECTIONS section; full suite 203/195. Sidebar headers/environment rows/selected row and the URL preview line aligned to the updated mockup plus the URL row (method chevron, `{{var}}` highlight, split Send) on `feat/endpoint-examples` (252/244). Next: t3 tab bar, t4 sub-tabs, t6 response pane. |
 | [X] | 09 | Design tokens | — | `4289b76` on `ws/09-design-tokens/t1-tokens`: Rustman Light/Dark appended, fresh-install default, 5 tests. Fonts deferred; status colors kept global (36 call sites). |
 
 ## Active task details
 
-- Task: [~] native endpoint examples; user reported missing Add example in the real app.
-- Owner: Codex, 2026-11-04 (Asia/Jakarta); branch feat/endpoint-examples.
-- Base: local development at a39ddd5; unrelated .gitignore/.claude-flow edits preserved.
-- Design: ../mockup/pages/rustman-endpoint-examples.html; light/dark in gallery.
-- Flow: endpoint Add example; child rows; editable request/response; Save as example.
-- Preview is in-memory only; it does not send HTTP or persist native application data.
-- Playwright: add/edit/save/reopen, response snapshot, empty-name validation and
-  menu overlay geometry passed at 1280 x 800; light/dark screenshots in ../mockup/png/.
-- Native menu/SQLite/editor implemented; Postman reference now drives compact layout and themed code editors.
-- Release rebuilt/launched via scripts/ui.sh -t -r -x; final visual input stopped by physical Escape; import/export/Git example sync excluded.
-- Earlier memory measurements/limitations: ../0-foundation/memory-optimization.md.
-- Deferred sidebar fuzzy-search visual checks and equal-load Postman RAM comparison
-  remain open; global plans are not Done. No commit or push for this new feature.
+- Task: [~] bottom-anchored Environments and hover-only environment actions.
+- Owner: Codex, 2026-11-04; feat/endpoint-examples, existing HEAD 2b00b48.
+- Collections fills spare sidebar height; Environments stays below it even open.
+- Collapsing Collections moves Environments directly below its header.
+- Separate scroll areas; environment rows capped at192px; no shared outer scroll.
+- Atomic: generic sidebar_sections molecule; active/More actions hover-only.
+- Prior main editor/footer, environment menu/auto rows/hover delete preserved.
+- Gates: 251 default / 243 no-default passed; 3 network ignored each.
+- Iced layout test proves lower anchoring at300/700px; Playwright verifies
+  both disclosures,900px viewport,35-item scroll list and active hover visibility.
+- Gallery30/31/32 refreshed;33 shows bottom section. Release build in progress:
+  target/sidebar-anchor-release.log. Native action/typing QA previously stopped
+  by user's physical Escape; no claim of native typing verification.
+- Details: ../0-foundation/sidebar-environments.md; fuzzy-search visual checks
+  and equal-load Postman RAM comparison deferred. Global plans unfinished.
+- 2026-11-04 polish (Claude, user request): section headers share one padded
+  band (10px under the search box, 2px under each label); environment rows use
+  ROW_H with a 2px gap; header hover also covers press. The selected request
+  row is now the neutral square band (mockup 32/33) instead of the accent tint.
+  The URL bar's resolved-URL preview is a muted mono line aligned under the URL
+  text, with no orange chrome strip. Environment workspace tab left unchanged.
+- URL row follows mockup HTML `.url-row`: method column 115px bg-2 with a small
+  chevron (hover bd-2, accent ring when open), mono 13px URL with `{{var}}`
+  highlighted (Tone::Info), "→ Send" + 30px split chevron. The chevron menu
+  holds Import cURL… / Export as cURL, replacing the loose import icon.
+  Section headers: label centred in the 24px band, 10px text, 10px inset.
+  Unused accent `RowFill::Selected` removed. Gates 252/244.
+- Committed on feat/endpoint-examples at the user's request (for a PR); not pushed.
 
 ## Verification checkpoint
 
-- Latest Windows gate: 238 default / 230 no-default tests passed; 3 live-network
-  tests ignored each; no-default all-target check and release build/launch pass (target/endpoint-example-postman-release.log).
+- Latest Windows gate: 251 default / 243 no-default tests passed; 3 live-network
+  tests ignored each; final no-default check/release evidence: target/environment-page-release.log.
 - Historical 2026-11-03 baseline: zip 9 Windows extraction fixed; build and launch
   passed, tests 139 default / 131 no-default; manual request/sync not exhaustive.
 - CI execution is not proven by local tests; wave 0 scaffold added the test gate.
