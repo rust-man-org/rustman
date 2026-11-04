@@ -49,12 +49,39 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .app{width:1240px;min-width:972px;max-width:100%;margin:auto;height:100%;max-height:860px;min-height:720px;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:10px;box-shadow:var(--shadow-1);display:flex;flex-direction:column;overflow:hidden}
 @media (max-height:760px){.app{border-radius:0;border-left:0;border-right:0}}
 
-.app-header{flex:0 0 48px;display:flex;align-items:center;gap:24px;border-bottom:1px solid var(--bd-1);padding:0 16px}
-.hdr-left{display:flex;align-items:center;gap:12px;flex:1 0 auto}
+.app-header{flex:0 0 48px;display:flex;align-items:center;gap:24px;border-bottom:1px solid var(--bd-1);padding:0 16px;position:relative;z-index:20}
+.hdr-left{display:flex;align-items:center;gap:12px;flex:1 0 auto;min-width:0}
 .logo{width:24px;height:24px;border-radius:4px;background:var(--accent);color:#fff;font:600 13px/24px var(--font-ui);text-align:center}
-.ws{display:flex;align-items:center;gap:8px}
-.ws-name{font-size:14px;font-weight:600;letter-spacing:-.01em}
-.branch{display:flex;align-items:center;gap:5px;font:600 11px var(--font-code);color:var(--tx-2);background:var(--bg-2);border-radius:100%;padding:3px 9px}
+.ws{display:flex;align-items:center;gap:8px;min-width:0}
+.wsdd{position:relative}
+.wsdd summary{list-style:none;display:flex;align-items:center;gap:7px;height:28px;padding:0 8px;border-radius:4px;cursor:pointer}
+.wsdd summary::-webkit-details-marker{display:none}
+.wsdd summary:hover,.wsdd[open] summary{background:var(--bg-2)}
+.ws-ico{display:flex;color:var(--tx-3)}
+.ws-name{font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wsdd summary > svg{color:var(--tx-3);flex:0 0 auto}
+.ws-menu{position:absolute;left:0;top:calc(100% + 6px);z-index:40;width:304px;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden}
+.ws-menu-top{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--bd-1)}
+.ws-search{flex:1;position:relative;min-width:0}
+.ws-search svg{position:absolute;left:8px;top:7px;color:var(--tx-3)}
+.ws-search input{width:100%;height:28px;box-sizing:border-box;border:1px solid var(--accent);border-radius:4px;background:var(--bg-1);padding:0 8px 0 26px;font-size:12px;color:var(--tx-1)}
+.ws-search input::placeholder{color:var(--tx-3)}
+.ws-search input:focus{outline:none}
+.ws-create{height:28px;padding:0 10px;border-radius:4px;background:var(--accent);color:#fff;font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.ws-create:hover{background:var(--accent-h)}
+.ws-list{max-height:292px;overflow-y:auto;padding:6px}
+.ws-item{display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border-radius:5px;font-size:12px;color:var(--tx-1);text-align:left}
+.ws-item:hover{background:var(--bg-1)}
+.wsi{width:20px;height:20px;border-radius:5px;background:var(--bg-2);color:var(--tx-2);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.ws-item.active .wsi{background:var(--accent-tint);color:var(--accent)}
+.ws-item .name{text-transform:uppercase;font-weight:500;font-size:11px;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-item.mixed .name{text-transform:none;font-weight:400;font-size:12px;letter-spacing:0}
+.ws-item .tick{margin-left:auto;color:var(--accent);display:none;flex:0 0 auto}
+.ws-item.active .tick{display:flex}
+.ws-div{height:1px;background:var(--bd-1);margin:5px 4px}
+.ws-all{display:flex;align-items:center;gap:9px;width:100%;padding:7px 8px;border-radius:5px;font-size:12px;color:var(--tx-2);text-align:left}
+.ws-all:hover{background:var(--bg-1);color:var(--tx-1)}
+.branch{display:flex;align-items:center;gap:5px;font:600 11px var(--font-code);color:var(--tx-2);background:var(--bg-2);border-radius:24px;padding:3px 9px}
 .branch svg{opacity:.7}
 .hdr-center{flex:1 1 auto;display:flex;justify-content:center}
 .hdr-search{width:340px;height:32px;border:1px solid var(--bd-1);border-radius:8px;background:var(--bg-1);padding:0 10px 0 32px;font-size:12px;color:var(--tx-1)}
@@ -79,35 +106,40 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .rail-item.gap{margin-top:auto}
 
 .sidebar{flex:0 0 280px;background:var(--bg-1);border-right:1px solid var(--bd-1);display:flex;flex-direction:column;min-height:0}
-.side-top{padding:12px 12px 10px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--bd-1)}
-.side-search{position:relative}
-.side-search svg{position:absolute;left:8px;top:7px;color:var(--tx-3)}
-.side-search input{width:100%;height:28px;box-sizing:border-box;border:1px solid transparent;background:var(--bg-2);border-radius:4px;padding:0 8px 0 28px;font-size:12px}
-.side-search input:focus{background:var(--bg-0);border-color:var(--bd-2);outline:none}
-.tree{flex:1;overflow-y:auto;padding:8px 6px 12px}
-.col-row{display:flex;align-items:center;gap:6px;height:30px;padding:0 8px;border-radius:4px;font-size:12px;color:var(--tx-1);cursor:default}
-.col-row .chev{color:var(--tx-3);flex:0 0 auto}
-.col-row .c-name{font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.col-row .count{font:600 10px var(--font-code);color:var(--tx-3);font-variant-numeric:tabular-nums}
+.side-top{padding:10px 10px 4px;display:flex;flex-direction:column;gap:8px}
+.side-search-row{display:flex;align-items:center;gap:6px}
+.side-search{position:relative;flex:1;min-width:0}
+.side-search svg{position:absolute;left:9px;top:7px;color:var(--tx-3)}
+.side-search input{width:100%;height:28px;box-sizing:border-box;border:1px solid var(--bd-1);background:var(--bg-0);border-radius:4px;padding:0 8px 0 30px;font-size:12px;color:var(--tx-1)}
+.side-search input::placeholder{color:var(--tx-3)}
+.side-search input:focus{outline:none;border-color:var(--accent);background:var(--bg-0)}
+.side-icon{width:26px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);flex:0 0 auto}
+.side-icon:hover{background:var(--bg-2);color:var(--tx-1)}
+.side-section{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx-2)}
+.side-section svg{color:var(--tx-3)}
+.tree{flex:1;overflow-y:auto;padding:4px 6px 12px}
+.col-row{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border-radius:4px;font-size:12px;color:var(--tx-1);cursor:default}
 .col-row:hover{background:var(--bg-2)}
-.folder-row{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px 0 22px;border-radius:4px;font-size:12px;color:var(--tx-1)}
-.folder-row:hover{background:var(--bg-2)}
-.folder-row .chev{color:var(--tx-3)}
-.folder-row .f-name{flex:1}
+.col-row .chev{color:var(--tx-3);flex:0 0 auto}
+.col-row .c-name{font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.col-row .count{font:600 10px var(--font-code);color:var(--tx-3);font-variant-numeric:tabular-nums}
+.folder-row{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px 0 22px;border-radius:4px;font-size:12px;color:var(--tx-2);cursor:default}
+.folder-row:hover{background:var(--bg-2);color:var(--tx-1)}
+.folder-row .chev{color:var(--tx-3);flex:0 0 auto}
+.folder-row .fico{color:var(--tx-3);flex:0 0 auto}
+.folder-row .f-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .folder-row .f-mini{font-size:10px;color:var(--tx-3);font-variant-numeric:tabular-nums}
-.req-row{display:flex;align-items:center;gap:7px;height:28px;padding:0 8px 0 42px;border-radius:4px;font-size:12px}
+.req-row{display:flex;align-items:center;gap:7px;height:26px;padding:0 8px 0 44px;border-radius:4px;font-size:12px;cursor:default}
 .req-row:hover{background:var(--bg-2)}
 .req-row .m{font:600 10px var(--font-code);flex:0 0 34px}
 .m.get{color:var(--success)}.m.post{color:var(--accent)}.m.put{color:var(--info)}.m.del{color:var(--danger)}
-.req-row .r-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx-2)}
+.req-row .r-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx-2)}
 .req-row .st{flex:0 0 auto;display:flex}
 .req-row.selected{background:var(--accent-tint)}
 .req-row.selected .r-name{color:var(--tx-1);font-weight:500}
 .st-warning{color:var(--accent)}.st-ready{color:var(--success)}.st-draft{color:var(--tx-3)}
 .st-draft{width:12px;display:flex;justify-content:center}
 .st-draft::after{content:"";width:7px;height:7px;border-radius:100%;background:currentColor}
-.side-actions{display:flex;gap:6px}
-.side-actions .btn{flex:1;justify-content:center;min-width:0}
 .kv-note.tight{margin-top:8px}
 
 .main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -256,6 +288,21 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 .kv-row input:hover{background:var(--bg-2)}
 .kv-row input:focus{outline:none;border-color:var(--bd-2);background:var(--bg-0)}
 .kv-row .desc{font-size:11px;color:var(--tx-3)}
+.params-title{margin:0 0 8px;font-size:12px;font-weight:500;color:var(--tx-2)}
+.params-table{border:1px solid var(--bd-1);border-radius:4px;overflow:hidden}
+.p-row{display:grid;grid-template-columns:1fr 1.4fr 1.2fr 132px;align-items:center;min-height:30px;border-bottom:1px solid var(--bd-1);font-size:12px}
+.p-row:last-child{border-bottom:0}
+.p-row > span{padding:0 10px;border-right:1px solid var(--bd-1);height:30px;display:flex;align-items:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-row > span:last-child{border-right:0}
+.p-head{color:var(--tx-2);background:var(--bg-1);font-weight:500}
+.p-head .p-actions{justify-content:flex-end;gap:6px;padding:0 6px}
+.p-bulk{height:24px;padding:0 8px;border-radius:4px;font-size:11px;color:var(--tx-2)}
+.p-bulk:hover{background:var(--bg-2);color:var(--tx-1)}
+.p-more summary{width:24px;padding:0;justify-content:center;border-color:transparent;background:transparent}
+.p-more[open] summary{background:var(--bg-2);border-color:var(--bd-2)}
+.p-menu-label{padding:6px 10px 4px;font-size:11px;color:var(--tx-3)}
+.p-empty .ph{color:var(--tx-3)}
+.rt-count{font:600 10px var(--font-code);color:var(--tx-3);margin-left:2px}
 .combo{position:relative;min-width:0}
 [data-panel="headers"] .kv{overflow:visible}
 .combo summary{list-style:none;display:flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 8px;border:1px solid transparent;border-radius:4px;font:400 12px var(--font-code);color:var(--tx-1);cursor:pointer}
@@ -345,17 +392,33 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 .rsp-code .j-str{color:var(--success)}
 [data-theme=dark] .rsp-code .j-str{color:#4ADE80}
 #rr-body:checked ~ .rsp-panel[data-rsp="body"]{display:flex;flex-direction:column}
-.auth-grid{display:grid;grid-template-columns:210px 1fr;gap:16px;align-items:start}
-.auth-grid > div{min-width:0}
-.auth-list{border-radius:6px}
-.auth-item{width:100%;display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 10px;border-radius:4px;font-size:12px;color:var(--tx-2);text-align:left}
-.auth-item:hover{background:var(--bg-2);color:var(--tx-1)}
-.auth-item.active{background:var(--accent-tint);color:var(--tx-1);font-weight:500}
-.auth-item .inh{font-size:10px;color:var(--tx-3)}
-.auth-field{max-width:420px}
-.auth-field label{display:block;font-size:11px;font-weight:500;color:var(--tx-3);margin-bottom:5px}
-.auth-field input{width:100%;height:32px;box-sizing:border-box;padding:0 10px;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);font:400 12px var(--font-code)}
-.auth-field input:focus{background:var(--bg-0);outline:none;border-color:var(--bd-2)}
+.auth-grid{display:grid;grid-template-columns:196px 1fr;gap:24px;align-items:start}
+.auth-side{display:flex;flex-direction:column;gap:8px;min-width:0}
+.auth-side-label{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--tx-3)}
+.auth-side-label svg{color:var(--tx-3)}
+.auth-select{position:relative}
+.auth-select summary{list-style:none;display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);font-size:12px;color:var(--tx-1);cursor:pointer}
+.auth-select summary::-webkit-details-marker{display:none}
+.auth-select summary:hover{border-color:var(--bd-2)}
+.auth-select[open] summary{border-color:var(--accent);background:var(--bg-0)}
+.auth-select summary .val{flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.auth-select summary > svg{color:var(--tx-3);flex:0 0 auto}
+.auth-select .combo-menu{left:0;right:0;top:calc(100% + 4px);min-width:0}
+.auth-select .combo-item{font:400 12px var(--font-ui)}
+.auth-help{margin:2px 0 0;font-size:11px;line-height:17px;color:var(--tx-3)}
+.auth-help a{color:var(--tx-2);text-decoration:underline}
+.auth-main{min-width:0}
+.auth-title{margin:0 0 16px;font-size:14px;font-weight:600;letter-spacing:-.01em}
+.auth-row{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center;margin-bottom:12px}
+.auth-row > label{font-size:12px;color:var(--tx-1)}
+.auth-input{position:relative;min-width:0}
+.auth-input input{width:100%;height:32px;box-sizing:border-box;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);padding:0 58px 0 10px;font:400 12px var(--font-code);color:var(--tx-1)}
+.auth-input input:focus{background:var(--bg-0);outline:none;border-color:var(--accent)}
+.auth-input .af-actions{position:absolute;right:6px;top:0;height:32px;display:flex;align-items:center;gap:2px}
+.af-btn{width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3)}
+.af-btn:hover{background:var(--bg-2);color:var(--tx-1)}
+.auth-hint{margin:6px 0 0;font-size:11px;color:var(--tx-3)}
+.auth-hint code{font:500 10px var(--font-code);background:var(--bg-2);border-radius:3px;padding:1px 5px}
 .comment{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--bd-1);position:relative}
 .comment:last-of-type{border-bottom:0}
 .c-av{width:26px;height:26px;border-radius:100%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font:600 11px/1 var(--font-ui);position:relative;margin-top:1px}
@@ -440,7 +503,67 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
     <div class="hdr-left">
       <div class="logo">R</div>
       <div class="ws">
-        <span class="ws-name">Company APIs</span>
+        <details class="wsdd">
+          <summary>
+            <span class="ws-ico">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 2.5h7a1.5 1.5 0 0 1 1.5 1.5v9.3l-5-3-5 3V4a1.5 1.5 0 0 1 1.5-1.5Z" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="ws-name">Company API</span>
+            <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+          </summary>
+          <div class="ws-menu">
+            <div class="ws-menu-top">
+              <div class="ws-search">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.2"/><path d="m13.2 13.2-3-3"/></svg>
+                <input placeholder="Search workspaces...">
+              </div>
+              <button class="ws-create">
+                <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>
+                Create
+              </button>
+            </div>
+            <div class="ws-list">
+              <button class="ws-item active">
+                <span class="wsi"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.5"/><path d="M3.5 13.2c.7-2.2 2.4-3.4 4.5-3.4s3.8 1.2 4.5 3.4"/></svg></span>
+                <span class="name">Company API</span>
+                <span class="tick"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+              </button>
+              <button class="ws-item">
+                <span class="wsi"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.5"/><path d="M3.5 13.2c.7-2.2 2.4-3.4 4.5-3.4s3.8 1.2 4.5 3.4"/></svg></span>
+                <span class="name">Code Symphony Dev</span>
+              </button>
+              <button class="ws-item">
+                <span class="wsi"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.5"/><path d="M3.5 13.2c.7-2.2 2.4-3.4 4.5-3.4s3.8 1.2 4.5 3.4"/></svg></span>
+                <span class="name">Development</span>
+              </button>
+              <button class="ws-item mixed">
+                <span class="wsi"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.5"/><path d="M3.5 13.2c.7-2.2 2.4-3.4 4.5-3.4s3.8 1.2 4.5 3.4"/></svg></span>
+                <span class="name">Merchant Platform</span>
+              </button>
+              <button class="ws-item">
+                <span class="wsi"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
+                <span class="name">Document Builder API</span>
+              </button>
+              <button class="ws-item">
+                <span class="wsi"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.5"/><path d="M3.5 13.2c.7-2.2 2.4-3.4 4.5-3.4s3.8 1.2 4.5 3.4"/></svg></span>
+                <span class="name">Payment Services</span>
+              </button>
+              <button class="ws-item mixed">
+                <span class="wsi"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.5"/><path d="M3.5 13.2c.7-2.2 2.4-3.4 4.5-3.4s3.8 1.2 4.5 3.4"/></svg></span>
+                <span class="name">QA Playground</span>
+              </button>
+              <button class="ws-item">
+                <span class="wsi"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
+                <span class="name">Internal Tools</span>
+              </button>
+              <div class="ws-div"></div>
+              <button class="ws-all">
+                <span class="wsi"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="2.5" width="4.4" height="4.4" rx="1"/><rect x="9.1" y="2.5" width="4.4" height="4.4" rx="1"/><rect x="2.5" y="9.1" width="4.4" height="4.4" rx="1"/><rect x="9.1" y="9.1" width="4.4" height="4.4" rx="1"/></svg></span>
+                View all workspaces
+              </button>
+            </div>
+          </div>
+        </details>
         <span class="branch">
           <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="4" cy="3.5" r="1.7"/><circle cx="4" cy="12.5" r="1.7"/><circle cx="12" cy="3.5" r="1.7"/><path d="M4 5.2v5.6M12 5.2c0 3-3 3.6-5.4 3.9"/></svg>
           main
@@ -487,16 +610,27 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 
     <aside class="sidebar">
       <div class="side-top">
-        <div class="side-search">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.4"/><path d="m13.5 13.5-3.2-3.2"/></svg>
-          <input placeholder="Cari request atau folder">
-        </div>
-        <div class="side-actions">
-          <button class="btn btn-ghost">Baru</button>
-          <button class="btn btn-ghost">Impor</button>
+        <div class="side-search-row">
+          <div class="side-search">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 4h7M2.5 8h11M2.5 12h5"/></svg>
+            <input placeholder="Search">
+          </div>
+          <button class="side-icon" aria-label="Buat collection baru">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>
+          </button>
+          <button class="side-icon" aria-label="Impor">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="2.5" width="11" height="11" rx="1.4"/><path d="M8 5v5M5.5 7.8 8 10.3l2.5-2.5"/></svg>
+          </button>
+          <button class="side-icon" aria-label="Lainnya">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.4" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.6" cy="8" r="1.1"/></svg>
+          </button>
         </div>
       </div>
       <div class="tree">
+        <div class="side-section">
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 6 4 4 4-4"/></svg>
+          Collections
+        </div>
         <div class="col-row">
           <svg class="chev" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 6 4 4 4-4"/></svg>
           <span class="c-name">Merchant API</span>
@@ -504,6 +638,7 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
         </div>
         <div class="folder-row">
           <svg class="chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 6 4 4 4-4"/></svg>
+          <svg class="fico" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.8 4.3c0-.9.7-1.5 1.5-1.5h2.4c.4 0 .8.2 1.1.5l.7.8h4.3c.9 0 1.5.7 1.5 1.5v5.8c0 .9-.7 1.5-1.5 1.5H3.3c-.9 0-1.5-.7-1.5-1.5V4.3Z"/></svg>
           <span class="f-name">auth</span>
           <span class="f-mini">3</span>
         </div>
@@ -556,6 +691,7 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
         </div>
         <div class="folder-row">
           <svg class="chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 6 4 4 4-4"/></svg>
+          <svg class="fico" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.8 4.3c0-.9.7-1.5 1.5-1.5h2.4c.4 0 .8.2 1.1.5l.7.8h4.3c.9 0 1.5.7 1.5 1.5v5.8c0 .9-.7 1.5-1.5 1.5H3.3c-.9 0-1.5-.7-1.5-1.5V4.3Z"/></svg>
           <span class="f-name">merchant</span>
           <span class="f-mini">7</span>
         </div>
@@ -573,11 +709,13 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
         </div>
         <div class="folder-row">
           <svg class="chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 4 4 4-4 4"/></svg>
+          <svg class="fico" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.8 4.3c0-.9.7-1.5 1.5-1.5h2.4c.4 0 .8.2 1.1.5l.7.8h4.3c.9 0 1.5.7 1.5 1.5v5.8c0 .9-.7 1.5-1.5 1.5H3.3c-.9 0-1.5-.7-1.5-1.5V4.3Z"/></svg>
           <span class="f-name">payment</span>
           <span class="f-mini">12</span>
         </div>
         <div class="folder-row">
           <svg class="chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 4 4 4-4 4"/></svg>
+          <svg class="fico" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.8 4.3c0-.9.7-1.5 1.5-1.5h2.4c.4 0 .8.2 1.1.5l.7.8h4.3c.9 0 1.5.7 1.5 1.5v5.8c0 .9-.7 1.5-1.5 1.5H3.3c-.9 0-1.5-.7-1.5-1.5V4.3Z"/></svg>
           <span class="f-name">internal</span>
           <span class="f-mini">5</span>
         </div>
@@ -716,9 +854,10 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
           </button>
           <label class="rtab" for="rt-params">Params</label>
           <label class="rtab" for="rt-auth">Authorization</label>
-          <label class="rtab" for="rt-headers">Headers</label>
+          <label class="rtab" for="rt-headers">Headers <span class="rt-count">8</span></label>
           <label class="rtab" for="rt-body">Body</label>
           <label class="rtab" for="rt-scripts">Scripts</label>
+          <button class="docs-tab">Settings</button>
           <label class="rtab" for="rt-discussion">Diskusi <span class="badge">2</span></label>
           <button class="cookies-link">Cookies</button>
         </div>
@@ -738,52 +877,82 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
         </div>
 
         <section class="tpanel" data-panel="params">
-          <div class="kv">
-            <div class="kv-head"><span></span><span>Key</span><span>Value</span><span>Deskripsi</span><span></span></div>
-            <div class="kv-row">
-              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
-              <input value="page">
-              <input value="2">
-              <span class="desc">paginasi merchant</span>
+          <p class="params-title">Query Params</p>
+          <div class="params-table">
+            <div class="p-row p-head">
+              <span>Key</span>
+              <span>Value</span>
+              <span>Description</span>
+              <span class="p-actions">
+                <button class="p-bulk">Bulk Edit</button>
+                <details class="dd-mini p-more">
+                  <summary aria-label="Opsi kolom">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/></svg>
+                  </summary>
+                  <div class="combo-menu">
+                    <div class="p-menu-label">Show columns</div>
+                    <button class="combo-item">
+                      <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+                      Value
+                    </button>
+                    <button class="combo-item">
+                      <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
+                      Description
+                    </button>
+                  </div>
+                </details>
+              </span>
             </div>
-            <div class="kv-row">
-              <span class="check on"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
-              <input value="per_page">
-              <input value="50">
-              <span class="desc">maksimum services</span>
-            </div>
-            <div class="kv-row off">
-              <span class="check"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span>
-              <input value="debug">
-              <input value="1">
-              <span class="desc">nonaktif</span>
+            <div class="p-row p-empty">
+              <span class="ph">Key</span>
+              <span class="ph">Value</span>
+              <span class="ph">Description</span>
+              <span></span>
             </div>
           </div>
-          <button class="kv-add">
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg>
-            Tambah parameter
-          </button>
-          <p class="kv-note">Query parameter aktif menjadi pendorong URL variabel; proses substitusi bisa dilihat di Console.</p>
         </section>
 
         <section class="tpanel" data-panel="auth">
           <div class="auth-grid">
-            <div class="kv auth-list">
-              <button class="auth-item"><span>No Auth</span></button>
-              <button class="auth-item"><span>API Key</span></button>
-              <button class="auth-item active"><span>Bearer Token</span>
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="var(--accent)" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg>
-              </button>
-              <button class="auth-item"><span>Basic Auth</span></button>
-              <button class="auth-item"><span>OAuth 2.0</span></button>
-              <button class="auth-item"><span>Inherit dari collection</span><span class="inh">auth/index</span></button>
+            <div class="auth-side">
+              <label class="auth-side-label">Auth type
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 5h8.5M8.5 2.6 11 5 8.5 7.4M13.5 11H5M7.5 8.6 5 11l2.5 2.4"/></svg>
+              </label>
+              <details class="auth-select">
+                <summary>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>
+                  <span class="val">Bearer Token</span>
+                  <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
+                </summary>
+                <div class="combo-menu">
+                  <button class="combo-item">No Auth</button>
+                  <button class="combo-item">API Key</button>
+                  <button class="combo-item">Basic Auth</button>
+                  <button class="combo-item">Bearer Token <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
+                  <button class="combo-item">Digest Auth</button>
+                  <button class="combo-item">OAuth 2.0</button>
+                  <button class="combo-item">Inherit dari collection</button>
+                </div>
+              </details>
+              <p class="auth-help">The authorization header will be automatically generated when you send the request. <a href="#">Learn more about authorization</a></p>
             </div>
-            <div>
-              <div class="auth-field">
+            <div class="auth-main">
+              <p class="auth-title">Bearer Token</p>
+              <div class="auth-row">
                 <label>Token</label>
-                <input value="{{SECRET_ACCESS_TOKEN}}">
+                <div class="auth-input">
+                  <input type="password" value="eyJhbGciOiJIUzI1NiJ9.{{SECRET_ACCESS_TOKEN}}">
+                  <span class="af-actions">
+                    <button class="af-btn" aria-label="Tampilkan token">
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 8S4 3.8 8 3.8 14.5 8 14.5 8 12 12.2 8 12.2 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="1.9"/></svg>
+                    </button>
+                    <button class="af-btn" aria-label="Kunci secret lokal">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="7" width="9" height="6" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>
+                    </button>
+                  </span>
+                </div>
               </div>
-              <p class="kv-note">Nilai di-resolve dari Local secrets saat Send yaitu di mesin ini; placeholder {{...}} yang ikut di-commit ke repository, bukan tokennya. Untuk mode lain ubah dropdown di atas.</p>
+              <p class="auth-hint">Resolved from <code>Local secrets</code> on Send, on this machine only. The <code>{{SECRET_ACCESS_TOKEN}}</code> placeholder is what gets committed.</p>
             </div>
           </div>
         </section>
