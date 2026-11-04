@@ -84,6 +84,17 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
   Gates 254/246. Visual check of tab bar/menu still pending in the real app.
 - Code snippet panel (mockup rustman-requester-snippet .rightbar), right side:  language dropdown (cURL, HTTP, JS Fetch, Node Axios, Python requests, Go,  Java OkHttp, C# HttpClient, Ruby Net::HTTP, wget) from the same input as  Share; literal secrets masked, {{vars}} kept; Copy gives the full code.  Hide via header icon or footer toggle (closes flush, reopen from the footer
   toggle only, per user); left edge drags  to resize (220-720px). Open/width/language persist in the session. Cached  in AppState::snippet, refreshed after edits, not per frame. Gates 262/254.
+- Top bar per mockup rustman-requester-workspace `.app-header`: workspace
+  switcher (bookmark icon, UPPERCASE name, chevron) opens a `.ws-menu` with a
+  search box, Create (Git panel), git repos as workspaces (tile, tick on the
+  current one) and View all workspaces; branch chip mono bg-2 pill; search
+  without the Ctrl+P hint; sync chip dot with tinted ring; avatar from the
+  git author initial; bottom hairline only. Popup gained a sticky mode so
+  typing in the menu does not close it.
+- Request header Save is a split button (Save + chevron: Save as…, Commit &
+  sync → Git panel, Discard local changes when a draft exists); Share is an
+  outlined link button. Resolved-URL line under the URL bar removed (not in
+  the mockup, per user). Gates 263/255.
 - Committed on feat/endpoint-examples at the user's request (for a PR); not pushed.
 
 ## Verification checkpoint
