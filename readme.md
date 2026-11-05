@@ -205,11 +205,26 @@ Use Git Bash on Windows. Use a terminal with `sh` on macOS or Linux.
 |---|---|
 | `sh scripts/ui.sh` | Build and start the debug app with your normal data. |
 | `sh scripts/ui.sh -r` | Build and start the release app with your normal data. |
+| `sh scripts/ui.sh -r -b` | Build the release app only, without starting it. Output: `target/release/rustman` (`.exe` on Windows). |
 | `sh scripts/ui.sh -t -r` | Run both test configurations and the check. Then build and start the release app. |
 | `sh scripts/ui.sh -r -x` | Build and start the release app with the example workspace. |
 | `sh scripts/ui.sh -r -s` | Build and start the release app with a copy of your local data. |
 | `sh scripts/ui.sh -r -d "target/my-data"` | Use a separate data folder. |
-| `sh scripts/ui.sh -h` | Show the launcher options. |
+| `sh scripts/ui.sh -r -g software` | Start the release app with CPU rendering (smallest RAM, about 13 MB). |
+| `sh scripts/ui.sh -r -g gpu-high` | Start the release app on the discrete GPU. |
+| `sh scripts/ui.sh -h` | Show the launcher options and the pros and cons of each renderer. |
+
+Renderer modes (`-g`):
+
+- `gpu` (default): integrated GPU, DX12 only on Windows.
+  - Pro: smooth repaint, idle CPU, saves battery. Falls back to software when no GPU works.
+  - Con: about 80–100 MB RAM for the graphics driver and buffers.
+- `gpu-high`: discrete GPU.
+  - Pro: most graphics headroom.
+  - Con: wakes the discrete GPU (more power). No real gain for this app.
+- `software`: CPU rendering (tiny-skia).
+  - Pro: about 13 MB RAM. No GPU driver problems (old drivers, remote desktop, VMs).
+  - Con: more CPU work during scroll and typing. Less smooth on large or high-DPI screens.
 
 The example workspace uses `target/ui-example/`. Your normal collections stay in their original folder.
 The sample-copy option uses `target/ui-data/`. Changes to that copy stay in the copy.

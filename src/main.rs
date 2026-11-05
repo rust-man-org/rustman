@@ -11,7 +11,61 @@ mod ui;
 
 fn main() -> iced::Result {
     prefer_integrated_gpu_on_linux();
+    prefer_lean_gpu_on_windows();
     app::run()
+}
+
+/// Windows GPU defaults that keep RAM down (only when the user set nothing).
+///
+/// Unrestricted, wgpu brings up *every* backend on Windows: Vulkan and
+/// DX12 both load their drivers (NVIDIA and AMD on a hybrid laptop), which
+/// cost ~172 MB private working set at idle. DX12 alone measured ~74–80 MB on
+/// the same fixture (release build, 2026-11-05); software rendering ~13 MB.
+/// `low` power picks the integrated GPU like on Linux: less power, no
+/// discrete-GPU wake-up. If DX12 is missing, wgpu finds no adapter and iced
+/// falls back to the next `ICED_BACKEND` entry (tiny-skia by default).
+fn prefer_lean_gpu_on_windows() {
+    #[cfg(target_os = "windows")]
+    for (key, value) in windows_gpu_defaults(|k| std::env::var_os(k).is_some()) {
+        // SAFETY: called at the very start of `main`, before any threads
+        // exist and before wgpu reads these variables.
+        unsafe {
+            std::env::set_var(key, value);
+        }
+    }
+}
+
+/// The env defaults to set, skipping any the user already chose.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn windows_gpu_defaults(is_set: impl Fn(&str) -> bool) -> Vec<(&'static str, &'static str)> {
+    let mut out = Vec::new();
+    if !is_set("WGPU_BACKEND") {
+        out.push(("WGPU_BACKEND", "dx12"));
+    }
+    if !is_set("WGPU_POWER_PREF") && !is_set("WGPU_ADAPTER_NAME") {
+        out.push(("WGPU_POWER_PREF", "low"));
+    }
+    out
+}
+
+#[cfg(test)]
+mod gpu_default_tests {
+    use super::windows_gpu_defaults;
+
+    #[test]
+    fn defaults_apply_only_when_unset() {
+        assert_eq!(
+            windows_gpu_defaults(|_| false),
+            vec![("WGPU_BACKEND", "dx12"), ("WGPU_POWER_PREF", "low")]
+        );
+        assert!(windows_gpu_defaults(|_| true).is_empty());
+        // A chosen adapter keeps its own power choice; the backend still
+        // defaults to DX12.
+        assert_eq!(
+            windows_gpu_defaults(|k| k == "WGPU_ADAPTER_NAME"),
+            vec![("WGPU_BACKEND", "dx12")]
+        );
+    }
 }
 
 /// Default to the integrated GPU on Linux unless the user says otherwise.
