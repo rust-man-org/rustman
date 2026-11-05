@@ -83,11 +83,6 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .ws-all:hover{background:var(--bg-1);color:var(--tx-1)}
 .branch{display:flex;align-items:center;gap:5px;font:600 11px var(--font-code);color:var(--tx-2);background:var(--bg-2);border-radius:24px;padding:3px 9px}
 .branch svg{opacity:.7}
-.hdr-center{flex:1 1 auto;display:flex;justify-content:center}
-.hdr-search{width:340px;height:32px;border:1px solid var(--bd-1);border-radius:8px;background:var(--bg-1);padding:0 10px 0 32px;font-size:12px;color:var(--tx-1)}
-.hdr-search::placeholder{color:var(--tx-3)}
-.hdr-search-wrap{position:relative}
-.hdr-search-wrap svg{position:absolute;left:9px;top:8px;color:var(--tx-3)}
 .hdr-right{flex:1 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:10px}
 .sync-chip{display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:8px;border:1px solid transparent;font-size:12px;font-weight:500;color:var(--tx-2)}
 .sync-chip .dot{width:8px;height:8px;border-radius:100%;background:var(--success);box-shadow:0 0 0 3px var(--success-tint)}
@@ -183,7 +178,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .rb-splitter:hover{background:var(--accent-tint)}
 .rb-splitter:hover::after{opacity:1;background:var(--accent)}
 .statusbar{flex:0 0 25px;display:flex;align-items:center;gap:14px;padding:0 10px;border-top:1px solid var(--bd-1);background:var(--bg-1);font-size:11px;color:var(--tx-3)}
-.sb-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx-3);white-space:nowrap}
+.sb-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx-3);white-space:nowrap;cursor:pointer}
 .sb-item:hover{color:var(--tx-1)}
 .sb-item svg{color:var(--tx-3)}
 .sb-item:hover svg{color:var(--tx-1)}
@@ -196,6 +191,36 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 #sbhide:checked ~ .statusbar .sb-left{background:var(--accent-tint);color:var(--accent)}
 #rbhide:checked ~ .shell .rightbar{display:none}
 #rbhide:checked ~ .statusbar .sb-toggle{background:var(--accent-tint);color:var(--accent)}
+.dock{display:none;flex-direction:column;flex:0 0 210px;min-height:0;border-top:1px solid var(--bd-1);background:var(--bg-0)}
+#dock-console:checked ~ .shell .dock,#dock-terminal:checked ~ .shell .dock{display:flex}
+#dock-console:checked ~ .shell .dock [data-pane="terminal"]{display:none}
+#dock-terminal:checked ~ .shell .dock [data-pane="console"]{display:none}
+#dock-console:checked ~ .shell .response,
+#dock-terminal:checked ~ .shell .response,
+#dock-console:checked ~ .shell .splitter,
+#dock-terminal:checked ~ .shell .splitter{display:none}
+#dock-console:checked ~ #dock-terminal:checked ~ .shell .dock{display:flex}
+#dock-console:checked ~ #dock-terminal:checked ~ .shell .dock [data-pane="console"]{display:none}
+#dock-console:checked ~ #dock-terminal:checked ~ .shell .dock [data-pane="terminal"]{display:flex}
+.dock-pane{display:flex;flex-direction:column;flex:1;min-height:0}
+.dock-head{display:flex;align-items:center;gap:4px;height:32px;padding:0 12px;border-bottom:1px solid var(--bd-1);background:var(--bg-1)}
+.dock-tab{display:flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;font-size:11px;color:var(--tx-3);cursor:pointer;white-space:nowrap}
+.dock-tab:hover{color:var(--tx-1)}
+.dock-tab.sel{background:var(--bg-2);color:var(--tx-1);font-weight:500}
+#dock-console:checked ~ .shell .dock [for="dock-console"],
+#dock-terminal:checked ~ .shell .dock [for="dock-terminal"]{background:var(--bg-2);color:var(--tx-1);font-weight:500}
+.dock-actions{margin-left:auto;display:flex;align-items:center;gap:6px}
+.dock-all{font-size:11px;color:var(--tx-3);padding:0 4px}
+.dock-btn{height:22px;padding:0 8px;border:1px solid var(--bd-2);border-radius:4px;font-size:11px;color:var(--tx-2)}
+.dock-btn:hover{color:var(--tx-1);border-color:var(--tx-3)}
+.dock-icon{width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);cursor:pointer}
+.dock-icon:hover{background:var(--bg-2);color:var(--tx-1)}
+.dock-body{flex:1;overflow:auto;padding:10px 14px;font:400 12px/19px var(--font-code);color:var(--tx-1)}
+.dock-body .dim{color:var(--tx-3)}
+.dock-cursor{display:inline-block;width:7px;height:13px;background:var(--tx-2);vertical-align:-2px;margin-left:1px}
+.dock-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:20px;text-align:center}
+.dock-empty .t{font-size:12px;font-weight:600;color:var(--tx-1)}
+.dock-empty .s{font-size:11px;color:var(--tx-3)}
 .rb-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px}
 .rb-title{font-size:13px;font-weight:600;letter-spacing:-.01em}
 .rb-actions{display:flex;gap:2px}
@@ -304,8 +329,6 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 .rtab{cursor:pointer}
 .docs-tab{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;font-size:12px;color:var(--tx-3);border-radius:4px}
 .docs-tab:hover{background:var(--bg-2);color:var(--tx-1)}
-.cookies-link{margin-left:auto;display:flex;align-items:center;height:26px;padding:0 8px;border-radius:4px;font-size:12px;color:var(--tx-2)}
-.cookies-link:hover{background:var(--bg-2);color:var(--tx-1)}
 #rt-params:checked ~ .req-tabs [for="rt-params"],
 #rt-auth:checked ~ .req-tabs [for="rt-auth"],
 #rt-headers:checked ~ .req-tabs [for="rt-headers"],
@@ -538,6 +561,8 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 <div class="app">
   <input class="rb-toggle" type="checkbox" id="rbhide">
   <input class="rb-toggle" type="checkbox" id="sbhide">
+  <input class="rb-toggle" type="checkbox" id="dock-console">
+  <input class="rb-toggle" type="checkbox" id="dock-terminal">
   <header class="app-header">
     <div class="hdr-left">
       <div class="logo">R</div>
@@ -607,12 +632,6 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
           <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="4" cy="3.5" r="1.7"/><circle cx="4" cy="12.5" r="1.7"/><circle cx="12" cy="3.5" r="1.7"/><path d="M4 5.2v5.6M12 5.2c0 3-3 3.6-5.4 3.9"/></svg>
           main
         </span>
-      </div>
-    </div>
-    <div class="hdr-center">
-      <div class="hdr-search-wrap">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.4"/><path d="m13.5 13.5-3.2-3.2"/></svg>
-        <input class="hdr-search" placeholder="Cari request, environment, atau diskusi...">
       </div>
     </div>
     <div class="hdr-right">
@@ -964,7 +983,6 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
           <label class="rtab" for="rt-scripts">Scripts</label>
           <button class="docs-tab">Settings</button>
           <label class="rtab" for="rt-discussion">Diskusi <span class="badge">2</span></label>
-          <button class="cookies-link">Cookies</button>
         </div>
 
         <div class="meta-strip">
@@ -1376,6 +1394,60 @@ pm.test('Response time di bawah 300ms', () =&gt; pm.expect(pm.response.responseT
           </div>
         </section>
       </div>
+      <section class="dock">
+        <div class="dock-pane" data-pane="console">
+          <div class="dock-head">
+            <span class="dock-tab sel">Console</span>
+            <span class="dock-tab">Terminal</span>
+            <button class="dock-tab">Issues</button>
+            <span class="dock-actions">
+              <span class="dock-all">All Logs ▾</span>
+              <button class="dock-btn">Clear</button>
+              <button class="dock-icon" aria-label="Salin log">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3"/><path d="M10.5 5.5v-2a1.3 1.3 0 0 0-1.3-1.3H3.8A1.3 1.3 0 0 0 2.5 3.5v5.4a1.3 1.3 0 0 0 1.3 1.3h1.7"/></svg>
+              </button>
+              <button class="dock-icon" aria-label="Lainnya">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/></svg>
+              </button>
+              <button class="dock-icon" aria-label="Perbesar">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9"/></svg>
+              </button>
+              <label class="dock-icon" for="dock-console" aria-label="Tutup console">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+              </label>
+            </span>
+          </div>
+          <div class="dock-empty">
+            <span class="t">No logs yet</span>
+            <span class="s">Send a request to view its details in the console.</span>
+          </div>
+        </div>
+        <div class="dock-pane" data-pane="terminal">
+          <div class="dock-head">
+            <span class="dock-tab">Console</span>
+            <span class="dock-tab sel">Terminal</span>
+            <button class="dock-tab">Issues</button>
+            <span class="dock-actions">
+              <button class="dock-btn">Clear</button>
+              <button class="dock-icon" aria-label="Terminal baru">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>
+              </button>
+              <button class="dock-icon" aria-label="Hapus terminal">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.8 4.3h10.4M6 4.3V3a1.2 1.2 0 0 1 1.2-1.2h1.6A1.2 1.2 0 0 1 10 3v1.3M4.2 4.3l.6 8.4a1.4 1.4 0 0 0 1.4 1.3h3.6a1.4 1.4 0 0 0 1.4-1.3l.6-8.4"/></svg>
+              </button>
+              <label class="dock-icon" for="dock-terminal" aria-label="Tutup terminal">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+              </label>
+            </span>
+          </div>
+          <div class="dock-body">
+Microsoft Windows [Version 10.0.26300.9818]
+(c) Microsoft Corporation. All rights reserved.
+
+<span class="dim">C:\Users\YSHA-PC&gt;</span><span class="dock-cursor"></span>
+          </div>
+        </div>
+      </section>
     </main>
 
     <aside class="rightbar">
@@ -1383,9 +1455,6 @@ pm.test('Response time di bawah 300ms', () =&gt; pm.expect(pm.response.responseT
       <div class="rb-head">
         <span class="rb-title">Code snippet</span>
         <span class="rb-actions">
-          <label class="rb-icon" for="rbhide" title="Sembunyikan panel" aria-label="Sembunyikan panel">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 4 4 4-4 4"/></svg>
-          </label>
           <button class="rb-icon" aria-label="Salin snippet">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3"/><path d="M10.5 5.5v-2a1.3 1.3 0 0 0-1.3-1.3H3.8A1.3 1.3 0 0 0 2.5 3.5v5.4a1.3 1.3 0 0 0 1.3 1.3h1.7"/></svg>
           </button>
@@ -1435,8 +1504,8 @@ pm.test('Response time di bawah 300ms', () =&gt; pm.expect(pm.response.responseT
       <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.8 4.3c0-.9.7-1.5 1.5-1.5h2.4c.4 0 .8.2 1.1.5l.7.8h4.3c.9 0 1.5.7 1.5 1.5v5.8c0 .9-.7 1.5-1.5 1.5H3.3c-.9 0-1.5-.7-1.5-1.5V4.3Z"/></svg>
       Open Folder
     </button>
-    <button class="sb-item">Terminal</button>
-    <button class="sb-item">Console</button>
+    <label class="sb-item" for="dock-terminal">Terminal</label>
+    <label class="sb-item" for="dock-console">Console</label>
     <span class="sb-hint">
       <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5 9.4 6.2 13 7.5 9.4 8.8 8 12.5 6.6 8.8 3 7.5 6.6 6.2 8 2.5Z" stroke-linejoin="round"/></svg>
       Need help with the next steps?
