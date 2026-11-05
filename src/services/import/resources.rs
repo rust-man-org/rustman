@@ -120,6 +120,17 @@ pub fn command_count(resources: &[Resource]) -> usize {
         .sum()
 }
 
+/// Repeated pastes often have no trailing newline. Add a command boundary
+/// only outside quotes, never inside an incomplete quoted payload.
+pub fn needs_paste_separator(before: &str, pasted: &str) -> bool {
+    !before.is_empty()
+        && !before.ends_with(['\r', '\n'])
+        && !before.trim_end().ends_with('\\')
+        && classify_pasted_command(before) != PastedCommand::Other
+        && classify_pasted_command(pasted) != PastedCommand::Other
+        && split_commands(before).is_ok()
+}
+
 pub fn common_origin(resources: &[Resource]) -> Option<String> {
     let mut urls = resources.iter().flat_map(|r| match r {
         Resource::Command(command, _) => vec![command],

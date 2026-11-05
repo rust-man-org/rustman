@@ -131,6 +131,17 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                     };
                 }
                 UrlAction::Edit(UrlEdit::Paste(text)) => {
+                    // Detect command pastes before stripping line breaks: the
+                    // parser needs shell continuations and quoted bodies intact.
+                    match classify_pasted_command(&text) {
+                        PastedCommand::Curl => {
+                            return handle(state, RequestMsg::ImportCurl(text.to_string()));
+                        }
+                        PastedCommand::Httpie => {
+                            return handle(state, RequestMsg::ImportHttpie(text.to_string()));
+                        }
+                        PastedCommand::Other => {}
+                    }
                     tab.url_completion_open = true;
                     tab.url_completion_selected = 0;
                     // URLs are single-line: drop raw line breaks (a trailing
@@ -506,7 +517,13 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                 state.importing = true;
                 return parse_command_off_thread(cmd, curl::parse);
             }
-            apply_parsed_command(tab, curl::parse(&cmd), cmd.len());
+            let parsed = curl::parse(&cmd);
+            if !command_has_url(&parsed) {
+                state.status_message =
+                    Some("The command needs a URL. Nothing was imported.".into());
+                return Task::none();
+            }
+            apply_parsed_command(tab, parsed, cmd.len());
         }
         RequestMsg::ImportHttpie(cmd) => {
             if cmd.len() > ASYNC_IMPORT_LEN {
@@ -514,10 +531,21 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                 state.importing = true;
                 return parse_command_off_thread(cmd, crate::services::import::httpie::parse);
             }
-            apply_parsed_command(tab, crate::services::import::httpie::parse(&cmd), cmd.len());
+            let parsed = crate::services::import::httpie::parse(&cmd);
+            if !command_has_url(&parsed) {
+                state.status_message =
+                    Some("The command needs a URL. Nothing was imported.".into());
+                return Task::none();
+            }
+            apply_parsed_command(tab, parsed, cmd.len());
         }
         RequestMsg::ImportCommandParsed { parsed, cmd_len } => {
             state.importing = false;
+            if !command_has_url(&parsed) {
+                state.status_message =
+                    Some("The command needs a URL. Nothing was imported.".into());
+                return Task::none();
+            }
             state.status_message = Some("Command imported.".to_owned());
             apply_parsed_command(tab, parsed, cmd_len);
         }
@@ -793,6 +821,9 @@ fn edit_class(msg: &RequestMsg) -> EditClass {
     use RequestMsg as M;
     match msg {
         M::UrlChanged(_) => EditClass::Coalesce(K::Url),
+        M::UrlEdited(iced::widget::text_editor::Action::Edit(
+            iced::widget::text_editor::Edit::Paste(text),
+        )) if classify_pasted_command(text) != PastedCommand::Other => EditClass::Skip,
         M::UrlEdited(action) if url_action_edits_content(action) => EditClass::Coalesce(K::Url),
         M::HeaderKeyChanged(i, _) => EditClass::Coalesce(K::HeaderKey(*i)),
         M::HeaderValueChanged(i, _) => EditClass::Coalesce(K::HeaderValue(*i)),
@@ -821,6 +852,7 @@ fn edit_class(msg: &RequestMsg) -> EditClass {
         | M::AuthTypeChanged(_)
         | M::ApiKeyLocationChanged(_)
         | M::ImportCurl(_)
+        | M::ImportHttpie(_)
         | M::ImportCommandParsed { .. } => EditClass::Discrete,
         _ => EditClass::Skip,
     }
@@ -1166,11 +1198,40 @@ fn import_pasted_text(state: &mut AppState, text: String) -> Task<Message> {
     }
 }
 
+fn command_has_url(command: &crate::services::curl::ParsedCurl) -> bool {
+    command
+        .url
+        .as_deref()
+        .is_some_and(|url| !url.trim().is_empty())
+}
+
 pub(super) fn apply_parsed_command(
     tab: &mut RequestTabState,
     parsed: crate::services::curl::ParsedCurl,
     cmd_len: usize,
 ) {
+    // A complete command describes a new HTTP payload. Preserve tab identity,
+    // title and scripts, but never carry old credentials/body to its endpoint.
+    // Incomplete typed commands keep the existing fields until a URL exists.
+    if parsed.url.is_some() {
+        tab.headers.clear();
+        tab.headers_bulk = None;
+        tab.params_bulk = None;
+        tab.auth_type = crate::domain::request::AuthType::None;
+        tab.bearer_token.clear();
+        tab.basic_user.clear();
+        tab.basic_pass.clear();
+        tab.api_key_name.clear();
+        tab.api_key_value.clear();
+        tab.jwt_secret.clear();
+        tab.jwt_subject.clear();
+        tab.cookie_string.clear();
+        tab.cookies.clear();
+        tab.body_type = BodyType::None;
+        tab.body_editor = crate::state::tabs::make_code_editor("", "txt");
+        tab.form_fields.clear();
+        tab.form_viewers.clear();
+    }
     // A paste that parses to no URL must not linger in the URL bar: a
     // multi-MB command would sit in the single-line URL input and freeze
     // layout every frame. The parsed content still applies below — only the

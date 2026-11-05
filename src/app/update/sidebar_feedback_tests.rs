@@ -539,3 +539,110 @@ fn reopen_import_resumes_a_pending_file_selection() {
     drop(state);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn repeated_command_pastes_without_newlines_add_six_requests() {
+    use iced::widget::text_editor::{Action, Edit};
+    let (mut state, dir) = fixture();
+    let command = r#"curl --request POST 'https://httpbin.org/post' \
+ --header 'Content-Type: application/json' \
+ --data-raw '{"message":"Tes import cURL"}'"#;
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    for _ in 0..6 {
+        let action = Action::Edit(Edit::Paste(std::sync::Arc::new(command.into())));
+        let _ = super::update(&mut state, Message::Import(ImportMsg::Edited(action)));
+    }
+    let crate::app::ImportSource::Text(source) = state.import_source.as_ref().unwrap() else {
+        panic!("text source expected")
+    };
+    let resources = vec![crate::services::import::resources::parse(source).unwrap()];
+    assert_eq!(
+        crate::services::import::resources::command_count(&resources),
+        6
+    );
+    assert!(!source.contains("}'curl"));
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn repeated_clipboard_pastes_keep_appending_after_the_preview_is_truncated() {
+    let (mut state, dir) = fixture();
+    let command = format!(
+        "curl https://httpbin.org/post --data-raw '{}'",
+        "x".repeat(600)
+    );
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    for _ in 0..12 {
+        let _ = super::update(
+            &mut state,
+            Message::Import(ImportMsg::ClipboardReady(Some(command.clone()))),
+        );
+    }
+    assert!(state.import_truncated);
+    let Some(crate::app::ImportSource::Text(source)) = &state.import_source else {
+        panic!("full source expected")
+    };
+    let resources = vec![crate::services::import::resources::parse(source).unwrap()];
+    assert_eq!(
+        crate::services::import::resources::command_count(&resources),
+        12
+    );
+    assert_eq!(
+        source,
+        &std::iter::repeat_n(command, 12)
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn command_paste_replaces_selection_and_keeps_quoted_body_text_unchanged() {
+    use iced::widget::text_editor::{Action, Edit};
+    let (mut state, dir) = fixture();
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ClipboardReady(Some(
+            "curl https://old.example".into(),
+        ))),
+    );
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::Edited(Action::SelectAll)),
+    );
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ClipboardReady(Some(
+            "curl https://new.example".into(),
+        ))),
+    );
+    assert_eq!(state.import_editor.text(), "curl https://new.example");
+    let prefix = "curl https://httpbin.org/post --data-raw 'before ";
+    state.import_editor = iced::widget::text_editor::Content::with_text(&format!("{prefix}after'"));
+    state
+        .import_editor
+        .move_to(iced_core::text::editor::Cursor {
+            position: iced_core::text::editor::Position {
+                line: 0,
+                column: prefix.len(),
+            },
+            selection: None,
+        });
+    let action = Action::Edit(Edit::Paste(std::sync::Arc::new(
+        "curl stays in body ".into(),
+    )));
+    let _ = super::update(&mut state, Message::Import(ImportMsg::Edited(action)));
+    let parsed = crate::services::import::resources::parse(&state.import_editor.text()).unwrap();
+    let crate::services::import::resources::Resource::Command(command, _) = parsed else {
+        panic!("one command expected")
+    };
+    assert_eq!(
+        command.body.as_deref(),
+        Some("before curl stays in body after")
+    );
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}

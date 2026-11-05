@@ -263,3 +263,110 @@ fn title_edits_only_active_tab_and_prefills_save_dialog() {
     drop(state);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn url_bar_curl_paste_maps_endpoint_headers_and_body_before_stripping_newlines() {
+    let (mut state, dir) = fixture();
+    state.snippet_open = true;
+    state
+        .tabs
+        .active_tab_mut()
+        .set_url("https://old.example".into());
+    let command = r#"curl --request POST 'https://httpbin.org/post' \
+ --header 'Content-Type: application/json' \
+ --header 'X-Test: rustman-import' \
+ --data-raw '{"name":"Yosua","message":"Tes import cURL"}'"#;
+    dispatch(
+        &mut state,
+        RequestMsg::UrlEdited(iced::widget::text_editor::Action::Edit(
+            iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(command.into())),
+        )),
+    );
+    let tab = state.tabs.active_tab();
+    assert_eq!(tab.url, "https://httpbin.org/post");
+    assert_eq!(tab.url_editor.text(), "https://httpbin.org/post");
+    assert_eq!(tab.method.as_str(), "POST");
+    assert_eq!(tab.headers.len(), 2);
+    assert!(
+        tab.headers
+            .iter()
+            .any(|h| h.key == "X-Test" && h.value == "rustman-import")
+    );
+    assert_eq!(
+        tab.body_editor.content(),
+        r#"{"name":"Yosua","message":"Tes import cURL"}"#
+    );
+    assert_eq!(tab.body_type, crate::domain::request::BodyType::Json);
+    assert!(!state.snippet.contains("https://curl"));
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn url_bar_get_curl_paste_does_not_keep_the_previous_request_credentials_or_body() {
+    let (mut state, dir) = fixture();
+    let tab = state.tabs.active_tab_mut();
+    tab.title = "Custom request name".into();
+    tab.auth_type = crate::domain::request::AuthType::Bearer;
+    tab.bearer_token = "old-private-token".into();
+    tab.body_type = crate::domain::request::BodyType::Json;
+    tab.body_editor = crate::state::tabs::make_code_editor(r#"{"old":"private body"}"#, "json");
+    tab.headers.push(crate::domain::request::KeyValue {
+        id: "old".into(),
+        key: "X-Old".into(),
+        value: "private".into(),
+        enabled: true,
+    });
+    dispatch(
+        &mut state,
+        RequestMsg::UrlEdited(iced::widget::text_editor::Action::Edit(
+            iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(
+                "curl https://new.example/get".into(),
+            )),
+        )),
+    );
+    let tab = state.tabs.active_tab();
+    assert_eq!(tab.url, "https://new.example/get");
+    assert_eq!(tab.title, "Custom request name");
+    assert_eq!(tab.auth_type, crate::domain::request::AuthType::None);
+    assert!(tab.bearer_token.is_empty());
+    assert!(tab.headers.is_empty());
+    assert_eq!(tab.body_type, crate::domain::request::BodyType::None);
+    assert!(tab.body_editor.content().is_empty());
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn incomplete_curl_paste_preserves_the_previous_request() {
+    let (mut state, dir) = fixture();
+    let tab = state.tabs.active_tab_mut();
+    tab.set_url("https://old.example/keep".into());
+    tab.body_type = crate::domain::request::BodyType::Json;
+    tab.body_editor = crate::state::tabs::make_code_editor(r#"{"old":true}"#, "json");
+    tab.auth_type = crate::domain::request::AuthType::Bearer;
+    tab.bearer_token = "keep-token".into();
+    let command = r#"curl -X DELETE -H 'X-New: wrong' --data-raw '{"new":true}'"#;
+    dispatch(
+        &mut state,
+        RequestMsg::UrlEdited(iced::widget::text_editor::Action::Edit(
+            iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(command.into())),
+        )),
+    );
+    let tab = state.tabs.active_tab();
+    assert_eq!(tab.url, "https://old.example/keep");
+    assert_eq!(tab.url_editor.text(), "https://old.example/keep");
+    assert_eq!(tab.method.as_str(), "GET");
+    assert!(tab.headers.is_empty());
+    assert_eq!(tab.body_editor.content(), r#"{"old":true}"#);
+    assert_eq!(tab.bearer_token, "keep-token");
+    assert!(
+        state
+            .status_message
+            .as_deref()
+            .unwrap_or_default()
+            .contains("URL")
+    );
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}

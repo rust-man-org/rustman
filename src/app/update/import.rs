@@ -41,11 +41,9 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
             }
             if let iced::widget::text_editor::Action::Edit(
                 iced::widget::text_editor::Edit::Paste(value),
-            ) = &action
+            ) = action
             {
-                if value.len() > crate::consts::PASTE_GUARD_LEN {
-                    return preview_source(state, value.to_string());
-                }
+                return paste_text(state, value.as_str());
             }
             let edits = action.is_edit();
             if state.import_truncated && edits {
@@ -132,7 +130,7 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
                 return Task::none();
             }
             match text {
-                Some(text) => preview_source(state, text),
+                Some(text) => paste_text(state, &text),
                 None => {
                     state.import_error = Some("Clipboard is empty.".into());
                     Task::none()
@@ -564,4 +562,84 @@ fn command_collection(
         },
         environment,
     ))
+}
+
+/// Insert clipboard text at the editor selection. Large sources retain their
+/// full data outside the widget; subsequent command pastes append to that data.
+fn paste_text(state: &mut AppState, pasted: &str) -> Task<Message> {
+    use crate::services::import::resources::needs_paste_separator;
+    use iced::widget::text_editor::{Action, Edit};
+    if state.import_truncated {
+        let Some(crate::app::ImportSource::Text(source)) = &state.import_source else {
+            return Task::none();
+        };
+        if crate::services::import::classify_pasted_command(pasted)
+            == crate::services::import::PastedCommand::Other
+        {
+            state.import_error = Some("Clear the large input before replacing it. Command pastes append to the full input.".into());
+            return Task::none();
+        }
+        let separator = if needs_paste_separator(source, pasted) {
+            "\n"
+        } else {
+            ""
+        };
+        if source
+            .len()
+            .saturating_add(separator.len())
+            .saturating_add(pasted.len())
+            > crate::consts::IMPORT_FILE_LIMIT
+        {
+            state.import_error = Some("Combined input exceeds the 32 MB import limit.".into());
+            return Task::none();
+        }
+        return preview_source(state, format!("{source}{separator}{pasted}"));
+    }
+    let text = state.import_editor.text();
+    let cursor = state.import_editor.cursor();
+    let offset = |position: iced_core::text::editor::Position| -> usize {
+        let mut index = 0;
+        for (line_index, line) in state.import_editor.lines().enumerate() {
+            if line_index == position.line {
+                return index + position.column.min(line.text.len());
+            }
+            index += line.text.len()
+                + if line.ending == iced_core::text::editor::LineEnding::None {
+                    1
+                } else {
+                    line.ending.as_str().len()
+                };
+        }
+        text.len()
+    };
+    let caret = offset(cursor.position);
+    let anchor = cursor.selection.map(offset).unwrap_or(caret);
+    let start = caret.min(anchor);
+    let end = caret.max(anchor);
+    let separator = if start == end && end == text.len() && needs_paste_separator(&text, pasted) {
+        "\n"
+    } else {
+        ""
+    };
+    let result_len = text
+        .len()
+        .saturating_sub(end - start)
+        .saturating_add(separator.len())
+        .saturating_add(pasted.len());
+    if result_len > crate::consts::IMPORT_FILE_LIMIT {
+        state.import_error = Some("Combined input exceeds the 32 MB import limit.".into());
+        return Task::none();
+    }
+    if result_len > crate::consts::PASTE_GUARD_LEN {
+        return preview_source(
+            state,
+            format!("{}{separator}{pasted}{}", &text[..start], &text[end..]),
+        );
+    }
+    state
+        .import_editor
+        .perform(Action::Edit(Edit::Paste(std::sync::Arc::new(format!(
+            "{separator}{pasted}"
+        )))));
+    schedule_preview(state, state.import_editor.text())
 }

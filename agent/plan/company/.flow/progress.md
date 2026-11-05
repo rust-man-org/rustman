@@ -4,8 +4,8 @@ Updated: 2026-11-05 (Asia/Jakarta).
 
 ## Resume checkpoint
 
-- Current scope: batch cURL import, environment-save shortcut and live request titles on `ws/10-layout/t4-request-tabs`.
-- Active task: batch import + environment shortcut + live title completed; local commit only, no push.
+- Current scope: repeated import paste and direct URL-bar cURL mapping fixes on `ws/10-layout/t4-request-tabs`.
+- Active task: repeated paste and direct URL-bar mapping fixes completed; local commit only, no push.
 - Completed: Windows baseline/launch green (zip 9 fix); parallel rules and 09 plan written.
 - Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
   Local scaffold/CI commit: `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
@@ -47,6 +47,20 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 | [X] | 09 | Design tokens | — | `4289b76` on `ws/09-design-tokens/t1-tokens`: Rustman Light/Dark appended, fresh-install default, 5 tests. Fonts deferred; status colors kept global (36 call sites). |
 
 ## Active task details
+
+- [X] Codex, 2026-11-05: repeated command pastes insert a newline at the end
+  of existing commands, so bodies no longer join directly to the next curl.
+  Ctrl+V and the clipboard button share insertion/selection behavior; large
+  sources append outside the truncated widget. Quoted body text stays intact.
+  Red reproduced six pastes counted as one; updated regression counts six.
+  Small cURL/HTTPie pastes in the URL bar map before newline stripping.
+  Complete commands replace HTTP fields without carrying old auth/body;
+  incomplete commands without a URL preserve the existing request.
+  Review finding reproduced DELETE mutation from missing-URL paste, then fixed
+  in synchronous and background import handlers; review verified the fix.
+  Gates: 302 default / 294 no-default passed, 3 network tests ignored each.
+  File claims released: import/request, resource helper and paste regressions.
+  Current native executable needs rebuilding after closing the running app.
 
 - [X] Codex, 2026-11-05, `ws/10-layout/t4-request-tabs`: batch import and inline editing.
   Multiple pasted cURL commands retain quoted/multiline payloads and order.
@@ -158,7 +172,7 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 
 ## Verification checkpoint
 
-- Latest Windows gate (2026-11-05): 296 default / 288 no-default tests passed;
+- Latest Windows gate (2026-11-05): 302 default / 294 no-default tests passed;
   3 live-network tests ignored each. Native QA and exe-lock limits above.
   Earlier release evidence: target/environment-page-release.log.
 - Historical 2026-11-03 baseline: zip 9 Windows extraction fixed; build and launch
