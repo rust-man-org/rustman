@@ -198,8 +198,15 @@ pub(super) fn save_dialog(state: &AppState) -> Element<'_, Message> {
         .padding([8, 10])
         .style(crate::ui::styles::field_input);
 
-    let mut col_col = column![text("Save to").size(11).color(Palette::text_muted())].spacing(4);
+    let mut col_col = column![].spacing(4);
 
+    // Only the chosen collection unfolds its folders; listing every folder
+    // of every collection made the dialog taller than the window (a large
+    // workspace has hundreds), and nothing below the name was drawn.
+    let open_col = match state.save_dialog_group_id.as_deref() {
+        Some(gid) => crate::app::tree::root_collection_of(&state.groups, gid),
+        None => state.save_dialog_collection_id.clone(),
+    };
     for col in &state.collections {
         let selected = !state.save_dialog_new_col
             && state.save_dialog_group_id.is_none()
@@ -210,7 +217,9 @@ pub(super) fn save_dialog(state: &AppState) -> Element<'_, Message> {
             selected,
             move || Message::SaveDialog(SaveDialogMsg::ParentSelected(col_id.clone())),
         ));
-        col_col = save_dialog_groups(state, col_col, &col.id, true, 1);
+        if !state.save_dialog_new_col && open_col.as_deref() == Some(col.id.as_str()) {
+            col_col = save_dialog_groups(state, col_col, &col.id, true, 1);
+        }
     }
 
     let new_col_selected = state.save_dialog_new_col;
@@ -255,7 +264,15 @@ pub(super) fn save_dialog(state: &AppState) -> Element<'_, Message> {
         text("Name").size(11).color(Palette::text_muted()),
         name_input,
         Space::new().height(8),
-        col_col,
+        text("Save to").size(11).color(Palette::text_muted()),
+        container(
+            scrollable(container(col_col).padding(iced::padding::right(10)))
+                .direction(iced::widget::scrollable::Direction::Vertical(
+                    crate::ui::theme::grabbable_scrollbar(),
+                ))
+                .style(crate::ui::theme::thin_scrollbar),
+        )
+        .max_height(320),
     ]
     .spacing(4)
     .width(440);
@@ -599,17 +616,15 @@ fn import_summary(s: &crate::services::import::resources::Summary) -> Element<'s
             })
             .into()
     };
-    let tiles = container(
-        row![
-            tile(s.folders, "Folders", false),
-            rule(),
-            tile(s.requests, "Requests", false),
-            rule(),
-            tile(s.variables, "Variables", false),
-            rule(),
-            tile(s.environments, "Environments", s.environments > 0),
-        ],
-    )
+    let tiles = container(row![
+        tile(s.folders, "Folders", false),
+        rule(),
+        tile(s.requests, "Requests", false),
+        rule(),
+        tile(s.variables, "Variables", false),
+        rule(),
+        tile(s.environments, "Environments", s.environments > 0),
+    ])
     .clip(true)
     .style(|_| container::Style {
         border: Border {
@@ -619,22 +634,23 @@ fn import_summary(s: &crate::services::import::resources::Summary) -> Element<'s
         },
         ..Default::default()
     });
-    let chip = |icon: iced::widget::Text<'static>, label: String, fg: iced::Color, bg: iced::Color| {
-        container(
-            row![icon.size(12).color(fg), text(label).size(11).color(fg)]
-                .spacing(6)
-                .align_y(iced::Alignment::Center),
-        )
-        .padding([5, 10])
-        .style(move |_| container::Style {
-            background: Some(bg.into()),
-            border: Border {
-                radius: 24.0.into(),
+    let chip =
+        |icon: iced::widget::Text<'static>, label: String, fg: iced::Color, bg: iced::Color| {
+            container(
+                row![icon.size(12).color(fg), text(label).size(11).color(fg)]
+                    .spacing(6)
+                    .align_y(iced::Alignment::Center),
+            )
+            .padding([5, 10])
+            .style(move |_| container::Style {
+                background: Some(bg.into()),
+                border: Border {
+                    radius: 24.0.into(),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        })
-    };
+            })
+        };
     let mut chips = row![].spacing(8);
     let supported = s.requests.saturating_sub(s.scripts_to_review);
     if supported > 0 {

@@ -209,11 +209,31 @@ fn label_impl(
         tip = tip.font(font);
     }
     let tip_text = tip_text(&name);
+    // The full name of a truncated row: a framed card under the row, shown
+    // only after the pointer rests, so sweeping the tree stays quiet.
     iced::widget::tooltip(
         tip,
-        text(tip_text).size(12).color(Palette::text()),
-        iced::widget::tooltip::Position::FollowCursor,
+        iced::widget::container(text(tip_text).size(12).color(Palette::text()))
+            .padding([4, 8])
+            .max_width(420)
+            .style(|_| iced::widget::container::Style {
+                background: Some(iced::Background::Color(Palette::surface_raised())),
+                border: iced::Border {
+                    color: Palette::border(),
+                    width: 1.0,
+                    radius: 4.0.into(),
+                },
+                shadow: iced::Shadow {
+                    color: iced::Color::from_rgba(0.0, 0.0, 0.0, 0.3),
+                    offset: iced::Vector::new(0.0, 2.0),
+                    blur_radius: 8.0,
+                },
+                ..Default::default()
+            }),
+        iced::widget::tooltip::Position::Bottom,
     )
+    .gap(4)
+    .delay(std::time::Duration::from_millis(700))
     .into()
 }
 
