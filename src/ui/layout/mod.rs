@@ -9,6 +9,7 @@ use crate::{
     ui::{icons, request, response, sidebar, theme::Palette},
 };
 
+mod collections_modal;
 mod console;
 mod dialogs;
 pub mod header;
@@ -104,6 +105,8 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         iced::widget::stack![root, dialogs::save_dialog(state)].into()
     } else if state.curl_modal_open {
         iced::widget::stack![root, dialogs::curl_modal(state)].into()
+    } else if let Some(modal) = &state.collections_modal {
+        iced::widget::stack![root, collections_modal::view(state, modal)].into()
     } else if state.import_dialog_open {
         iced::widget::stack![root, dialogs::import_dialog(state)].into()
     } else if state.global_scripts_modal_open {

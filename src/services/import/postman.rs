@@ -241,6 +241,23 @@ pub fn import_environment(
     })
 }
 
+/// Postman's old v1 collection shape (`requests` + `order`, no `info`).
+pub fn is_v1_collection(json: &str) -> bool {
+    let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(json) else {
+        return false;
+    };
+    !map.contains_key("info") && map.get("requests").is_some_and(|r| r.is_array())
+}
+
+/// The `name` of a v1 collection, for its picker row.
+pub fn v1_name(json: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(json)
+        .ok()?
+        .get("name")?
+        .as_str()
+        .map(str::to_owned)
+}
+
 /// A Postman data dump's `archive.json`: only an index of ids, no data.
 pub fn is_dump_index(json: &str) -> bool {
     let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(json) else {

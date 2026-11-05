@@ -282,12 +282,200 @@ pub fn read_paths(paths: Vec<std::path::PathBuf>) -> Result<Vec<Resource>, Strin
         }
         let input = String::from_utf8(bytes)
             .map_err(|_| format!("{} is not UTF-8 text.", path.display()))?;
+        let input = input
+            .strip_prefix('\u{feff}')
+            .map(str::to_owned)
+            .unwrap_or(input);
         resources.extend(parse_all(&input).map_err(|e| format!("{}: {e}", path.display()))?);
     }
     if resources.is_empty() {
         return Err("No supported resources found in this selection.".into());
     }
     Ok(resources)
+}
+
+/// How one scanned file can be imported (mockup `.imp-status`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScanStatus {
+    /// Imports as is.
+    Ready,
+    /// Imports, but has Postman scripts kept as comments.
+    Review,
+    /// A format Rustman reads but cannot import (Postman v1).
+    Unsupported(String),
+    /// Could not be read or parsed.
+    Error(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScanKind {
+    Collection,
+    Environment,
+}
+
+/// One file of a folder import, parsed on its own so a bad file only
+/// marks its own row.
+#[derive(Debug, Clone)]
+pub struct ScanEntry {
+    pub file: String,
+    pub name: String,
+    pub kind: ScanKind,
+    pub summary: Summary,
+    pub status: ScanStatus,
+    pub resources: Vec<Resource>,
+}
+
+impl ScanEntry {
+    pub fn importable(&self) -> bool {
+        matches!(self.status, ScanStatus::Ready | ScanStatus::Review)
+    }
+}
+
+/// Expand folders (one level of nesting per entry, symlinks skipped) into
+/// the files a folder import looks at.
+fn collect_files(paths: Vec<std::path::PathBuf>) -> Result<Vec<std::path::PathBuf>, String> {
+    let mut pending = paths;
+    let mut files = Vec::new();
+    let mut visited = 0;
+    while let Some(path) = pending.pop() {
+        visited += 1;
+        if visited > 2048 {
+            return Err("Select fewer files (maximum 2048 folder entries).".into());
+        }
+        let metadata = std::fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
+        if metadata.is_dir() {
+            for entry in std::fs::read_dir(&path).map_err(|e| e.to_string())? {
+                let child = entry.map_err(|e| e.to_string())?.path();
+                if child.is_dir()
+                    || child.extension().and_then(|s| s.to_str()).is_some_and(|s| {
+                        matches!(
+                            s.to_ascii_lowercase().as_str(),
+                            "json" | "yaml" | "yml" | "txt" | "curl" | "sh"
+                        )
+                    })
+                {
+                    pending.push(child);
+                }
+            }
+            continue;
+        }
+        files.push(path);
+    }
+    files.sort();
+    Ok(files)
+}
+
+/// Scan files and folders for the import picker. Unlike [`read_paths`],
+/// every file gets its own row and status; only the selection-wide size
+/// limit stops the scan. A data dump's `archive.json` index is skipped.
+pub fn scan_paths(paths: Vec<std::path::PathBuf>) -> Result<Vec<ScanEntry>, String> {
+    use std::io::Read;
+    let mut entries = Vec::new();
+    let mut total = 0usize;
+    for path in collect_files(paths)? {
+        let file = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.display().to_string());
+        let error = |file: &str, msg: String| ScanEntry {
+            name: file.to_owned(),
+            file: file.to_owned(),
+            kind: ScanKind::Collection,
+            summary: Summary::default(),
+            status: ScanStatus::Error(msg),
+            resources: Vec::new(),
+        };
+        let mut bytes = Vec::new();
+        let read = std::fs::File::open(&path).and_then(|f| {
+            f.take(crate::consts::IMPORT_FILE_LIMIT as u64 + 1)
+                .read_to_end(&mut bytes)
+        });
+        if let Err(e) = read {
+            entries.push(error(&file, e.to_string()));
+            continue;
+        }
+        if bytes.len() > crate::consts::IMPORT_FILE_LIMIT {
+            entries.push(error(&file, "Larger than the 32 MB import limit".into()));
+            continue;
+        }
+        total += bytes.len();
+        if total > crate::consts::IMPORT_TOTAL_LIMIT {
+            return Err("Selection exceeds the 256 MB import limit.".into());
+        }
+        let Ok(input) = String::from_utf8(bytes) else {
+            entries.push(error(&file, "Not UTF-8 text".into()));
+            continue;
+        };
+        // Windows tools often write a UTF-8 BOM; JSON parsers reject it.
+        let input = input
+            .strip_prefix('\u{feff}')
+            .map(str::to_owned)
+            .unwrap_or(input);
+        if super::postman::is_dump_index(&input) {
+            continue;
+        }
+        if super::postman::is_v1_collection(&input) {
+            let mut e = error(&file, String::new());
+            e.name = super::postman::v1_name(&input).unwrap_or(file.clone());
+            e.status = ScanStatus::Unsupported("Postman v1 format is not supported".into());
+            entries.push(e);
+            continue;
+        }
+        match parse_all(&input) {
+            Err(e) => {
+                let mut msg = e;
+                if let Err(json) = serde_json::from_str::<serde_json::Value>(&input) {
+                    msg = format!("Invalid JSON: {json}");
+                }
+                entries.push(error(&file, msg));
+            }
+            Ok(resources) => {
+                let summary = Summary::of(&resources);
+                let (kind, name) = match resources.first() {
+                    Some(Resource::Environments(envs)) => (
+                        ScanKind::Environment,
+                        envs.first().map(|e| e.name.clone()).unwrap_or_default(),
+                    ),
+                    Some(Resource::Collections(cols)) => (
+                        ScanKind::Collection,
+                        cols.first()
+                            .map(|c| c.collection.name.clone())
+                            .unwrap_or_default(),
+                    ),
+                    _ => (ScanKind::Collection, file.clone()),
+                };
+                entries.push(ScanEntry {
+                    file: file.clone(),
+                    name: if name.trim().is_empty() { file } else { name },
+                    kind,
+                    status: if summary.scripts_to_review > 0 {
+                        ScanStatus::Review
+                    } else {
+                        ScanStatus::Ready
+                    },
+                    summary,
+                    resources,
+                });
+            }
+        }
+    }
+    if entries.is_empty() {
+        return Err("No supported resources found in this selection.".into());
+    }
+    // Importable rows first (collections, then environments), then the
+    // unsupported / broken files; each group by name.
+    let rank = |e: &ScanEntry| {
+        (
+            !e.importable(),
+            e.kind == ScanKind::Environment,
+            e.name.to_lowercase(),
+        )
+    };
+    entries.sort_by_key(rank);
+    Ok(entries)
 }
 
 #[cfg(test)]
@@ -384,5 +572,46 @@ mod tests {
                 .contains("32 MB")
         );
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn scan_rows_each_file_with_its_own_status() {
+        let dir = std::env::temp_dir().join(format!("rustman-scan-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(dir.join("collection")).unwrap();
+        std::fs::create_dir_all(dir.join("environment")).unwrap();
+        std::fs::write(dir.join("archive.json"), r#"{"collection": {"a": true}}"#).unwrap();
+        std::fs::write(
+            dir.join("collection/a.json"),
+            "\u{feff}{\"info\": {\"name\": \"Alpha\"}, \"item\": []}",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("collection/old.json"),
+            r#"{"name": "Old", "requests": []}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.join("collection/bad.json"), r#"{"info": "#).unwrap();
+        std::fs::write(
+            dir.join("environment/e.json"),
+            r#"{"name": "Env", "values": [{"key": "k", "value": "v"}]}"#,
+        )
+        .unwrap();
+        let rows = scan_paths(vec![dir.clone()]).unwrap();
+        let status = |name: &str| {
+            rows.iter()
+                .find(|r| r.name == name)
+                .map(|r| r.status.clone())
+        };
+        assert_eq!(rows.len(), 4, "archive.json is skipped");
+        assert_eq!(status("Alpha"), Some(ScanStatus::Ready), "BOM is tolerated");
+        assert!(matches!(status("Old"), Some(ScanStatus::Unsupported(_))));
+        assert!(matches!(status("bad.json"), Some(ScanStatus::Error(_))));
+        let order: Vec<&str> = rows.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(
+            order,
+            ["Alpha", "Env", "bad.json", "Old"],
+            "importable first (collections, environments), then the rest"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

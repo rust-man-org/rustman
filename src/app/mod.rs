@@ -24,7 +24,7 @@ mod scripting;
 mod session;
 pub(crate) mod snippet;
 mod subscription;
-mod tree;
+pub(crate) mod tree;
 mod update;
 
 #[derive(Debug, Clone)]
@@ -95,6 +95,8 @@ pub struct AppState {
     pub curl_modal_command: String,
     /// Shared resource dialog; large clipboard/file imports parse off-thread.
     pub import_dialog_open: bool,
+    /// Import / export collections picker (section ⋯ menu).
+    pub collections_modal: Option<crate::state::collections_modal::CollectionsModal>,
     pub import_editor: iced::widget::text_editor::Content,
     pub import_error: Option<String>,
     pub import_preview: Option<Vec<crate::services::import::resources::Resource>>,

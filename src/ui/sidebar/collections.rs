@@ -238,13 +238,17 @@ fn more_menu_items() -> Vec<Element<'static, Message>> {
         menu_item(
             Some(icons::import_box()),
             "Import collections…",
-            Some(Message::Import(ImportMsg::OpenPostmanDialog)),
+            Some(Message::Import(ImportMsg::ModalOpened(
+                crate::state::collections_modal::ModalTab::Import,
+            ))),
             false,
         ),
         menu_item(
             Some(icons::export()),
-            "Export all collections",
-            Some(Message::Import(ImportMsg::ExportAllCollections)),
+            "Export collections…",
+            Some(Message::Import(ImportMsg::ModalOpened(
+                crate::state::collections_modal::ModalTab::Export,
+            ))),
             false,
         ),
     ]

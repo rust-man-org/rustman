@@ -6,6 +6,7 @@ use super::AppState;
 
 mod app_msg;
 mod auth;
+mod collections_modal;
 mod drafts;
 mod environment_cell;
 mod examples;
@@ -180,6 +181,20 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
                 | crate::message::ImportMsg::ChooseFiles
                 | crate::message::ImportMsg::ChooseFolder
                 | crate::message::ImportMsg::PathsSelected(_)
+                | crate::message::ImportMsg::ModalOpened(_)
+                | crate::message::ImportMsg::ModalClosed
+                | crate::message::ImportMsg::ModalTabSelected(_)
+                | crate::message::ImportMsg::ModalFilterChanged(_)
+                | crate::message::ImportMsg::PickChooseFolder
+                | crate::message::ImportMsg::PickChooseFiles
+                | crate::message::ImportMsg::PickScanned(_)
+                | crate::message::ImportMsg::PickToggled(_)
+                | crate::message::ImportMsg::PickToggledAll
+                | crate::message::ImportMsg::ExportToggled(_)
+                | crate::message::ImportMsg::ExportToggledAll
+                | crate::message::ImportMsg::ExportFormatChanged(_)
+                | crate::message::ImportMsg::ExportIncludeEnvToggled
+                | crate::message::ImportMsg::ExportSubmit
         )
         // Expanded editors are transient UI: paging or expanding never
         // touches the persisted snapshot. A rejected oversized paste changes

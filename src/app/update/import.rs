@@ -4,6 +4,26 @@ use crate::app::AppState;
 use crate::message::{AppMsg, ImportMsg, Message};
 
 pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
+    if matches!(
+        msg,
+        ImportMsg::ModalOpened(_)
+            | ImportMsg::ModalClosed
+            | ImportMsg::ModalTabSelected(_)
+            | ImportMsg::ModalFilterChanged(_)
+            | ImportMsg::PickChooseFolder
+            | ImportMsg::PickChooseFiles
+            | ImportMsg::PickScanned(_)
+            | ImportMsg::PickToggled(_)
+            | ImportMsg::PickToggledAll
+            | ImportMsg::PickSubmit
+            | ImportMsg::ExportToggled(_)
+            | ImportMsg::ExportToggledAll
+            | ImportMsg::ExportFormatChanged(_)
+            | ImportMsg::ExportIncludeEnvToggled
+            | ImportMsg::ExportSubmit
+    ) {
+        return super::collections_modal::handle(state, msg);
+    }
     match msg {
         ImportMsg::OpenPostmanDialog => {
             if state.importing && !state.import_dialog_open {
@@ -366,42 +386,22 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
             )
         }
 
-        ImportMsg::ExportAllCollections => {
-            let all: Vec<crate::domain::group::ImportedCollection> = state
-                .collections
-                .iter()
-                .map(|c| crate::app::tree::collection_from_state(state, c))
-                .collect();
-            if all.is_empty() {
-                state.status_message = Some("Nothing to export — no collections yet".to_owned());
-                return Task::none();
-            }
-            let json = crate::services::import::native_export_all(&all);
-            let file_name = "rustman-collections.json".to_owned();
-            Task::perform(
-                async move {
-                    let file = rfd::AsyncFileDialog::new()
-                        .set_file_name(&file_name)
-                        .add_filter("JSON", &["json"])
-                        .set_title("Export All Collections")
-                        .save_file()
-                        .await;
-                    if let Some(f) = file {
-                        let path = f.path().to_path_buf();
-                        let _ = tokio::fs::write(&path, json.as_bytes()).await;
-                        Some(path.to_string_lossy().to_string())
-                    } else {
-                        None
-                    }
-                },
-                |path| match path {
-                    Some(p) => Message::Import(ImportMsg::ExportDone(p)),
-                    None => Message::App(AppMsg::Noop),
-                },
-            )
-        }
-
         ImportMsg::PostmanLoaded(data) => apply_collections(state, data, None),
+        ImportMsg::ModalOpened(_)
+        | ImportMsg::ModalClosed
+        | ImportMsg::ModalTabSelected(_)
+        | ImportMsg::ModalFilterChanged(_)
+        | ImportMsg::PickChooseFolder
+        | ImportMsg::PickChooseFiles
+        | ImportMsg::PickScanned(_)
+        | ImportMsg::PickToggled(_)
+        | ImportMsg::PickToggledAll
+        | ImportMsg::PickSubmit
+        | ImportMsg::ExportToggled(_)
+        | ImportMsg::ExportToggledAll
+        | ImportMsg::ExportFormatChanged(_)
+        | ImportMsg::ExportIncludeEnvToggled
+        | ImportMsg::ExportSubmit => unreachable!("routed to collections_modal"),
 
         ImportMsg::ExportDone(path) => {
             state.status_message = Some(format!("Exported to {path}"));
@@ -464,7 +464,7 @@ fn apply_collections(
 /// Postman environment or collection imported again) is updated in place
 /// and keeps its active flag. When nothing is active yet, the first real
 /// Postman environment is activated so imported requests resolve at once.
-fn apply_environments(
+pub(super) fn apply_environments(
     state: &mut AppState,
     envs: Vec<crate::domain::environment::AppEnvironment>,
 ) -> Result<(), String> {
