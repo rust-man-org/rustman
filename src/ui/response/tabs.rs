@@ -43,6 +43,10 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
                     Palette::SUCCESS
                 }),
             )
+        } else if t == ResponseTab::Headers {
+            // "Headers 8", like Postman.
+            let n = tab.response.as_ref().map_or(0, |r| r.headers.len());
+            ((n > 0).then_some(n), None)
         } else {
             (None, None)
         };

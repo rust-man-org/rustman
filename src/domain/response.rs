@@ -27,6 +27,19 @@ pub struct HttpResponse {
     pub timing: ResponseTiming,
     #[serde(default)]
     pub sizes: ResponseSizes,
+    #[serde(default)]
+    pub network: ResponseNetwork,
+}
+
+/// Connection facts for the network hover card.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResponseNetwork {
+    /// `HTTP/1.1`, `HTTP/2.0`, … (empty for older history).
+    pub http_version: String,
+    /// Server IP and port the response came from, when known.
+    pub remote_addr: Option<String>,
+    /// Sent over HTTPS (certificate verified by the client).
+    pub tls: bool,
 }
 
 /// Where the time went, in microseconds. `wait` runs from handing the request

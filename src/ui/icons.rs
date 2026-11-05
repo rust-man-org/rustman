@@ -191,6 +191,21 @@ pub fn file_code() -> Text<'static> {
 pub fn letter_text() -> Text<'static> {
     glyph('\u{e605}')
 }
+/// Lucide globe-lock, the response network card.
+pub fn globe_lock() -> Text<'static> {
+    glyph('\u{e5cd}')
+}
+/// Lucide timer, the response time card.
+pub fn timer() -> Text<'static> {
+    glyph('\u{e1e0}')
+}
+/// Lucide arrow-down / arrow-up, response / request size.
+pub fn arrow_down() -> Text<'static> {
+    glyph('\u{e042}')
+}
+pub fn arrow_up() -> Text<'static> {
+    glyph('\u{e04a}')
+}
 /// Lucide file-up, form-data file picker.
 pub fn file_up() -> Text<'static> {
     glyph('\u{e32a}')

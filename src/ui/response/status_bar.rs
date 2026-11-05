@@ -11,6 +11,7 @@ use crate::{
     message::Message,
     ui::{
         components::atoms::tooltip::tooltip,
+        icons,
         theme::{MONO, Palette, UI_FONT_MEDIUM},
     },
 };
@@ -75,6 +76,13 @@ pub fn meta(resp: &HttpResponse) -> Element<'static, Message> {
         hover_card(time.into(), time_card(resp)),
         text("·").size(11).color(Palette::text_subtle()),
         hover_card(size.into(), size_card(resp)),
+        hover_card(
+            icons::globe_lock()
+                .size(13)
+                .color(Palette::text_muted())
+                .into(),
+            network_card(resp),
+        ),
     ]
     .spacing(6)
     .align_y(Alignment::Center)
@@ -127,7 +135,12 @@ fn time_card(resp: &HttpResponse) -> Option<Element<'static, Message>> {
     if total == 0 {
         return None;
     }
-    let mut rows = column![card_title("Response Time", fmt_us(total))].spacing(6);
+    let mut rows = column![card_title(
+        icons::timer().size(13).color(Palette::text_muted()).into(),
+        "Response Time",
+        fmt_us(total)
+    )]
+    .spacing(6);
     let mut offset = 0u64;
     for (label, us, color) in phases {
         // Waterfall: lead-in, the phase, then the rest, in 1/1000ths.
@@ -191,7 +204,7 @@ fn size_card(resp: &HttpResponse) -> Option<Element<'static, Message>> {
                 .font(MONO)
                 .color(Palette::text_muted()),
         ]
-        .padding(iced::padding::left(14))
+        .padding(iced::padding::left(26))
         .into()
     };
     let rule = container(Space::new())
@@ -204,6 +217,7 @@ fn size_card(resp: &HttpResponse) -> Option<Element<'static, Message>> {
     Some(
         column![
             card_title(
+                badge(icons::arrow_down(), INFO),
                 "Response Size",
                 fmt_bytes(s.response_headers + resp.body_size)
             ),
@@ -211,6 +225,7 @@ fn size_card(resp: &HttpResponse) -> Option<Element<'static, Message>> {
             line("Body", resp.body_size),
             rule,
             card_title(
+                badge(icons::arrow_up(), Palette::WARNING),
                 "Request Size",
                 fmt_bytes(s.request_headers + s.request_body)
             ),
@@ -222,8 +237,13 @@ fn size_card(resp: &HttpResponse) -> Option<Element<'static, Message>> {
     )
 }
 
-fn card_title(label: &'static str, value: String) -> Element<'static, Message> {
+fn card_title(
+    icon: Element<'static, Message>,
+    label: &'static str,
+    value: String,
+) -> Element<'static, Message> {
     row![
+        icon,
         text(label)
             .size(12)
             .font(UI_FONT_MEDIUM)
@@ -231,8 +251,75 @@ fn card_title(label: &'static str, value: String) -> Element<'static, Message> {
         Space::new().width(Length::Fill),
         text(value).size(12).font(MONO).color(Palette::text()),
     ]
+    .spacing(8)
     .align_y(Alignment::Center)
     .into()
+}
+
+/// Blue, like Postman's response-size arrow.
+const INFO: Color = Color::from_rgb(0.30, 0.55, 0.95);
+
+/// 18px tinted square holding a white arrow (size card titles).
+fn badge(icon: iced::widget::Text<'static>, color: Color) -> Element<'static, Message> {
+    container(icon.size(11).color(Color::WHITE))
+        .width(18)
+        .height(18)
+        .center_x(18)
+        .center_y(18)
+        .style(move |_| container::Style {
+            background: Some(Background::Color(Color { a: 0.85, ..color })),
+            border: Border {
+                radius: 4.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
+}
+
+/// Postman's globe card: protocol, server address and whether the
+/// connection was encrypted. `None` for older history without it.
+fn network_card(resp: &HttpResponse) -> Option<Element<'static, Message>> {
+    let n = &resp.network;
+    if n.http_version.is_empty() {
+        return None;
+    }
+    let line = |label: &'static str, value: String| -> Element<'static, Message> {
+        row![
+            text(label).size(11).color(Palette::text_muted()),
+            Space::new().width(Length::Fill),
+            text(value).size(11).font(MONO).color(Palette::text()),
+        ]
+        .padding(iced::padding::left(26))
+        .into()
+    };
+    Some(
+        column![
+            card_title(
+                icons::globe_lock()
+                    .size(13)
+                    .color(Palette::text_muted())
+                    .into(),
+                "Network",
+                String::new(),
+            ),
+            line("HTTP Version", n.http_version.clone()),
+            line(
+                "Remote Address",
+                n.remote_addr.clone().unwrap_or_else(|| "—".into())
+            ),
+            line(
+                "Connection",
+                if n.tls {
+                    "TLS (certificate verified)".into()
+                } else {
+                    "Not encrypted (http)".into()
+                },
+            ),
+        ]
+        .spacing(6)
+        .into(),
+    )
 }
 
 fn fmt_us(us: u64) -> String {
@@ -293,9 +380,12 @@ mod tests {
         };
         assert!(time_card(&resp).is_none());
         assert!(size_card(&resp).is_none());
+        assert!(network_card(&resp).is_none());
         resp.timing.wait_us = 1000;
         resp.sizes.response_headers = 120;
         assert!(time_card(&resp).is_some());
         assert!(size_card(&resp).is_some());
+        resp.network.http_version = "HTTP/1.1".into();
+        assert!(network_card(&resp).is_some());
     }
 }

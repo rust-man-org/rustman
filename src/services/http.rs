@@ -285,6 +285,11 @@ async fn do_send(
 
     let status = response.status().as_u16();
     let response_headers = response_header_size(&response);
+    let network = crate::domain::response::ResponseNetwork {
+        http_version: format!("{:?}", response.version()),
+        remote_addr: response.remote_addr().map(|a| a.to_string()),
+        tls: response.url().scheme() == "https",
+    };
     let status_text = response
         .status()
         .canonical_reason()
@@ -364,6 +369,7 @@ async fn do_send(
             error: None,
             timing,
             sizes,
+            network: network.clone(),
         }),
         Err(_) => Ok(HttpResponse {
             status,
@@ -386,6 +392,7 @@ async fn do_send(
             error: None,
             timing,
             sizes,
+            network: network.clone(),
         }),
     }
 }
