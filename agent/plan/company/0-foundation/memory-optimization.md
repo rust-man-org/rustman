@@ -52,3 +52,32 @@ wgpu,tiny-skia unless ICED_BACKEND has a value. The measurements above describe
 the earlier software configuration. They are not GPU-default RAM measurements.
 The README uses short instructions in a Simplified Technical English style;
 full ASD-STE100 dictionary compliance has not been certified.
+
+## GPU default trimmed (2026-11-05, branch `perf/memory-optimize`)
+
+User report: ~180 MB in Task Manager with the GPU default. Cause: unrestricted
+wgpu on Windows initialises every backend, so Vulkan and DX12 both load their
+drivers (NVIDIA and AMD on this hybrid laptop).
+
+Release build, nine-request fixture, idle, private working set (Task Manager
+"Memory"), three samples each:
+
+| Config | MB |
+|---|---|
+| Old default (`wgpu,tiny-skia`, all backends) | 172 |
+| Power `low`, all backends | 132 |
+| `WGPU_BACKEND=vulkan` + low | 85–88 |
+| `WGPU_BACKEND=dx12` + high (NVIDIA) | 74–89 |
+| `WGPU_BACKEND=dx12` + low (AMD iGPU), **new default** | 80–99 |
+| Software `ICED_BACKEND=tiny-skia` | 13 |
+
+Change (`src/main.rs`): on Windows default `WGPU_BACKEND=dx12` and
+`WGPU_POWER_PREF=low` when the user set nothing; explicit `WGPU_BACKEND`,
+`WGPU_POWER_PREF`, `WGPU_ADAPTER_NAME` win. Without DX12, wgpu finds no adapter
+and iced falls back to tiny-skia. Low vs high power measured the same within
+noise, so low (integrated GPU, no discrete wake-up) was kept. GPU stays the
+default per the user's 2026-11-04 decision; software (`ICED_BACKEND=tiny-skia`)
+remains the opt-in for the smallest footprint.
+
+Next ideas (not done): glyph/atlas trimming, lazy editor creation for hidden
+tabs, response buffer caps, measuring after heavy JSON responses.
