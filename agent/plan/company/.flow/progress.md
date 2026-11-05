@@ -4,8 +4,8 @@ Updated: 2026-11-05 (Asia/Jakarta).
 
 ## Resume checkpoint
 
-- Current scope: repeated import paste and direct URL-bar cURL mapping fixes on `ws/10-layout/t4-request-tabs`.
-- Active task: repeated paste and direct URL-bar mapping fixes completed; local commit only, no push.
+- Current scope: layout parity 10 t4/t6 plus Postman collection import/export on `ws/10-layout/t4-request-tabs`.
+- Active task: request/response mockup parity (`ced2e85`), Postman data-dump import (`d328714`) and the import/export collections modal (`4797de1`) done; local commits only, no push. Next: merge into local `development`.
 - Completed: Windows baseline/launch green (zip 9 fix); parallel rules and 09 plan written.
 - Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
   Local scaffold/CI commit: `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
@@ -43,10 +43,22 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 | [ ] | 06 | Secrets / scanner | — | Audit redaction, re-merge and write guards. |
 | [ ] | 07 | Self-update integrity | — | Audit existing verification and tests. |
 | [ ] | 08 | PR / company CI | — | Audit review flow and validator. |
-| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header (`a488b7f`), t2 request header + URL row (`1a494f2`), seams (`9846277`) and t5 sidebar (`d382c1c`, `dc731ca`, hover actions, then aligned to the updated mockup `0976b17`; sample workspace via `scripts/ui.sh -x`) done and merged. Sidebar is made as close to Postman as possible (user decision 2026-11-04): filter box, `+` menu incl. Folder, import, `⋯`, COLLECTIONS section; full suite 203/195. Sidebar headers/environment rows/selected row and the URL preview line aligned to the updated mockup plus the URL row (method chevron, `{{var}}` highlight, split Send) on `feat/endpoint-examples` (252/244). Next: t3 tab bar, t4 sub-tabs, t6 response pane. |
+| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header (`a488b7f`), t2 request header + URL row (`1a494f2`), seams (`9846277`) and t5 sidebar (`d382c1c`, `dc731ca`, hover actions, then aligned to the updated mockup `0976b17`; sample workspace via `scripts/ui.sh -x`) done and merged. Sidebar is made as close to Postman as possible (user decision 2026-11-04): filter box, `+` menu incl. Folder, import, `⋯`, COLLECTIONS section; full suite 203/195. Sidebar headers/environment rows/selected row and the URL preview line aligned to the updated mockup plus the URL row (method chevron, `{{var}}` highlight, split Send) on `feat/endpoint-examples` (252/244). t4 sub-tabs + Headers/Auth/Body (incl. form-data on the kv table) and t6 response head/toolbar follow the mockup (`ced2e85`, `d328714`); saved tabs show the request name. Collections ⋯ menu opens the mockup's Import/Export modal (`4797de1`): per-file scan with Ready / Needs review / Unsupported / Error rows, Postman v2.1 or Rustman bundle export; full suite 314/306. Next: merge to `development`, t7 fonts. |
 | [X] | 09 | Design tokens | — | `4289b76` on `ws/09-design-tokens/t1-tokens`: Rustman Light/Dark appended, fresh-install default, 5 tests. Fonts deferred; status colors kept global (36 call sites). |
 
 ## Active task details
+
+- [X] Claude, 2026-11-05: Postman import/export. Data dumps (`archive.json`
+  index + `collection/` + `environment/`) import with environments,
+  collection variables as an environment, inherited auth (inherit / noauth,
+  v2.0 and v2.1 shapes) and Postman scripts kept as comments for review.
+  The import modal scans a folder or files and rows each file with its own
+  status (v1 = Unsupported, broken JSON = Error, BOM tolerated); only picked
+  rows import. Export writes one `.postman_collection.json` per collection
+  (+ active environment) or one Rustman bundle. Verified by capture against
+  a fixture dump; real-size dry run (100+ collections) parses in under 2 s.
+  Gaps: environment export uses the active environment only; Esc does not
+  close the modal yet.
 
 - [X] Codex, 2026-11-05: repeated command pastes insert a newline at the end
   of existing commands, so bodies no longer join directly to the next curl.
