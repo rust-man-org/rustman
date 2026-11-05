@@ -22,6 +22,8 @@ pub enum RowFill {
     Hover,
     /// Neutral active example, matching the Postman tree selection.
     NeutralSelected,
+    /// Accent-tinted, outlined: where a dragged row will land on release.
+    DropTarget,
 }
 
 pub fn tree_row<'a, M: Clone + 'a, R: iced::advanced::Renderer + 'a>(
@@ -47,11 +49,18 @@ pub fn tree_row<'a, M: Clone + 'a, R: iced::advanced::Renderer + 'a>(
                 background: match fill {
                     RowFill::NeutralSelected => Some(Palette::hover()),
                     RowFill::Hover => Some(Palette::hover()),
+                    RowFill::DropTarget => Some(Palette::accent_soft()),
                     RowFill::None => None,
                 }
                 .map(Background::Color),
                 text_color: Some(Palette::text()),
                 border: Border {
+                    color: Palette::accent(),
+                    width: if fill == RowFill::DropTarget {
+                        1.0
+                    } else {
+                        0.0
+                    },
                     radius: if matches!(fill, RowFill::NeutralSelected) {
                         0.0.into()
                     } else {

@@ -367,10 +367,7 @@ fn collection_view<'a>(
                 content,
                 BASE_INDENT,
                 COLLECTION_ROW_H,
-                drag_fill(
-                    dragging
-                        || state.sidebar.hovered_row.as_deref() == Some(collection.id.as_str()),
-                ),
+                container_fill(state, &collection.id, dragging),
                 Message::Sidebar(SidebarMsg::ItemDragStart(collection.id.clone())),
             ),
             &collection.id,
@@ -505,9 +502,7 @@ fn group_view<'a>(
                 content,
                 indent,
                 ROW_H,
-                drag_fill(
-                    dragging || state.sidebar.hovered_row.as_deref() == Some(group.id.as_str()),
-                ),
+                container_fill(state, &group.id, dragging),
                 Message::Sidebar(SidebarMsg::ItemDragStart(group.id.clone())),
             ),
             &group.id,
@@ -720,6 +715,16 @@ fn draggable<'a>(row_el: Element<'a, Message>, id: &str) -> Element<'a, Message>
 }
 
 const ACTION_W: f32 = 22.0;
+
+/// Collection / folder rows: outlined while a dragged row would drop into
+/// them, otherwise the usual drag / hover fill.
+fn container_fill(state: &AppState, id: &str, dragging: bool) -> RowFill {
+    if state.sidebar.drop_target.as_deref() == Some(id) {
+        RowFill::DropTarget
+    } else {
+        drag_fill(dragging || state.sidebar.hovered_row.as_deref() == Some(id))
+    }
+}
 
 fn drag_fill(dragging: bool) -> RowFill {
     if dragging {
