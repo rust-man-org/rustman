@@ -45,6 +45,7 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
     // search, palette, restore…), so refresh after everything except the
     // high-frequency noise that cannot change the request.
     let refresh_snippet = state.snippet_open
+        && !matches!(&message, Message::Request(crate::message::RequestMsg::UrlEdited(action)) if !request::url_action_edits_content(action))
         && !matches!(
             &message,
             Message::Response(_)
@@ -64,10 +65,22 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
                         | crate::message::SidebarMsg::ContextMenuClosed
                         | crate::message::SidebarMsg::EnvironmentVariableHover(..)
                 )
-                | Message::Import(crate::message::ImportMsg::Edited(_))
+                | Message::Import(
+                    crate::message::ImportMsg::Edited(_)
+                        | crate::message::ImportMsg::PreviewScheduled { .. }
+                        | crate::message::ImportMsg::PreviewReady { .. }
+                        | crate::message::ImportMsg::CollectionNameChanged(_)
+                        | crate::message::ImportMsg::CreateEnvironmentChanged(_)
+                        | crate::message::ImportMsg::Clear
+                )
                 | Message::Request(
-                    crate::message::RequestMsg::UrlHovered(_)
+                    crate::message::RequestMsg::TitleChanged(_)
+                        | crate::message::RequestMsg::UrlHovered(_)
                         | crate::message::RequestMsg::UrlCompletionMoved(_)
+                        | crate::message::RequestMsg::UrlVariableValueChanged(_)
+                        | crate::message::RequestMsg::UrlVariableEnvironmentSelected(_)
+                        | crate::message::RequestMsg::UrlVariableEnvironmentNameChanged(_)
+                        | crate::message::RequestMsg::UrlVariableDismissed
                         | crate::message::RequestMsg::UrlCompletionDismissed
                 )
                 | Message::Request(crate::message::RequestMsg::TabDragOver(_))
@@ -105,6 +118,9 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
 /// Expanded editors DO dirty on content edits (their write-back mutates the
 /// snapshot); navigation/selection/search inside them does not.
 pub(crate) fn marks_session_dirty(message: &Message) -> bool {
+    if let Message::Request(crate::message::RequestMsg::UrlEdited(action)) = message {
+        return request::url_action_edits_content(action);
+    }
     if matches!(
         message,
         Message::Sidebar(
@@ -150,7 +166,12 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
         )
         | Message::Palette(crate::message::PaletteMsg::Frame(_))
         | Message::Import(
-            crate::message::ImportMsg::OpenPostmanDialog
+            crate::message::ImportMsg::Clear
+                | crate::message::ImportMsg::CollectionNameChanged(_)
+                | crate::message::ImportMsg::CreateEnvironmentChanged(_)
+                | crate::message::ImportMsg::PreviewScheduled { .. }
+                | crate::message::ImportMsg::PreviewReady { .. }
+                | crate::message::ImportMsg::OpenPostmanDialog
                 | crate::message::ImportMsg::Edited(_)
                 | crate::message::ImportMsg::Submit
                 | crate::message::ImportMsg::Clipboard
@@ -186,6 +207,10 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
                 | crate::message::RequestMsg::FormValuePageNext(_)
                 | crate::message::RequestMsg::UrlHovered(_)
                 | crate::message::RequestMsg::UrlCompletionMoved(_)
+                | crate::message::RequestMsg::UrlVariableValueChanged(_)
+                | crate::message::RequestMsg::UrlVariableEnvironmentSelected(_)
+                | crate::message::RequestMsg::UrlVariableEnvironmentNameChanged(_)
+                | crate::message::RequestMsg::UrlVariableDismissed
                 | crate::message::RequestMsg::UrlCompletionDismissed
                 | crate::message::RequestMsg::OversizedUrlRejected(_)
                 | crate::message::RequestMsg::OpenImportDialog

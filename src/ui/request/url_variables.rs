@@ -8,7 +8,7 @@ use crate::{
 };
 use iced::{
     Border, Element, Length,
-    widget::{Space, button, column, container, row, scrollable, text, tooltip},
+    widget::{Space, button, column, container, row, scrollable, text, text_input, tooltip},
 };
 
 pub fn matches(tab: &RequestTabState, env: Option<&AppEnvironment>) -> Vec<String> {
@@ -37,13 +37,32 @@ pub fn wrap<'a>(
     tab: &'a RequestTabState,
     env: Option<&'a AppEnvironment>,
 ) -> Element<'a, Message> {
+    if let Some(draft) = &tab.url_variable_draft {
+        return crate::ui::widgets::popup::popup_sticky(
+            editor,
+            save_variable_card(draft),
+            Message::Request(RequestMsg::UrlVariableDismissed),
+            |message| {
+                matches!(
+                    message,
+                    Message::Request(
+                        RequestMsg::UrlVariableValueChanged(_)
+                            | RequestMsg::UrlVariableEnvironmentSelected(_)
+                            | RequestMsg::UrlVariableEnvironmentNameChanged(_)
+                            | RequestMsg::UrlVariableSave
+                    )
+                )
+            },
+            true,
+        );
+    }
     let keys = matches(tab, env);
     let open = !keys.is_empty();
     let tip: Element<'a, Message> = if !open && let Some(key) = &tab.url_hover {
         let value = env.and_then(|env| env.variables.get(key));
         let shown = value
             .map(|v| variables::preview(key, v))
-            .unwrap_or_else(|| "Unresolved variable".into());
+            .unwrap_or_else(|| "Unresolved variable · Click to save".into());
         container(
             column![
                 text(crate::services::format::head_capped(key, 128))
@@ -150,4 +169,107 @@ pub fn wrap<'a>(
         Message::Request(RequestMsg::UrlCompletionDismissed),
         open,
     )
+}
+
+fn save_variable_card(draft: &crate::state::tabs::UrlVariableDraft) -> Element<'_, Message> {
+    let mut destinations = column![].spacing(3);
+    for (id, name) in &draft.environments {
+        let selected = draft.environment_id.as_deref() == Some(id.as_str());
+        destinations = destinations.push(
+            button(
+                row![
+                    text(if selected { "●" } else { "○" })
+                        .size(12)
+                        .color(Palette::accent()),
+                    text(crate::services::format::head_capped(name, 80))
+                        .size(12)
+                        .color(Palette::text()),
+                ]
+                .spacing(8),
+            )
+            .on_press(Message::Request(
+                RequestMsg::UrlVariableEnvironmentSelected(Some(id.clone())),
+            ))
+            .width(Length::Fill)
+            .padding([6, 8])
+            .style(iced::widget::button::text),
+        );
+    }
+    destinations = destinations.push(
+        button(
+            row![
+                text(if draft.environment_id.is_none() {
+                    "●"
+                } else {
+                    "○"
+                })
+                .size(12)
+                .color(Palette::accent()),
+                text("Create environment…").size(12).color(Palette::text()),
+            ]
+            .spacing(8),
+        )
+        .on_press(Message::Request(
+            RequestMsg::UrlVariableEnvironmentSelected(None),
+        ))
+        .width(Length::Fill)
+        .padding([6, 8])
+        .style(iced::widget::button::text),
+    );
+    let mut content = column![
+        text(format!(
+            "Save {{{{{}}}}}",
+            crate::services::format::head_capped(&draft.key, 80)
+        ))
+        .size(13)
+        .font(UI_FONT_MEDIUM)
+        .color(Palette::text()),
+        text("Value").size(11).color(Palette::text_muted()),
+        text_input("Variable value", &draft.value)
+            .id("url-variable-value")
+            .style(crate::ui::styles::field_input)
+            .on_input(|value| Message::Request(RequestMsg::UrlVariableValueChanged(value)))
+            .secure(variables::sensitive(&draft.key))
+            .on_submit(Message::Request(RequestMsg::UrlVariableSave))
+            .size(12)
+            .padding([8, 9]),
+        text("Save to environment")
+            .size(11)
+            .color(Palette::text_muted()),
+        container(
+            scrollable(destinations)
+                .height(Length::Shrink)
+                .style(crate::ui::theme::thin_scrollbar)
+        )
+        .max_height(150),
+    ]
+    .spacing(8);
+    if draft.environment_id.is_none() {
+        content = content.push(
+            text_input("Environment name", &draft.environment_name)
+                .style(crate::ui::styles::field_input)
+                .on_input(|value| {
+                    Message::Request(RequestMsg::UrlVariableEnvironmentNameChanged(value))
+                })
+                .on_submit(Message::Request(RequestMsg::UrlVariableSave))
+                .size(12)
+                .padding([8, 9]),
+        );
+    }
+    if let Some(error) = &draft.error {
+        content = content.push(text(error).size(11).color(Palette::ERROR));
+    }
+    content = content.push(
+        row![
+            Space::new().width(Length::Fill),
+            crate::ui::components::atoms::Button::new("Cancel")
+                .ghost()
+                .on_press(Message::Request(RequestMsg::UrlVariableDismissed)),
+            crate::ui::components::atoms::Button::new("Save")
+                .primary()
+                .on_press(Message::Request(RequestMsg::UrlVariableSave)),
+        ]
+        .spacing(6),
+    );
+    container(content).padding(12).width(340).style(card).into()
 }

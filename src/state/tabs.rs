@@ -45,6 +45,16 @@ pub struct TestResult {
     pub passed: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct UrlVariableDraft {
+    pub key: String,
+    pub value: String,
+    pub environment_id: Option<String>,
+    pub environment_name: String,
+    pub environments: Vec<(String, String)>,
+    pub error: Option<String>,
+}
+
 pub struct RequestTabState {
     pub id: String,
     pub title: String,
@@ -58,6 +68,7 @@ pub struct RequestTabState {
     /// never disagree.
     pub url_editor: text_editor::Content,
     pub url_hover: Option<String>,
+    pub url_variable_draft: Option<UrlVariableDraft>,
     pub url_completion_open: bool,
     pub url_completion_selected: usize,
     pub headers: Vec<KeyValue>,
@@ -194,6 +205,7 @@ impl RequestTabState {
             url: String::new(),
             url_editor: text_editor::Content::new(),
             url_hover: None,
+            url_variable_draft: None,
             url_completion_open: false,
             url_completion_selected: 0,
             headers: Vec::new(),
@@ -256,6 +268,7 @@ impl RequestTabState {
     /// performs into the existing editor so the cursor survives.
     pub fn set_url(&mut self, url: String) {
         self.url_hover = None;
+        self.url_variable_draft = None;
         self.url_completion_open = false;
         self.url = url;
         self.url_editor = text_editor::Content::with_text(&self.url);

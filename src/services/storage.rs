@@ -484,6 +484,16 @@ pub fn replace_collection_contents(
     groups: &[Group],
     requests: &[SavedRequest],
 ) -> Result<(), String> {
+    replace_collection_and_environment(conn, collection, groups, requests, None)
+}
+
+pub fn replace_collection_and_environment(
+    conn: &Connection,
+    collection: &Collection,
+    groups: &[Group],
+    requests: &[SavedRequest],
+    environment: Option<&AppEnvironment>,
+) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     let collection_id = &collection.id;
     tx.execute(
@@ -509,6 +519,9 @@ pub fn replace_collection_contents(
         if !incoming.contains(old.id.as_str()) {
             delete_request(&tx, &old.id)?;
         }
+    }
+    if let Some(environment) = environment {
+        save_environment(&tx, environment)?;
     }
     tx.commit().map_err(|e| e.to_string())
 }

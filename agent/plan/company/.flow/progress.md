@@ -4,8 +4,8 @@ Updated: 2026-11-05 (Asia/Jakarta).
 
 ## Resume checkpoint
 
-- Current scope: resource-import dialog and URL variable assistance on `ws/10-layout/t4-request-tabs`.
-- Active task: resource import and URL variable assistance completed; local commit only, no push.
+- Current scope: batch cURL import, environment-save shortcut and live request titles on `ws/10-layout/t4-request-tabs`.
+- Active task: batch import + environment shortcut + live title completed; local commit only, no push.
 - Completed: Windows baseline/launch green (zip 9 fix); parallel rules and 09 plan written.
 - Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
   Local scaffold/CI commit: `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
@@ -48,23 +48,23 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 
 ## Active task details
 
-- [X] Codex, 2026-11-05, `ws/10-layout/t4-request-tabs`: sidebar and URL-menu
-  import now share the resource dialog (paste, clipboard, files/folders, drop).
-  cURL opens a new tab; errors stay inline; bounded parsing runs off-thread.
-  URL hover now shows the active environment value (secret-like names masked).
-  Typing an unfinished {{variable}} opens prefix completion, with mouse,
-  arrows, Enter/Tab and Escape. Replacement preserves suffix/caret and undo.
-  Snippets and Copy resolve the active environment; previews mask credentials.
-  Hover/completion navigation remain transient and skip snippet regeneration.
-  Gates: 283 default / 275 no-default passed, 3 network tests ignored each.
-  Native software-renderer QA: sidebar open, initial editor focus, keyboard
-  input, inline invalid-resource error, Escape close; modal shadow removed
-  after visual inspection. Successful import verified by state/parser tests;
-  native successful file/drop import and variable-assistance UI not exercised.
-  Computer Use stopped on the user's physical Escape; no further UI control.
-  Latest exe replacement was blocked by the still-open test app; both test
-  configurations compile. Local commit only, no push. File claim released;
-  prior sidebar checkpoints below remain historical.
+- [X] Codex, 2026-11-05, `ws/10-layout/t4-request-tabs`: batch import and inline editing.
+  Multiple pasted cURL commands retain quoted/multiline payloads and order.
+  Async preview shows request count + editable collection name before import.
+  Same-origin batches offer a new active baseUrl environment; collection and
+  environment persist in one transaction. Single commands still open a tab.
+  Retained text/path sources resume previews after close/reopen; Clear and
+  successful import release them. Stale preview revisions are ignored.
+  Clicking an unresolved URL variable opens an actual DB-save shortcut:
+  choose an existing environment or create a named one; duplicates rejected.
+  Title is editable in the header, updates the tab/draft, and prefills Save.
+  Gates: 296 default / 288 no-default passed, 3 network tests ignored each.
+  Independent review's preview-resume finding fixed with two regressions.
+  Latest changes have parser/state tests; native UI QA has not been repeated.
+  Prior native QA/control stopped on physical Escape. Run the app outside
+  the sandbox: sandbox launch hid clipboard text and could not open AppData
+  storage; user testing resumed via an outside-sandbox launch of 1ae078b.
+  File claims released: import/state/storage/dialog + URL shortcut/title. No push.
 
 - Task: [~] bottom-anchored Environments and hover-only environment actions.
 - Owner: Codex, 2026-11-04; feat/endpoint-examples, existing HEAD 2b00b48.
@@ -158,7 +158,7 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 
 ## Verification checkpoint
 
-- Latest Windows gate (2026-11-05): 283 default / 275 no-default tests passed;
+- Latest Windows gate (2026-11-05): 296 default / 288 no-default tests passed;
   3 live-network tests ignored each. Native QA and exe-lock limits above.
   Earlier release evidence: target/environment-page-release.log.
 - Historical 2026-11-03 baseline: zip 9 Windows extraction fixed; build and launch

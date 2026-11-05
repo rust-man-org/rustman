@@ -33,6 +33,11 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             | RequestMsg::UrlCompletionMoved(_)
             | RequestMsg::UrlCompletionSelected(_)
             | RequestMsg::UrlCompletionDismissed
+            | RequestMsg::UrlVariableValueChanged(_)
+            | RequestMsg::UrlVariableEnvironmentSelected(_)
+            | RequestMsg::UrlVariableEnvironmentNameChanged(_)
+            | RequestMsg::UrlVariableSave
+            | RequestMsg::UrlVariableDismissed
     ) {
         return handle_url_variables(state, msg);
     }
@@ -42,7 +47,18 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
         RequestMsg::UrlHovered(_)
         | RequestMsg::UrlCompletionMoved(_)
         | RequestMsg::UrlCompletionSelected(_)
-        | RequestMsg::UrlCompletionDismissed => unreachable!("handled above"),
+        | RequestMsg::UrlCompletionDismissed
+        | RequestMsg::UrlVariableValueChanged(_)
+        | RequestMsg::UrlVariableEnvironmentSelected(_)
+        | RequestMsg::UrlVariableEnvironmentNameChanged(_)
+        | RequestMsg::UrlVariableSave
+        | RequestMsg::UrlVariableDismissed => unreachable!("handled above"),
+        RequestMsg::TitleChanged(value) => {
+            if tab.title != value {
+                tab.title = value;
+                tab.modified = true;
+            }
+        }
         RequestMsg::Undo => {
             if let Some(prev) = tab.undo.pop() {
                 tab.redo.push(tab.edit_snapshot());
@@ -79,6 +95,21 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             tab.url_hover = None;
             use iced::widget::text_editor::{Action as UrlAction, Edit as UrlEdit};
             match action {
+                UrlAction::Click(point) => {
+                    tab.url_editor.perform(UrlAction::Click(point));
+                    let key = crate::services::variables::variable_at(
+                        &tab.url,
+                        tab.url_editor.cursor().position.column,
+                    );
+                    tab.url_variable_draft = None;
+                    if let Some(key) = key.filter(|key| !key.is_empty()) {
+                        open_url_variable(state, key);
+                        if state.tabs.active_tab().url_variable_draft.is_some() {
+                            return iced::widget::operation::focus("url-variable-value");
+                        }
+                    }
+                    return Task::none();
+                }
                 // The bar is single-line by construction: Enter never lands
                 // (previously a no-op without `on_submit`, same as now).
                 UrlAction::Edit(UrlEdit::Enter) => return Task::none(),
@@ -118,6 +149,7 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                     // content edits flow on to keep params, undo and dirty in
                     // step — exactly what `on_input` used to drive.
                     if edits {
+                        tab.url_variable_draft = None;
                         tab.url_completion_open = true;
                         tab.url_completion_selected = 0;
                         let new_url = tab.url_editor.text();
@@ -519,7 +551,9 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
         RequestMsg::SaveRequest => {
             let tab = state.tabs.active_tab();
             if tab.saved_as.is_none() {
-                let name = if tab.url.is_empty() {
+                let name = if tab.url.is_empty()
+                    || !matches!(tab.title.trim(), "" | "New Request" | "Untitled Request")
+                {
                     tab.title.clone()
                 } else {
                     tab.url.clone()
@@ -721,7 +755,7 @@ enum EditClass {
 /// Whether a URL-bar editor action mutates the text (for undo coalescing
 /// and the `UrlChanged` follow-up). Navigation, selection and focus never
 /// count — cursor moves must not mark the tab modified.
-fn url_action_edits_content(action: &iced::widget::text_editor::Action) -> bool {
+pub(super) fn url_action_edits_content(action: &iced::widget::text_editor::Action) -> bool {
     use iced::widget::text_editor::{Action as UrlAction, Edit as UrlEdit};
     matches!(
         action,
@@ -1292,6 +1326,38 @@ fn guess_mime(name: &str) -> Option<String> {
 fn handle_url_variables(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
     use crate::services::variables;
     match msg {
+        RequestMsg::UrlVariableDismissed => {
+            state.tabs.active_tab_mut().url_variable_draft = None;
+        }
+        RequestMsg::UrlVariableValueChanged(value) => {
+            if let Some(draft) = &mut state.tabs.active_tab_mut().url_variable_draft {
+                draft.value = value;
+                draft.error = None;
+            }
+        }
+        RequestMsg::UrlVariableEnvironmentSelected(id) => {
+            if id
+                .as_ref()
+                .is_none_or(|id| state.environments.iter().any(|env| &env.id == id))
+                && let Some(draft) = &mut state.tabs.active_tab_mut().url_variable_draft
+            {
+                draft.environment_id = id;
+                draft.error = None;
+            }
+        }
+        RequestMsg::UrlVariableEnvironmentNameChanged(name) => {
+            if let Some(draft) = &mut state.tabs.active_tab_mut().url_variable_draft {
+                draft.environment_name = name;
+                draft.error = None;
+            }
+        }
+        RequestMsg::UrlVariableSave => {
+            if let Err(error) = save_url_variable(state)
+                && let Some(draft) = &mut state.tabs.active_tab_mut().url_variable_draft
+            {
+                draft.error = Some(error);
+            }
+        }
         RequestMsg::UrlHovered(point) => {
             let tab = state.tabs.active_tab_mut();
             tab.url_hover = point
@@ -1362,4 +1428,106 @@ fn handle_url_variables(state: &mut AppState, msg: RequestMsg) -> Task<Message> 
         _ => {}
     }
     Task::none()
+}
+
+pub(super) fn open_url_variable(state: &mut AppState, key: String) {
+    if state
+        .active_env()
+        .is_some_and(|env| env.variables.contains_key(&key))
+    {
+        return;
+    }
+    let environment_id = state
+        .active_env()
+        .or(state.environments.first())
+        .map(|env| env.id.clone());
+    let environments = state
+        .environments
+        .iter()
+        .map(|env| (env.id.clone(), env.name.clone()))
+        .collect();
+    let tab = state.tabs.active_tab_mut();
+    tab.url_completion_open = false;
+    tab.url_variable_draft = Some(crate::state::tabs::UrlVariableDraft {
+        key,
+        value: String::new(),
+        environment_id,
+        environment_name: String::new(),
+        environments,
+        error: None,
+    });
+}
+
+fn save_url_variable(state: &mut AppState) -> Result<(), String> {
+    use crate::{domain::environment::AppEnvironment, services::storage};
+    let Some(draft) = state.tabs.active_tab().url_variable_draft.clone() else {
+        return Ok(());
+    };
+    if draft.key.is_empty() || draft.key.contains(['{', '}', '\r', '\n']) {
+        return Err("Choose a valid variable name.".into());
+    }
+    // The token may have disappeared through another URL writer while open.
+    if !state
+        .tabs
+        .active_tab()
+        .url
+        .match_indices("{{")
+        .any(|(offset, _)| {
+            crate::services::variables::variable_at(&state.tabs.active_tab().url, offset).as_deref()
+                == Some(&draft.key)
+        })
+    {
+        return Err("This variable is no longer in the URL.".into());
+    }
+    let mut environment = match &draft.environment_id {
+        Some(id) => state
+            .environments
+            .iter()
+            .find(|env| &env.id == id)
+            .cloned()
+            .ok_or("The selected environment no longer exists.")?,
+        None => {
+            let name = draft.environment_name.trim();
+            if name.is_empty() {
+                return Err("Enter an environment name.".into());
+            }
+            AppEnvironment {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: name.into(),
+                variables: Default::default(),
+                is_active: true,
+            }
+        }
+    };
+    if environment.variables.contains_key(&draft.key) {
+        return Err(
+            "This environment already defines this variable. Edit it in Environments.".into(),
+        );
+    }
+    environment.variables.insert(draft.key.clone(), draft.value);
+    environment.is_active = true;
+    let db = state
+        .db
+        .as_ref()
+        .ok_or("Local storage is unavailable. Variable was not saved.")?;
+    // save_environment also deactivates the previous environment. Both writes
+    // must commit together before the UI or snippet can observe the new value.
+    let transaction = db.unchecked_transaction().map_err(|e| e.to_string())?;
+    storage::save_environment(&transaction, &environment)?;
+    transaction.commit().map_err(|e| e.to_string())?;
+    for env in &mut state.environments {
+        env.is_active = false;
+    }
+    let id = environment.id.clone();
+    match state.environments.iter_mut().find(|env| env.id == id) {
+        Some(existing) => *existing = environment,
+        None => state.environments.push(environment),
+    }
+    if state.sidebar.env_editing.as_deref() == Some(id.as_str()) {
+        let value = state.active_env().unwrap().variables[&draft.key].clone();
+        state.sidebar.env_edit_rows.push((draft.key, value));
+    }
+    state.tabs.active_tab_mut().url_variable_draft = None;
+    state.status_message = Some("Variable saved to environment".into());
+    Ok(())
 }

@@ -247,6 +247,13 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
         import_dialog_open: false,
         import_editor: iced::widget::text_editor::Content::new(),
         import_error: None,
+        import_preview: None,
+        import_source: None,
+        import_revision: 0,
+        import_parsing: false,
+        import_truncated: false,
+        import_collection_name: String::new(),
+        import_create_environment: true,
         importing: false,
         git_history_search: String::new(),
         git_user_name: git_identity

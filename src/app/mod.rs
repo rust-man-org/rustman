@@ -27,6 +27,12 @@ mod subscription;
 mod tree;
 mod update;
 
+#[derive(Debug, Clone)]
+pub enum ImportSource {
+    Text(String),
+    Paths(Vec<PathBuf>),
+}
+
 pub struct AppState {
     pub environment_cell: Option<crate::state::environment_cell::EnvironmentCellEditor>,
     pub console_open: bool,
@@ -91,6 +97,13 @@ pub struct AppState {
     pub import_dialog_open: bool,
     pub import_editor: iced::widget::text_editor::Content,
     pub import_error: Option<String>,
+    pub import_preview: Option<Vec<crate::services::import::resources::Resource>>,
+    pub import_source: Option<ImportSource>,
+    pub import_revision: u64,
+    pub import_parsing: bool,
+    pub import_truncated: bool,
+    pub import_collection_name: String,
+    pub import_create_environment: bool,
     /// A background command parse is running (see `ImportCommandParsed`).
     pub importing: bool,
     pub git_user_name: String,

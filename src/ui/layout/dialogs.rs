@@ -584,12 +584,16 @@ pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
     .align_y(iced::Alignment::Center);
     let editor = text_editor(&state.import_editor)
         .id("resource-import")
-        .placeholder("Paste a cURL command, OpenAPI spec, or collection JSON")
+        .placeholder("Paste cURL commands, an OpenAPI spec, or collection JSON")
         .on_action(move |action| Message::Import(ImportMsg::Edited(action)))
         .font(MONO)
         .size(12)
         .padding(10)
-        .height(140)
+        .height(if state.import_preview.is_some() {
+            240
+        } else {
+            140
+        })
         .style(|theme, status| {
             let mut style = text_editor::default(theme, status);
             style.background = Palette::background().into();
@@ -659,18 +663,120 @@ pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
         .spacing(12)
         .align_y(iced::Alignment::Center),
         editor,
-        drop_area,
         text("Postman / OpenAPI / Rustman JSON / HTTPie / cURL")
             .size(11)
             .color(Palette::text_muted()),
     ]
     .spacing(12);
+    if state.import_truncated {
+        body = body.push(text("Large input: showing the first 4 KB. Clear to replace; the preview uses the full input.").size(11).color(Palette::text_muted()));
+    }
+    if state.import_parsing {
+        body = body.push(
+            text("Analyzing resources...")
+                .size(12)
+                .color(Palette::text_muted()),
+        );
+    }
+    let command_count = state
+        .import_preview
+        .as_deref()
+        .map(crate::services::import::resources::command_count)
+        .unwrap_or(0);
+    if let Some(resources) = &state.import_preview {
+        let collection_requests: usize = resources
+            .iter()
+            .map(|r| match r {
+                crate::services::import::resources::Resource::Collections(c) => {
+                    c.iter().map(|c| c.all_requests().len()).sum()
+                }
+                _ => 0,
+            })
+            .sum();
+        let mut preview = column![
+            text(format!(
+                "{} requests ready to import",
+                command_count + collection_requests
+            ))
+            .size(13)
+            .font(crate::ui::theme::UI_FONT_MEDIUM)
+            .color(Palette::text()),
+        ]
+        .spacing(9);
+        if command_count > 1 {
+            preview = preview
+                .push(
+                    text("Collection name")
+                        .size(11)
+                        .color(Palette::text_muted()),
+                )
+                .push(
+                    text_input("Collection name", &state.import_collection_name)
+                        .on_input(|name| Message::Import(ImportMsg::CollectionNameChanged(name)))
+                        .style(crate::ui::styles::field_input)
+                        .size(12)
+                        .padding([7, 9]),
+                )
+                .push(
+                    text(format!(
+                        "Imports as a collection with {command_count} requests"
+                    ))
+                    .size(12)
+                    .color(Palette::text()),
+                );
+            if let Some(origin) = crate::services::import::resources::common_origin(resources) {
+                preview = preview.push(
+                    iced::widget::checkbox(state.import_create_environment)
+                        .label("Create and activate an environment with {{baseUrl}}")
+                        .on_toggle(|enabled| {
+                            Message::Import(ImportMsg::CreateEnvironmentChanged(enabled))
+                        })
+                        .size(14)
+                        .text_size(12),
+                );
+                preview = preview.push(
+                    text(origin)
+                        .font(MONO)
+                        .size(11)
+                        .color(Palette::text_muted()),
+                );
+            }
+        } else if command_count == 1 {
+            preview = preview.push(
+                text("Imports into a new request tab")
+                    .size(12)
+                    .color(Palette::text_muted()),
+            );
+        } else {
+            preview = preview.push(
+                text("Imports into Collections")
+                    .size(12)
+                    .color(Palette::text_muted()),
+            );
+        }
+        body = body.push(
+            container(preview)
+                .padding(14)
+                .width(Length::Fill)
+                .style(|_| container::Style {
+                    border: Border {
+                        color: Palette::border(),
+                        width: 1.0,
+                        radius: 6.0.into(),
+                    },
+                    ..Default::default()
+                }),
+        );
+    } else {
+        body = body.push(drop_area);
+    }
     if let Some(error) = &state.import_error {
         body = body.push(text(error).size(12).color(Palette::ERROR));
     }
     body = body.push(
         row![
             action("Paste from clipboard", ImportMsg::Clipboard),
+            action("Clear", ImportMsg::Clear),
             Space::new().width(Length::Fill),
             button(text("Cancel").size(12).color(Palette::text_muted()))
                 .on_press(Message::Request(RequestMsg::CloseImportDialog))
@@ -678,8 +784,11 @@ pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
                 .padding([7, 14]),
             button(text(if busy { "Importing..." } else { "Import" }).size(12))
                 .on_press_maybe(
-                    (!busy && !state.import_editor.text().trim().is_empty())
-                        .then_some(Message::Import(ImportMsg::Submit))
+                    (!busy
+                        && !state.import_parsing
+                        && state.import_preview.is_some()
+                        && (command_count < 2 || !state.import_collection_name.trim().is_empty()))
+                    .then_some(Message::Import(ImportMsg::Submit))
                 )
                 .style(|theme, status| {
                     let mut style = accent_btn_style(theme, status);

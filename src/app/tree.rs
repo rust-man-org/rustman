@@ -123,6 +123,14 @@ pub(crate) fn try_insert_collection(
     state: &mut AppState,
     imported: ImportedCollection,
 ) -> Result<(), String> {
+    try_insert_collection_with_environment(state, imported, None)
+}
+
+pub(crate) fn try_insert_collection_with_environment(
+    state: &mut AppState,
+    imported: ImportedCollection,
+    environment: Option<crate::domain::environment::AppEnvironment>,
+) -> Result<(), String> {
     let col = imported.collection.clone();
     let group_refs = imported.all_groups();
     // Importers carry ownership in the nested tree; leaf group_id values may
@@ -159,7 +167,25 @@ pub(crate) fn try_insert_collection(
     let exists = state.collections.iter().any(|c| c.id == col.id);
 
     let db = state.db.as_ref().ok_or("Local storage is unavailable.")?;
-    storage::replace_collection_contents(db, &col, &groups, &requests)?;
+    if environment.is_some() {
+        storage::replace_collection_and_environment(
+            db,
+            &col,
+            &groups,
+            &requests,
+            environment.as_ref(),
+        )?;
+    } else {
+        storage::replace_collection_contents(db, &col, &groups, &requests)?;
+    }
+    if let Some(environment) = environment {
+        if environment.is_active {
+            for existing in &mut state.environments {
+                existing.is_active = false;
+            }
+        }
+        state.environments.push(environment);
+    }
 
     if exists {
         if let Some(existing) = state.collections.iter_mut().find(|c| c.id == col.id) {
