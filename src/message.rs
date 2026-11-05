@@ -439,6 +439,8 @@ pub enum SaveDialogMsg {
     ParentSelected(String),
     ToggleNewCollection,
     NewCollectionNameChanged(String),
+    /// "Search collections and folders" box.
+    FilterChanged(String),
     Confirm,
 }
 

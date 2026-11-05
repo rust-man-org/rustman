@@ -191,103 +191,211 @@ pub(super) fn request_delete_dialog(state: &AppState) -> Element<'_, Message> {
     )
 }
 
+/// Postman-style "Save request": name, a searchable Save-to list
+/// (collections with their folders under the chosen one), the target path,
+/// and New collection / Cancel / Save in the footer.
 pub(super) fn save_dialog(state: &AppState) -> Element<'_, Message> {
+    let label = |s: &'static str| text(s).size(11).color(Palette::text_muted());
+
     let name_input = text_input("Request name", &state.save_dialog_name)
         .on_input(|s| Message::SaveDialog(SaveDialogMsg::NameChanged(s)))
+        .on_submit(Message::SaveDialog(SaveDialogMsg::Confirm))
         .size(13)
         .padding([8, 10])
-        .style(crate::ui::styles::field_input);
+        .style(crate::ui::styles::boxed_input);
 
-    let mut col_col = column![].spacing(4);
+    let search = text_input("Search collections and folders", &state.save_dialog_filter)
+        .on_input(|s| Message::SaveDialog(SaveDialogMsg::FilterChanged(s)))
+        .icon(text_input::Icon {
+            font: icons::ICON_FONT,
+            code_point: '\u{e151}',
+            size: Some(12.0.into()),
+            spacing: 8.0,
+            side: text_input::Side::Left,
+        })
+        .size(12)
+        .padding([7, 10])
+        .style(crate::ui::styles::boxed_input);
 
-    // Only the chosen collection unfolds its folders; listing every folder
-    // of every collection made the dialog taller than the window (a large
-    // workspace has hundreds), and nothing below the name was drawn.
+    let q = state.save_dialog_filter.trim().to_lowercase();
+    let filtering = !q.is_empty();
+    // Only the chosen collection unfolds its folders (a large workspace has
+    // hundreds); while searching, matching folders show under their
+    // collection instead.
     let open_col = match state.save_dialog_group_id.as_deref() {
         Some(gid) => crate::app::tree::root_collection_of(&state.groups, gid),
         None => state.save_dialog_collection_id.clone(),
     };
+    let mut list = column![].spacing(1);
+    let mut shown = 0usize;
     for col in &state.collections {
+        let col_match = col.name.to_lowercase().contains(&q);
+        let mut folders = Vec::new();
+        let folder_hits = save_dialog_groups(state, &mut folders, &col.id, true, 1, &q);
+        let expanded = !state.save_dialog_new_col
+            && (filtering || open_col.as_deref() == Some(col.id.as_str()));
+        if filtering && !col_match && folder_hits == 0 {
+            continue;
+        }
+        shown += 1;
         let selected = !state.save_dialog_new_col
             && state.save_dialog_group_id.is_none()
             && state.save_dialog_collection_id.as_deref() == Some(&col.id);
         let col_id = col.id.clone();
-        col_col = col_col.push(collection_radio_btn(
+        list = list.push(target_row(
+            icons::collections(),
             col.name.clone(),
+            0,
             selected,
-            move || Message::SaveDialog(SaveDialogMsg::ParentSelected(col_id.clone())),
+            Message::SaveDialog(SaveDialogMsg::ParentSelected(col_id)),
         ));
-        if !state.save_dialog_new_col && open_col.as_deref() == Some(col.id.as_str()) {
-            col_col = save_dialog_groups(state, col_col, &col.id, true, 1);
+        if expanded && (folder_hits > 0 || !filtering) {
+            list = list.push(iced::widget::Column::with_children(folders).spacing(1));
         }
     }
-
-    let new_col_selected = state.save_dialog_new_col;
-    col_col = col_col.push(collection_radio_btn(
-        "+ New collection".to_owned(),
-        new_col_selected,
-        || Message::SaveDialog(SaveDialogMsg::ToggleNewCollection),
-    ));
-
-    let new_col_input: Option<Element<'_, Message>> = if state.save_dialog_new_col {
-        Some(
-            text_input("Collection name…", &state.save_dialog_new_col_name)
-                .on_input(|s| Message::SaveDialog(SaveDialogMsg::NewCollectionNameChanged(s)))
-                .size(12)
-                .padding([6, 10])
-                .style(crate::ui::styles::field_input)
-                .into(),
+    let list: Element<'_, Message> = if shown == 0 {
+        container(
+            text(if state.collections.is_empty() {
+                "No collections yet. Create one below."
+            } else {
+                "No collection or folder matches."
+            })
+            .size(12)
+            .color(Palette::text_subtle()),
         )
+        .padding([14, 12])
+        .into()
     } else {
-        None
+        scrollable(container(list).padding(4))
+            .direction(iced::widget::scrollable::Direction::Vertical(
+                crate::ui::theme::grabbable_scrollbar(),
+            ))
+            .style(crate::ui::theme::thin_scrollbar)
+            .into()
+    };
+    let list_box =
+        container(list)
+            .height(260)
+            .width(Length::Fill)
+            .style(|_| iced::widget::container::Style {
+                background: Some(Background::Color(Palette::surface())),
+                border: Border {
+                    color: Palette::border_subtle(),
+                    width: 1.0,
+                    radius: 6.0.into(),
+                },
+                ..Default::default()
+            });
+
+    // "Saving to Collection / Folder" under the list.
+    let target: Element<'_, Message> = if state.save_dialog_new_col {
+        column![
+            label("New collection name"),
+            text_input("New Collection", &state.save_dialog_new_col_name)
+                .on_input(|s| Message::SaveDialog(SaveDialogMsg::NewCollectionNameChanged(s)))
+                .on_submit(Message::SaveDialog(SaveDialogMsg::Confirm))
+                .size(12)
+                .padding([7, 10])
+                .style(crate::ui::styles::boxed_input),
+        ]
+        .spacing(6)
+        .into()
+    } else {
+        let path = save_target_path(state);
+        row![
+            text("Saving to").size(11).color(Palette::text_subtle()),
+            text(path.unwrap_or_else(|| "pick a collection".into()))
+                .size(11)
+                .font(crate::ui::theme::UI_FONT_MEDIUM)
+                .color(Palette::text()),
+        ]
+        .spacing(6)
+        .into()
     };
 
-    let btns = row![
-        button(text("Cancel").size(12).color(Palette::text_muted()))
-            .on_press(Message::SaveDialog(SaveDialogMsg::Close))
-            .style(iced::widget::button::text)
-            .padding([6, 14]),
+    let new_col_btn = button(
+        row![
+            icons::plus().size(12).color(Palette::accent()),
+            text(if state.save_dialog_new_col {
+                "Pick an existing collection"
+            } else {
+                "New collection"
+            })
+            .size(12)
+            .color(Palette::accent()),
+        ]
+        .spacing(6)
+        .align_y(iced::Alignment::Center),
+    )
+    .on_press(Message::SaveDialog(SaveDialogMsg::ToggleNewCollection))
+    .style(iced::widget::button::text)
+    .padding([6, 4]);
+
+    let footer = row![
+        new_col_btn,
         Space::new().width(Length::Fill),
+        crate::ui::components::atoms::Button::new("Cancel")
+            .on_press(Message::SaveDialog(SaveDialogMsg::Close)),
         button(text("Save").size(12).color(Color::WHITE))
             .on_press(Message::SaveDialog(SaveDialogMsg::Confirm))
             .style(accent_btn_style)
             .padding([6, 18]),
     ]
+    .spacing(8)
     .align_y(iced::Alignment::Center);
 
-    let mut body_col = column![
-        text("Save Request")
+    let head = row![
+        text("Save request")
             .size(TEXT_LG)
             .color(Palette::text())
             .font(crate::ui::theme::UI_FONT_MEDIUM),
-        Space::new().height(8),
-        text("Name").size(11).color(Palette::text_muted()),
-        name_input,
-        Space::new().height(8),
-        text("Save to").size(11).color(Palette::text_muted()),
-        container(
-            scrollable(container(col_col).padding(iced::padding::right(10)))
-                .direction(iced::widget::scrollable::Direction::Vertical(
-                    crate::ui::theme::grabbable_scrollbar(),
-                ))
-                .style(crate::ui::theme::thin_scrollbar),
-        )
-        .max_height(320),
+        Space::new().width(Length::Fill),
+        crate::ui::components::atoms::compact_icon_button(
+            icons::close(),
+            "Close",
+            Message::SaveDialog(SaveDialogMsg::Close),
+            22.0
+        ),
     ]
-    .spacing(4)
-    .width(440);
+    .align_y(iced::Alignment::Center);
 
-    if let Some(inp) = new_col_input {
-        body_col = body_col.push(inp);
-    }
-    body_col = body_col.push(Space::new().height(12)).push(btns);
+    let body = column![
+        head,
+        column![label("Request name"), name_input].spacing(6),
+        column![label("Save to"), search, list_box].spacing(6),
+        target,
+        footer,
+    ]
+    .spacing(16)
+    .width(Length::Fill);
 
     modal_overlay(
-        container(body_col)
+        container(body)
             .style(modal_card_style)
-            .padding([20, 24])
-            .width(440),
+            .padding([20, 22])
+            .width(520),
     )
+}
+
+/// "Collection / Folder / Sub-folder" of the current Save-to choice.
+fn save_target_path(state: &AppState) -> Option<String> {
+    let mut parts = Vec::new();
+    let mut gid = state.save_dialog_group_id.clone();
+    while let Some(id) = gid {
+        let g = state.groups.iter().find(|g| g.id == id)?;
+        parts.push(g.name.clone());
+        gid = (!g.parent_is_collection).then(|| g.parent_id.clone());
+        if g.parent_is_collection {
+            let col = state.collections.iter().find(|c| c.id == g.parent_id)?;
+            parts.push(col.name.clone());
+        }
+    }
+    if parts.is_empty() {
+        let id = state.save_dialog_collection_id.as_deref()?;
+        parts.push(state.collections.iter().find(|c| c.id == id)?.name.clone());
+    }
+    parts.reverse();
+    Some(parts.join(" / "))
 }
 
 pub(super) fn export_dialog(state: &AppState) -> Element<'_, Message> {
@@ -1073,77 +1181,79 @@ pub(super) fn global_scripts_modal(state: &AppState) -> Element<'_, Message> {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-/// Folder rows under `parent` for the save dialog's parent picker, indented
-/// by `depth` and sorted like the sidebar tree (issue #53).
+/// Folder rows under `parent_id` (recursively), indented by depth. With a
+/// query, only folders that match or contain a match are listed. Returns
+/// how many folders matched.
 fn save_dialog_groups<'a>(
     state: &'a AppState,
-    mut col: iced::widget::Column<'a, Message>,
+    out: &mut Vec<Element<'a, Message>>,
     parent_id: &str,
     parent_is_collection: bool,
-    depth: usize,
-) -> iced::widget::Column<'a, Message> {
+    depth: u16,
+    q: &str,
+) -> usize {
     let mut groups: Vec<&'a crate::domain::group::Group> = state
         .groups
         .iter()
         .filter(|g| g.parent_id == parent_id && g.parent_is_collection == parent_is_collection)
         .collect();
     groups.sort_by_key(|g| g.sort_order);
+    let mut hits = 0;
     for group in groups {
+        let mut children = Vec::new();
+        let child_hits = save_dialog_groups(state, &mut children, &group.id, false, depth + 1, q);
+        let own = q.is_empty() || group.name.to_lowercase().contains(q);
+        if !own && child_hits == 0 {
+            continue;
+        }
+        hits += usize::from(own) + child_hits;
         let selected =
             !state.save_dialog_new_col && state.save_dialog_group_id.as_deref() == Some(&group.id);
-        let gid = group.id.clone();
-        let label = format!("└ {}", group.name);
-        let row: Element<'static, Message> =
-            container(collection_radio_btn(label, selected, move || {
-                Message::SaveDialog(SaveDialogMsg::ParentSelected(gid.clone()))
-            }))
-            .padding(iced::Padding {
-                top: 0.0,
-                right: 0.0,
-                bottom: 0.0,
-                left: (depth as f32) * 16.0,
-            })
-            .into();
-        col = col.push(row);
-        col = save_dialog_groups(state, col, &group.id, false, depth + 1);
+        out.push(target_row(
+            icons::folder(),
+            group.name.clone(),
+            depth,
+            selected,
+            Message::SaveDialog(SaveDialogMsg::ParentSelected(group.id.clone())),
+        ));
+        out.extend(children);
     }
-    col
+    hits
 }
 
-fn collection_radio_btn(
-    label: String,
+/// One Save-to row: icon + name, indented 16px per level; the chosen row is
+/// accent-tinted with an accent icon, others highlight on hover.
+fn target_row(
+    icon: iced::widget::Text<'static>,
+    name: String,
+    depth: u16,
     selected: bool,
-    on_press: impl Fn() -> Message,
+    msg: Message,
 ) -> Element<'static, Message> {
     button(
         row![
-            container(Space::new().width(8).height(8))
-                .style(move |_| iced::widget::container::Style {
-                    background: Some(Background::Color(if selected {
-                        Palette::accent()
-                    } else {
-                        Palette::border()
-                    })),
-                    border: Border {
-                        radius: 4.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .width(8)
-                .height(8),
-            text(label).size(12).color(if selected {
+            icon.size(13).color(if selected {
                 Palette::accent()
             } else {
-                Palette::text_muted()
+                Palette::text_subtle()
             }),
+            text(name)
+                .size(12)
+                .color(if selected {
+                    Palette::text()
+                } else {
+                    Palette::text_muted()
+                })
+                .wrapping(iced::widget::text::Wrapping::None),
         ]
         .spacing(8)
         .align_y(iced::Alignment::Center),
     )
-    .on_press(on_press())
+    .on_press(msg)
     .style(move |_t, s| iced::widget::button::Style {
-        background: if selected || matches!(s, iced::widget::button::Status::Hovered) {
+        background: if selected {
+            Some(Background::Color(Palette::accent_soft()))
+        } else if matches!(s, iced::widget::button::Status::Hovered) {
             Some(Background::Color(Palette::surface_high()))
         } else {
             None
@@ -1155,7 +1265,12 @@ fn collection_radio_btn(
         text_color: Palette::text(),
         ..Default::default()
     })
-    .padding([5, 8])
+    .padding(iced::Padding {
+        top: 6.0,
+        right: 8.0,
+        bottom: 6.0,
+        left: 8.0 + f32::from(depth) * 16.0,
+    })
     .width(Length::Fill)
     .into()
 }

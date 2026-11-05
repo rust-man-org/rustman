@@ -8,8 +8,10 @@ use crate::services::storage;
 
 pub(super) fn handle(state: &mut AppState, msg: SaveDialogMsg) -> Task<Message> {
     match msg {
+        SaveDialogMsg::FilterChanged(q) => state.save_dialog_filter = q,
         SaveDialogMsg::Close => {
             state.save_dialog_open = false;
+            state.save_dialog_filter.clear();
             state.example_after_save = false;
             state.save_dialog_new_col = false;
             state.save_dialog_new_col_name = String::new();
@@ -32,6 +34,7 @@ pub(super) fn handle(state: &mut AppState, msg: SaveDialogMsg) -> Task<Message> 
         SaveDialogMsg::NewCollectionNameChanged(s) => state.save_dialog_new_col_name = s,
         SaveDialogMsg::Confirm => {
             state.save_dialog_open = false;
+            state.save_dialog_filter.clear();
             let name = state.save_dialog_name.clone();
 
             if state.save_dialog_new_col {

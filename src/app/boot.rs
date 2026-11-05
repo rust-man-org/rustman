@@ -231,6 +231,7 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
         save_dialog_group_id: None,
         save_dialog_new_col: false,
         save_dialog_new_col_name: String::new(),
+        save_dialog_filter: String::new(),
         git_log: Vec::new(),
         git_status: None,
         git_branches: Vec::new(),

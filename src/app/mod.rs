@@ -82,6 +82,8 @@ pub struct AppState {
     pub save_dialog_group_id: Option<String>,
     pub save_dialog_new_col: bool,
     pub save_dialog_new_col_name: String,
+    /// Save dialog search over collections and folders.
+    pub save_dialog_filter: String,
     pub git_log: Vec<crate::services::vcs::CommitInfo>,
     pub git_status: Option<crate::services::vcs::RepoStatus>,
     pub git_branches: Vec<crate::services::vcs::BranchInfo>,
