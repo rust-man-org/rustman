@@ -110,8 +110,12 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
   working), with recent requests/collections/environments from local data.
   Typing `>` switches to commands, reusing the command palette. Show only
   filters Rustman can back (Type, In); no visibility/org filters.
-- Pending (user request 2026-11-05, Postman reference): two controls at the
-  right end of the tab bar, after `+`.
+- Done (user request 2026-11-05, Postman reference): two controls at the
+  right end of the tab bar, after `+` (`ui/layout/tab_menus.rs`). Both menus
+  share `sidebar.menu_filter` and the sticky popup (typing keeps them open);
+  "Recently closed" lists saved requests closed this session (newest first,
+  max 10, not persisted) and reopens them; quick look opens the active
+  environment page. Gates 267/259.
   - Tab list chevron (`⌄`): a popup (about 300px) with a "Search tabs" input
     (hint Ctrl+Shift+A) and every open tab as a row: method in its colour, the
     name ellipsized, and an orange dot when the tab is unsaved. Clicking a row
