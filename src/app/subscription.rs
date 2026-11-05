@@ -209,6 +209,12 @@ fn global_keys(event: Event, _status: event::Status, window_id: window::Id) -> O
         keyboard::Key::Character("p") if modifiers.command() => {
             Some(Message::Palette(PaletteMsg::Open))
         }
+        // Postman's tab search: the open-tabs list with its search box.
+        keyboard::Key::Character("a") if modifiers.command() && modifiers.shift() => {
+            Some(Message::Sidebar(crate::message::SidebarMsg::ContextMenuOpened(
+                crate::ui::layout::tab_menus::TABS_MENU.to_owned(),
+            )))
+        }
         keyboard::Key::Character("t") if modifiers.command() => {
             Some(Message::Request(RequestMsg::NewTab))
         }

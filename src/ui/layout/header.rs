@@ -172,11 +172,12 @@ fn workspace_switcher(state: &AppState, name: String, open: bool) -> Element<'_,
         return summary.into();
     }
 
-    crate::ui::widgets::popup::popup_left_sticky(
+    crate::ui::widgets::popup::popup_sticky(
         summary.into(),
         workspace_menu(state),
         Message::Sidebar(SidebarMsg::ContextMenuClosed),
-        |m| matches!(m, Message::Sidebar(SidebarMsg::WorkspaceFilterChanged(_))),
+        |m| matches!(m, Message::Sidebar(SidebarMsg::MenuFilterChanged(_))),
+        true,
     )
 }
 
@@ -188,9 +189,9 @@ pub const WORKSPACE_SEARCH_ID: &str = "header-workspace-search";
 /// "View all workspaces" footer. Create and View all lead to the Git panel,
 /// where workspaces are cloned, opened and removed.
 fn workspace_menu(state: &AppState) -> Element<'_, Message> {
-    let search = iced::widget::text_input("Search workspaces...", &state.sidebar.workspace_filter)
+    let search = iced::widget::text_input("Search workspaces...", &state.sidebar.menu_filter)
         .id(WORKSPACE_SEARCH_ID)
-        .on_input(|q| Message::Sidebar(SidebarMsg::WorkspaceFilterChanged(q)))
+        .on_input(|q| Message::Sidebar(SidebarMsg::MenuFilterChanged(q)))
         .size(12)
         .padding(iced::Padding {
             top: 6.0,
@@ -267,7 +268,7 @@ fn workspace_menu(state: &AppState) -> Element<'_, Message> {
     let top =
         container(row![search, create].spacing(8).align_y(Alignment::Center)).padding([10, 12]);
 
-    let query = state.sidebar.workspace_filter.trim().to_lowercase();
+    let query = state.sidebar.menu_filter.trim().to_lowercase();
     let repos: Vec<(String, String)> = if state.git_repos.is_empty() {
         vec![(LOCAL_ID.to_owned(), LOCAL_NAME.to_owned())]
     } else {

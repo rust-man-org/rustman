@@ -138,8 +138,10 @@ pub enum SidebarMsg {
     ToggleCollapsed,
     /// Collection tree search box.
     FilterChanged(String),
-    /// Header workspace switcher search box.
-    WorkspaceFilterChanged(String),
+    /// Search box inside an open menu (workspaces, open tabs, environments).
+    MenuFilterChanged(String),
+    /// Tab list menu: expand/collapse "Recently closed".
+    RecentlyClosedToggled,
     SearchMove(isize),
     SearchConfirm,
     SearchPick(usize),

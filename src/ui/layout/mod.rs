@@ -15,8 +15,19 @@ pub mod header;
 mod status_bar;
 mod style;
 mod tab_bar;
+pub mod tab_menus;
 
 use style::{icon_btn_style, icon_rail_style, sidebar_style, surface_style};
+
+/// The search box a menu focuses when it opens, for menus that have one.
+pub fn menu_search_id(menu: &str) -> Option<&'static str> {
+    match menu {
+        header::WORKSPACE_MENU => Some(header::WORKSPACE_SEARCH_ID),
+        tab_menus::TABS_MENU => Some(tab_menus::TABS_SEARCH_ID),
+        tab_menus::ENV_MENU => Some(tab_menus::ENV_SEARCH_ID),
+        _ => None,
+    }
+}
 
 pub fn view(state: &AppState) -> Element<'_, Message> {
     // Clicking anywhere outside an open collection menu dismisses it. Both

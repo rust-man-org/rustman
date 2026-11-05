@@ -69,8 +69,11 @@ pub struct SidebarState {
     pub collapsed: bool,
     /// Collection tree search box text (not persisted).
     pub filter: String,
-    /// Header workspace-menu search text (not persisted).
-    pub workspace_filter: String,
+    /// Search text of the open menu (workspaces, tabs, environments); not
+    /// persisted, cleared whenever a menu opens.
+    pub menu_filter: String,
+    /// Tab list menu: "Recently closed" expanded.
+    pub recently_closed_open: bool,
     /// Transient local search. Cached per query, never stored in the session.
     pub search_open: bool,
     pub search_selected: usize,
@@ -104,7 +107,8 @@ impl Default for SidebarState {
             env_variable_hover: None,
             collapsed: false,
             filter: String::new(),
-            workspace_filter: String::new(),
+            menu_filter: String::new(),
+            recently_closed_open: false,
             search_open: false,
             search_selected: 0,
             search_hits: Vec::new(),
