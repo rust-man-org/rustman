@@ -119,6 +119,31 @@ pub(super) fn handle(state: &mut AppState, msg: ExampleMsg) -> Task<Message> {
     {
         return Task::none();
     }
+    // Like Postman: an unsaved request is saved first (the save dialog),
+    // then its response becomes the example.
+    // A tab whose request is gone (deleted, or replaced by a re-import)
+    // counts as unsaved too, rather than failing with "no longer exists".
+    let stale = matches!(msg, ExampleMsg::SaveResponse)
+        && state
+            .tabs
+            .active_tab()
+            .saved_as
+            .as_ref()
+            .is_some_and(|(_, id)| parent(state, id).is_none());
+    if stale {
+        state.tabs.active_tab_mut().saved_as = None;
+    }
+    if matches!(msg, ExampleMsg::SaveResponse) && state.tabs.active_tab().saved_as.is_none() {
+        state.example_after_save = true;
+        let task = super::update(
+            state,
+            Message::Request(crate::message::RequestMsg::SaveRequest),
+        );
+        // Save can be refused (e.g. an example editor is open): no dialog,
+        // so nothing may run after a later, unrelated save.
+        state.example_after_save &= state.save_dialog_open;
+        return task;
+    }
     let result = apply(state, msg);
     if let Err(error) = result {
         state.status_message = Some(error);
@@ -453,6 +478,121 @@ mod tests {
             .unwrap()
             .body_stored = true;
         assert!(apply(&mut s, ExampleMsg::SaveResponse).is_err());
+        drop(s);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn save_examples_on_two_requests_one_after_another() {
+        let (mut s, dir, a) = setup();
+        let mut b_req = SavedRequest::new_in("col".into(), "Profile".into());
+        b_req.url = "https://example.test/me".into();
+        storage::create_request(s.db.as_ref().unwrap(), &b_req).unwrap();
+        let b = b_req.id.clone();
+        s.requests.get_mut("col").unwrap().push(b_req);
+        let respond = |s: &mut AppState, body: &str| {
+            s.tabs.active_tab_mut().response = Some(HttpResponse {
+                status: 200,
+                status_text: "OK".into(),
+                body: body.into(),
+                ..Default::default()
+            });
+        };
+        let open = |s: &mut AppState, id: &str| {
+            let req = s.requests["col"]
+                .iter()
+                .find(|r| r.id == id)
+                .unwrap()
+                .clone();
+            let _ = super::super::update(
+                s,
+                Message::Sidebar(crate::message::SidebarMsg::RequestOpened(req)),
+            );
+        };
+        let save = |s: &mut AppState| {
+            let _ = super::super::update(s, Message::Example(ExampleMsg::SaveResponse));
+        };
+
+        open(&mut s, &a);
+        respond(&mut s, "{\"a\":1}");
+        save(&mut s);
+        assert_eq!(
+            s.examples.items.get(&a).map_or(0, Vec::len),
+            1,
+            "{:?}",
+            s.status_message
+        );
+
+        open(&mut s, &b);
+        assert_eq!(
+            s.tabs
+                .active_tab()
+                .saved_as
+                .as_ref()
+                .map(|(_, id)| id.as_str()),
+            Some(b.as_str())
+        );
+        respond(&mut s, "{\"b\":2}");
+        save(&mut s);
+        assert_eq!(
+            s.examples.items.get(&b).map_or(0, Vec::len),
+            1,
+            "{:?}",
+            s.status_message
+        );
+
+        // A tab whose request vanished (e.g. re-imported) asks where to save.
+        // (The editor of the example just saved replaces the request pane in
+        // the app; leaving it is what brings the response back.)
+        s.examples.editor = None;
+        s.tabs.active_tab_mut().saved_as = Some(("col".into(), "gone".into()));
+        save(&mut s);
+        assert!(s.save_dialog_open, "{:?}", s.status_message);
+        let _ = super::super::update(
+            &mut s,
+            Message::SaveDialog(crate::message::SaveDialogMsg::Close),
+        );
+        assert!(!s.example_after_save);
+
+        // And a second example on the first request.
+        open(&mut s, &a);
+        respond(&mut s, "{\"a\":2}");
+        save(&mut s);
+        assert_eq!(
+            s.examples.items.get(&a).map_or(0, Vec::len),
+            2,
+            "{:?}",
+            s.status_message
+        );
+        drop(s);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn save_example_on_unsaved_request_saves_request_first() {
+        let (mut s, dir, _) = setup();
+        let _ = super::super::update(&mut s, Message::Request(crate::message::RequestMsg::NewTab));
+        s.tabs
+            .active_tab_mut()
+            .set_url("https://example.test/new".into());
+        s.tabs.active_tab_mut().response = Some(HttpResponse {
+            status: 200,
+            status_text: "OK".into(),
+            body: "{\"ok\":true}".into(),
+            ..Default::default()
+        });
+        let _ = handle(&mut s, ExampleMsg::SaveResponse);
+        assert!(s.save_dialog_open, "the save dialog asks where to save");
+        assert!(s.example_after_save);
+        let _ = super::super::update(
+            &mut s,
+            Message::SaveDialog(crate::message::SaveDialogMsg::Confirm),
+        );
+        assert!(!s.example_after_save);
+        let (_, id) = s.tabs.active_tab().saved_as.clone().expect("request saved");
+        // The chained SaveResponse runs as a task; run it directly here.
+        apply(&mut s, ExampleMsg::SaveResponse).unwrap();
+        assert_eq!(s.examples.items[&id][0].response.body, "{\"ok\":true}");
         drop(s);
         let _ = std::fs::remove_dir_all(dir);
     }

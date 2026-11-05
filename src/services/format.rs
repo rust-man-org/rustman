@@ -46,6 +46,10 @@ pub fn html_to_text(html: &str) -> String {
     // Hrefs of open `<a>` tags (browsers forbid nesting; the stack is
     // paranoia for malformed pages).
     let mut links: Vec<String> = Vec::new();
+    // Open `<pre>` / `<textarea>` depth: whitespace is kept as written there.
+    // Debug dumps (Laravel `dd()`, Symfony VarDumper, `var_dump` in `<pre>`)
+    // are only readable with their line breaks and indentation.
+    let mut pre_depth = 0usize;
 
     while let Some(c) = chars.next() {
         if c != '<' {
@@ -54,9 +58,10 @@ pub fn html_to_text(html: &str) -> String {
             }
             if c == '&' {
                 push_entity(&mut chars, &mut out);
+            } else if pre_depth > 0 && c != '\r' {
+                out.push(c);
             } else if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
-                // Collapse whitespace runs like a renderer would (outside
-                // `<pre>`, which API responses effectively never use).
+                // Collapse whitespace runs like a renderer would.
                 if !out.ends_with([' ', '\n']) {
                     out.push(' ');
                 }
@@ -68,7 +73,11 @@ pub fn html_to_text(html: &str) -> String {
 
         // Inside skipped content only the matching close tag matters.
         if skipping.is_some() {
-            let want = if skipping == Some(true) { "script" } else { "style" };
+            let want = if skipping == Some(true) {
+                "script"
+            } else {
+                "style"
+            };
             let is_close = chars.peek() == Some(&'/');
             if is_close {
                 chars.next();
@@ -149,8 +158,9 @@ pub fn html_to_text(html: &str) -> String {
         }
         let closing = raw.starts_with('/');
         let body = raw.trim_start_matches('/');
-        let name_end =
-            body.find(|c: char| c.is_whitespace() || c == '/').unwrap_or(body.len());
+        let name_end = body
+            .find(|c: char| c.is_whitespace() || c == '/')
+            .unwrap_or(body.len());
         let tag = body[..name_end].to_ascii_lowercase();
 
         if !closing && (tag == "script" || tag == "style") {
@@ -159,6 +169,13 @@ pub fn html_to_text(html: &str) -> String {
         }
         if !closing && tag == "a" {
             links.push(extract_href(&body[name_end..]));
+        }
+        if matches!(tag.as_str(), "pre" | "textarea") {
+            pre_depth = if closing {
+                pre_depth.saturating_sub(1)
+            } else {
+                pre_depth + 1
+            };
         }
         handle_tag_end(&tag, closing, &mut links, &mut out);
     }
@@ -213,8 +230,7 @@ fn extract_href(rest: &str) -> String {
     let mut i = 0;
     while i < toks.len() {
         let t = toks[i];
-        let is_href =
-            t.get(..4).is_some_and(|h| h.eq_ignore_ascii_case("href"));
+        let is_href = t.get(..4).is_some_and(|h| h.eq_ignore_ascii_case("href"));
         if !is_href {
             i += 1;
             continue;
@@ -269,9 +285,9 @@ fn handle_tag_end(tag: &str, closing: bool, links: &mut Vec<String>, out: &mut S
             }
         }
         "li" if !closing => out.push_str("\n• "),
-        "p" | "div" | "section" | "article" | "header" | "footer" | "main" | "nav"
-        | "ul" | "ol" | "table" | "tr" | "blockquote" | "form" | "hr" | "pre" | "dd"
-        | "dt" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => out.push('\n'),
+        "p" | "div" | "section" | "article" | "header" | "footer" | "main" | "nav" | "ul"
+        | "ol" | "table" | "tr" | "blockquote" | "form" | "hr" | "pre" | "dd" | "dt" | "h1"
+        | "h2" | "h3" | "h4" | "h5" | "h6" => out.push('\n'),
         _ => {}
     }
 }
@@ -318,9 +334,11 @@ fn push_entity(chars: &mut std::iter::Peekable<std::str::Chars>, out: &mut Strin
                 .and_then(char::from_u32)
                 .map(|c| c.to_string())
         }
-        _ if entity.starts_with('#') => {
-            entity[1..].parse::<u32>().ok().and_then(char::from_u32).map(|c| c.to_string())
-        }
+        _ if entity.starts_with('#') => entity[1..]
+            .parse::<u32>()
+            .ok()
+            .and_then(char::from_u32)
+            .map(|c| c.to_string()),
         _ => None,
     };
     match decoded {
@@ -356,7 +374,10 @@ mod html_tests {
 
     #[test]
     fn decodes_entities() {
-        assert_eq!(html_to_text("<p>a &amp; b &lt;c&gt; &#65; &#x41; &unknown;</p>"), "a & b <c> A A &unknown;");
+        assert_eq!(
+            html_to_text("<p>a &amp; b &lt;c&gt; &#65; &#x41; &unknown;</p>"),
+            "a & b <c> A A &unknown;"
+        );
     }
 
     #[test]
@@ -392,5 +413,21 @@ mod html_tests {
         assert_eq!(html_to_text("<?xml version=\"1.0\"?><p>hi</p>"), "hi");
         // Unclosed script: rest is code, but preceding text survives.
         assert_eq!(html_to_text("<p>before</p><script>alert(1)"), "before");
+    }
+
+    #[test]
+    fn laravel_dd_dump_keeps_its_lines() {
+        // Shape of Symfony VarDumper HTML, which Laravel `dd()` returns.
+        let html = "<script> Sfdump = window.Sfdump || (function (doc) {})(document)</script>\
+            <style>pre.sf-dump{display:block}</style>\
+            <pre class=sf-dump id=sf-dump-1 data-indent-pad=\"  \">\
+            <span class=sf-dump-note>array:2</span> [<samp data-depth=1 class=sf-dump-expanded>\n  \
+            \"<span class=sf-dump-key>name</span>\" =&gt; \"<span class=sf-dump-str title=\"5 characters\">Yosua</span>\"\n  \
+            \"<span class=sf-dump-key>id</span>\" =&gt; <span class=sf-dump-num>1</span>\n\
+            </samp>]\n</pre><script>Sfdump(\"sf-dump-1\")</script>";
+        assert_eq!(
+            html_to_text(html),
+            "array:2 [\n  \"name\" => \"Yosua\"\n  \"id\" => 1\n]"
+        );
     }
 }

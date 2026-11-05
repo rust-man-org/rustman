@@ -54,6 +54,9 @@ pub struct SidebarState {
     pub group_renaming: Option<String>,
     /// Id of the item being drag-reordered, if any (issue #53).
     pub dragging_item: Option<String>,
+    /// Collection or folder the dragged item lands in on release, when the
+    /// drag is a move rather than a reorder among siblings.
+    pub drop_target: Option<String>,
     /// Id of the tree row whose right-click menu is open, if any.
     pub context_menu: Option<String>,
     /// Last collection pressed + when, for double-click-to-rename.
@@ -98,6 +101,7 @@ impl Default for SidebarState {
             req_renaming: None,
             group_renaming: None,
             dragging_item: None,
+            drop_target: None,
             context_menu: None,
             last_press: None,
             rename_backup: None,

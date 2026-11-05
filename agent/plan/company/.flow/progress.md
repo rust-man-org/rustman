@@ -1,11 +1,11 @@
 # Company Plan — Current Progress
 
-Updated: 2026-11-04 (Asia/Jakarta).
+Updated: 2026-11-05 (Asia/Jakarta).
 
 ## Resume checkpoint
 
-- Current scope: endpoint examples mockup on `feat/endpoint-examples`, branched from development (`a39ddd5`).
-- Active task: bottom-anchored Environments and hover-only active action; release verification.
+- Current scope: layout parity 10 t4/t6 plus Postman collection import/export on `ws/10-layout/t4-request-tabs`.
+- Active task: request/response mockup parity (`ced2e85`), Postman data-dump import (`d328714`) and the import/export collections modal (`4797de1`) done; local commits only, no push. Next: merge into local `development`.
 - Completed: Windows baseline/launch green (zip 9 fix); parallel rules and 09 plan written.
 - Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
   Local scaffold/CI commit: `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
@@ -43,10 +43,54 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 | [ ] | 06 | Secrets / scanner | — | Audit redaction, re-merge and write guards. |
 | [ ] | 07 | Self-update integrity | — | Audit existing verification and tests. |
 | [ ] | 08 | PR / company CI | — | Audit review flow and validator. |
-| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header (`a488b7f`), t2 request header + URL row (`1a494f2`), seams (`9846277`) and t5 sidebar (`d382c1c`, `dc731ca`, hover actions, then aligned to the updated mockup `0976b17`; sample workspace via `scripts/ui.sh -x`) done and merged. Sidebar is made as close to Postman as possible (user decision 2026-11-04): filter box, `+` menu incl. Folder, import, `⋯`, COLLECTIONS section; full suite 203/195. Sidebar headers/environment rows/selected row and the URL preview line aligned to the updated mockup plus the URL row (method chevron, `{{var}}` highlight, split Send) on `feat/endpoint-examples` (252/244). Next: t3 tab bar, t4 sub-tabs, t6 response pane. |
+| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header (`a488b7f`), t2 request header + URL row (`1a494f2`), seams (`9846277`) and t5 sidebar (`d382c1c`, `dc731ca`, hover actions, then aligned to the updated mockup `0976b17`; sample workspace via `scripts/ui.sh -x`) done and merged. Sidebar is made as close to Postman as possible (user decision 2026-11-04): filter box, `+` menu incl. Folder, import, `⋯`, COLLECTIONS section; full suite 203/195. Sidebar headers/environment rows/selected row and the URL preview line aligned to the updated mockup plus the URL row (method chevron, `{{var}}` highlight, split Send) on `feat/endpoint-examples` (252/244). t4 sub-tabs + Headers/Auth/Body (incl. form-data on the kv table) and t6 response head/toolbar follow the mockup (`ced2e85`, `d328714`); saved tabs show the request name. Collections ⋯ menu opens the mockup's Import/Export modal (`4797de1`): per-file scan with Ready / Needs review / Unsupported / Error rows, Postman v2.1 or Rustman bundle export; full suite 314/306. Next: merge to `development`, t7 fonts. |
 | [X] | 09 | Design tokens | — | `4289b76` on `ws/09-design-tokens/t1-tokens`: Rustman Light/Dark appended, fresh-install default, 5 tests. Fonts deferred; status colors kept global (36 call sites). |
 
 ## Active task details
+
+- [X] Claude, 2026-11-05: Postman import/export. Data dumps (`archive.json`
+  index + `collection/` + `environment/`) import with environments,
+  collection variables as an environment, inherited auth (inherit / noauth,
+  v2.0 and v2.1 shapes) and Postman scripts kept as comments for review.
+  The import modal scans a folder or files and rows each file with its own
+  status (v1 = Unsupported, broken JSON = Error, BOM tolerated); only picked
+  rows import. Export writes one `.postman_collection.json` per collection
+  (+ active environment) or one Rustman bundle. Verified by capture against
+  a fixture dump; real-size dry run (100+ collections) parses in under 2 s.
+  Gaps: environment export uses the active environment only; Esc does not
+  close the modal yet.
+
+- [X] Codex, 2026-11-05: repeated command pastes insert a newline at the end
+  of existing commands, so bodies no longer join directly to the next curl.
+  Ctrl+V and the clipboard button share insertion/selection behavior; large
+  sources append outside the truncated widget. Quoted body text stays intact.
+  Red reproduced six pastes counted as one; updated regression counts six.
+  Small cURL/HTTPie pastes in the URL bar map before newline stripping.
+  Complete commands replace HTTP fields without carrying old auth/body;
+  incomplete commands without a URL preserve the existing request.
+  Review finding reproduced DELETE mutation from missing-URL paste, then fixed
+  in synchronous and background import handlers; review verified the fix.
+  Gates: 302 default / 294 no-default passed, 3 network tests ignored each.
+  File claims released: import/request, resource helper and paste regressions.
+  Current native executable needs rebuilding after closing the running app.
+
+- [X] Codex, 2026-11-05, `ws/10-layout/t4-request-tabs`: batch import and inline editing.
+  Multiple pasted cURL commands retain quoted/multiline payloads and order.
+  Async preview shows request count + editable collection name before import.
+  Same-origin batches offer a new active baseUrl environment; collection and
+  environment persist in one transaction. Single commands still open a tab.
+  Retained text/path sources resume previews after close/reopen; Clear and
+  successful import release them. Stale preview revisions are ignored.
+  Clicking an unresolved URL variable opens an actual DB-save shortcut:
+  choose an existing environment or create a named one; duplicates rejected.
+  Title is editable in the header, updates the tab/draft, and prefills Save.
+  Gates: 296 default / 288 no-default passed, 3 network tests ignored each.
+  Independent review's preview-resume finding fixed with two regressions.
+  Latest changes have parser/state tests; native UI QA has not been repeated.
+  Prior native QA/control stopped on physical Escape. Run the app outside
+  the sandbox: sandbox launch hid clipboard text and could not open AppData
+  storage; user testing resumed via an outside-sandbox launch of 1ae078b.
+  File claims released: import/state/storage/dialog + URL shortcut/title. No push.
 
 - Task: [~] bottom-anchored Environments and hover-only environment actions.
 - Owner: Codex, 2026-11-04; feat/endpoint-examples, existing HEAD 2b00b48.
@@ -140,8 +184,9 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 
 ## Verification checkpoint
 
-- Latest Windows gate: 251 default / 243 no-default tests passed; 3 live-network
-  tests ignored each; final no-default check/release evidence: target/environment-page-release.log.
+- Latest Windows gate (2026-11-05): 302 default / 294 no-default tests passed;
+  3 live-network tests ignored each. Native QA and exe-lock limits above.
+  Earlier release evidence: target/environment-page-release.log.
 - Historical 2026-11-03 baseline: zip 9 Windows extraction fixed; build and launch
   passed, tests 139 default / 131 no-default; manual request/sync not exhaustive.
 - CI execution is not proven by local tests; wave 0 scaffold added the test gate.

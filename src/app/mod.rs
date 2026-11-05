@@ -24,8 +24,14 @@ mod scripting;
 mod session;
 pub(crate) mod snippet;
 mod subscription;
-mod tree;
+pub(crate) mod tree;
 mod update;
+
+#[derive(Debug, Clone)]
+pub enum ImportSource {
+    Text(String),
+    Paths(Vec<PathBuf>),
+}
 
 pub struct AppState {
     pub environment_cell: Option<crate::state::environment_cell::EnvironmentCellEditor>,
@@ -66,6 +72,9 @@ pub struct AppState {
     pub parsed_cache: crate::services::cache::ParsedBodyCache,
     pub export_dialog_collection: Option<String>,
     pub save_dialog_open: bool,
+    /// "Save example" on an unsaved request opened the save dialog; its
+    /// Confirm saves the request and then the response as an example.
+    pub example_after_save: bool,
     pub save_dialog_name: String,
     pub save_dialog_collection_id: Option<String>,
     /// Parent picked in the save dialog when it is a group (an id in
@@ -73,6 +82,8 @@ pub struct AppState {
     pub save_dialog_group_id: Option<String>,
     pub save_dialog_new_col: bool,
     pub save_dialog_new_col_name: String,
+    /// Save dialog search over collections and folders.
+    pub save_dialog_filter: String,
     pub git_log: Vec<crate::services::vcs::CommitInfo>,
     pub git_status: Option<crate::services::vcs::RepoStatus>,
     pub git_branches: Vec<crate::services::vcs::BranchInfo>,
@@ -87,10 +98,19 @@ pub struct AppState {
     pub git_clone_url: String,
     pub curl_modal_open: bool,
     pub curl_modal_command: String,
-    /// Import-command dialog: clipboard/file import that bypasses text
-    /// widgets entirely (pasting megabytes into an input freezes iced's
-    /// per-grapheme shaping for minutes — see `URL_GUARD_LEN`).
+    /// Shared resource dialog; large clipboard/file imports parse off-thread.
     pub import_dialog_open: bool,
+    /// Import / export collections picker (section ⋯ menu).
+    pub collections_modal: Option<crate::state::collections_modal::CollectionsModal>,
+    pub import_editor: iced::widget::text_editor::Content,
+    pub import_error: Option<String>,
+    pub import_preview: Option<Vec<crate::services::import::resources::Resource>>,
+    pub import_source: Option<ImportSource>,
+    pub import_revision: u64,
+    pub import_parsing: bool,
+    pub import_truncated: bool,
+    pub import_collection_name: String,
+    pub import_create_environment: bool,
     /// A background command parse is running (see `ImportCommandParsed`).
     pub importing: bool,
     pub git_user_name: String,
@@ -112,6 +132,8 @@ pub struct AppState {
     pub snippet_lang: crate::services::snippet::Lang,
     /// Layout direction: false = top/bottom, true = left/right.
     pub horizontal_layout: bool,
+    /// Headers tab lists the headers the client adds on send (view only).
+    pub show_auto_headers: bool,
     /// UI zoom level (0.7 – 2.0). Applied via iced scale_factor.
     pub ui_scale: f64,
     /// Auto-update progress for the banner + settings panel. Absent when the

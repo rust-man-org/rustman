@@ -191,86 +191,211 @@ pub(super) fn request_delete_dialog(state: &AppState) -> Element<'_, Message> {
     )
 }
 
+/// Postman-style "Save request": name, a searchable Save-to list
+/// (collections with their folders under the chosen one), the target path,
+/// and New collection / Cancel / Save in the footer.
 pub(super) fn save_dialog(state: &AppState) -> Element<'_, Message> {
+    let label = |s: &'static str| text(s).size(11).color(Palette::text_muted());
+
     let name_input = text_input("Request name", &state.save_dialog_name)
         .on_input(|s| Message::SaveDialog(SaveDialogMsg::NameChanged(s)))
+        .on_submit(Message::SaveDialog(SaveDialogMsg::Confirm))
         .size(13)
         .padding([8, 10])
-        .style(crate::ui::styles::field_input);
+        .style(crate::ui::styles::boxed_input);
 
-    let mut col_col = column![text("Save to").size(11).color(Palette::text_muted())].spacing(4);
+    let search = text_input("Search collections and folders", &state.save_dialog_filter)
+        .on_input(|s| Message::SaveDialog(SaveDialogMsg::FilterChanged(s)))
+        .icon(text_input::Icon {
+            font: icons::ICON_FONT,
+            code_point: '\u{e151}',
+            size: Some(12.0.into()),
+            spacing: 8.0,
+            side: text_input::Side::Left,
+        })
+        .size(12)
+        .padding([7, 10])
+        .style(crate::ui::styles::boxed_input);
 
+    let q = state.save_dialog_filter.trim().to_lowercase();
+    let filtering = !q.is_empty();
+    // Only the chosen collection unfolds its folders (a large workspace has
+    // hundreds); while searching, matching folders show under their
+    // collection instead.
+    let open_col = match state.save_dialog_group_id.as_deref() {
+        Some(gid) => crate::app::tree::root_collection_of(&state.groups, gid),
+        None => state.save_dialog_collection_id.clone(),
+    };
+    let mut list = column![].spacing(1);
+    let mut shown = 0usize;
     for col in &state.collections {
+        let col_match = col.name.to_lowercase().contains(&q);
+        let mut folders = Vec::new();
+        let folder_hits = save_dialog_groups(state, &mut folders, &col.id, true, 1, &q);
+        let expanded = !state.save_dialog_new_col
+            && (filtering || open_col.as_deref() == Some(col.id.as_str()));
+        if filtering && !col_match && folder_hits == 0 {
+            continue;
+        }
+        shown += 1;
         let selected = !state.save_dialog_new_col
             && state.save_dialog_group_id.is_none()
             && state.save_dialog_collection_id.as_deref() == Some(&col.id);
         let col_id = col.id.clone();
-        col_col = col_col.push(collection_radio_btn(
+        list = list.push(target_row(
+            icons::collections(),
             col.name.clone(),
+            0,
             selected,
-            move || Message::SaveDialog(SaveDialogMsg::ParentSelected(col_id.clone())),
+            Message::SaveDialog(SaveDialogMsg::ParentSelected(col_id)),
         ));
-        col_col = save_dialog_groups(state, col_col, &col.id, true, 1);
+        if expanded && (folder_hits > 0 || !filtering) {
+            list = list.push(iced::widget::Column::with_children(folders).spacing(1));
+        }
     }
-
-    let new_col_selected = state.save_dialog_new_col;
-    col_col = col_col.push(collection_radio_btn(
-        "+ New collection".to_owned(),
-        new_col_selected,
-        || Message::SaveDialog(SaveDialogMsg::ToggleNewCollection),
-    ));
-
-    let new_col_input: Option<Element<'_, Message>> = if state.save_dialog_new_col {
-        Some(
-            text_input("Collection name…", &state.save_dialog_new_col_name)
-                .on_input(|s| Message::SaveDialog(SaveDialogMsg::NewCollectionNameChanged(s)))
-                .size(12)
-                .padding([6, 10])
-                .style(crate::ui::styles::field_input)
-                .into(),
+    let list: Element<'_, Message> = if shown == 0 {
+        container(
+            text(if state.collections.is_empty() {
+                "No collections yet. Create one below."
+            } else {
+                "No collection or folder matches."
+            })
+            .size(12)
+            .color(Palette::text_subtle()),
         )
+        .padding([14, 12])
+        .into()
     } else {
-        None
+        scrollable(container(list).padding(4))
+            .direction(iced::widget::scrollable::Direction::Vertical(
+                crate::ui::theme::grabbable_scrollbar(),
+            ))
+            .style(crate::ui::theme::thin_scrollbar)
+            .into()
+    };
+    let list_box =
+        container(list)
+            .height(260)
+            .width(Length::Fill)
+            .style(|_| iced::widget::container::Style {
+                background: Some(Background::Color(Palette::surface())),
+                border: Border {
+                    color: Palette::border_subtle(),
+                    width: 1.0,
+                    radius: 6.0.into(),
+                },
+                ..Default::default()
+            });
+
+    // "Saving to Collection / Folder" under the list.
+    let target: Element<'_, Message> = if state.save_dialog_new_col {
+        column![
+            label("New collection name"),
+            text_input("New Collection", &state.save_dialog_new_col_name)
+                .on_input(|s| Message::SaveDialog(SaveDialogMsg::NewCollectionNameChanged(s)))
+                .on_submit(Message::SaveDialog(SaveDialogMsg::Confirm))
+                .size(12)
+                .padding([7, 10])
+                .style(crate::ui::styles::boxed_input),
+        ]
+        .spacing(6)
+        .into()
+    } else {
+        let path = save_target_path(state);
+        row![
+            text("Saving to").size(11).color(Palette::text_subtle()),
+            text(path.unwrap_or_else(|| "pick a collection".into()))
+                .size(11)
+                .font(crate::ui::theme::UI_FONT_MEDIUM)
+                .color(Palette::text()),
+        ]
+        .spacing(6)
+        .into()
     };
 
-    let btns = row![
-        button(text("Cancel").size(12).color(Palette::text_muted()))
-            .on_press(Message::SaveDialog(SaveDialogMsg::Close))
-            .style(iced::widget::button::text)
-            .padding([6, 14]),
+    let new_col_btn = button(
+        row![
+            icons::plus().size(12).color(Palette::accent()),
+            text(if state.save_dialog_new_col {
+                "Pick an existing collection"
+            } else {
+                "New collection"
+            })
+            .size(12)
+            .color(Palette::accent()),
+        ]
+        .spacing(6)
+        .align_y(iced::Alignment::Center),
+    )
+    .on_press(Message::SaveDialog(SaveDialogMsg::ToggleNewCollection))
+    .style(iced::widget::button::text)
+    .padding([6, 4]);
+
+    let footer = row![
+        new_col_btn,
         Space::new().width(Length::Fill),
+        crate::ui::components::atoms::Button::new("Cancel")
+            .on_press(Message::SaveDialog(SaveDialogMsg::Close)),
         button(text("Save").size(12).color(Color::WHITE))
             .on_press(Message::SaveDialog(SaveDialogMsg::Confirm))
             .style(accent_btn_style)
             .padding([6, 18]),
     ]
+    .spacing(8)
     .align_y(iced::Alignment::Center);
 
-    let mut body_col = column![
-        text("Save Request")
+    let head = row![
+        text("Save request")
             .size(TEXT_LG)
             .color(Palette::text())
             .font(crate::ui::theme::UI_FONT_MEDIUM),
-        Space::new().height(8),
-        text("Name").size(11).color(Palette::text_muted()),
-        name_input,
-        Space::new().height(8),
-        col_col,
+        Space::new().width(Length::Fill),
+        crate::ui::components::atoms::compact_icon_button(
+            icons::close(),
+            "Close",
+            Message::SaveDialog(SaveDialogMsg::Close),
+            22.0
+        ),
     ]
-    .spacing(4)
-    .width(440);
+    .align_y(iced::Alignment::Center);
 
-    if let Some(inp) = new_col_input {
-        body_col = body_col.push(inp);
-    }
-    body_col = body_col.push(Space::new().height(12)).push(btns);
+    let body = column![
+        head,
+        column![label("Request name"), name_input].spacing(6),
+        column![label("Save to"), search, list_box].spacing(6),
+        target,
+        footer,
+    ]
+    .spacing(16)
+    .width(Length::Fill);
 
     modal_overlay(
-        container(body_col)
+        container(body)
             .style(modal_card_style)
-            .padding([20, 24])
-            .width(440),
+            .padding([20, 22])
+            .width(520),
     )
+}
+
+/// "Collection / Folder / Sub-folder" of the current Save-to choice.
+fn save_target_path(state: &AppState) -> Option<String> {
+    let mut parts = Vec::new();
+    let mut gid = state.save_dialog_group_id.clone();
+    while let Some(id) = gid {
+        let g = state.groups.iter().find(|g| g.id == id)?;
+        parts.push(g.name.clone());
+        gid = (!g.parent_is_collection).then(|| g.parent_id.clone());
+        if g.parent_is_collection {
+            let col = state.collections.iter().find(|c| c.id == g.parent_id)?;
+            parts.push(col.name.clone());
+        }
+    }
+    if parts.is_empty() {
+        let id = state.save_dialog_collection_id.as_deref()?;
+        parts.push(state.collections.iter().find(|c| c.id == id)?.name.clone());
+    }
+    parts.reverse();
+    Some(parts.join(" / "))
 }
 
 pub(super) fn export_dialog(state: &AppState) -> Element<'_, Message> {
@@ -559,87 +684,412 @@ pub(super) fn curl_modal(state: &AppState) -> Element<'_, Message> {
     modal_overlay(inner)
 }
 
-pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
-    let title = row![
-        text("Import Command")
-            .size(TEXT_LG)
-            .color(Palette::text())
-            .font(crate::ui::theme::UI_FONT_MEDIUM),
-        Space::new().width(Length::Fill),
-        button(icons::close().size(16).color(Palette::text_muted()))
-            .on_press(Message::Request(RequestMsg::CloseImportDialog))
-            .style(iced::widget::button::text)
-            .padding([2, 6]),
-    ]
-    .align_y(iced::Alignment::Center);
-
-    // Huge commands must not go through a text widget: pasting megabytes
-    // into an input freezes iced's shaping for minutes (see `URL_GUARD_LEN`).
-    // Both sources below hand raw bytes to the importer, never to a widget.
-    let body: Element<Message> = if state.importing {
-        column![
-            Space::new().height(8),
-            text("Working…").size(12).color(Palette::text_muted()),
-            Space::new().height(8),
-        ]
-        .spacing(4)
-        .into()
-    } else {
-        column![
-            button(
-                row![
-                    icons::copy().size(12).color(Palette::text_muted()),
-                    text("Paste from clipboard").size(12).color(Palette::text()),
-                ]
-                .spacing(8)
-                .align_y(iced::Alignment::Center),
-            )
-            .on_press(Message::Request(RequestMsg::ImportFromClipboard))
-            .style(iced::widget::button::text)
-            .padding([8, 12]),
-            button(
-                row![
-                    icons::import().size(12).color(Palette::text_muted()),
-                    text("Choose a file…").size(12).color(Palette::text()),
-                ]
-                .spacing(8)
-                .align_y(iced::Alignment::Center),
-            )
-            .on_press(Message::Request(RequestMsg::ImportFromFile))
-            .style(iced::widget::button::text)
-            .padding([8, 12]),
-        ]
-        .spacing(2)
+/// Mockup import review: four counters (the environment one accented),
+/// then "supported" / "to review" chips and where variables end up.
+fn import_summary(s: &crate::services::import::resources::Summary) -> Element<'static, Message> {
+    let tile = |n: usize, label: &'static str, accent: bool| -> Element<'static, Message> {
+        container(
+            column![
+                text(n.to_string())
+                    .size(20)
+                    .font(iced::Font {
+                        weight: iced::font::Weight::Semibold,
+                        ..crate::ui::theme::UI_FONT
+                    })
+                    .color(if accent {
+                        Palette::accent()
+                    } else {
+                        Palette::text()
+                    }),
+                text(label).size(11).color(Palette::text_subtle()),
+            ]
+            .spacing(14),
+        )
+        .padding([14, 16])
+        .width(Length::Fill)
+        .height(84)
+        .style(move |_| container::Style {
+            background: accent.then(|| Palette::accent_soft().into()),
+            ..Default::default()
+        })
         .into()
     };
-
-    let inner = container(
-        column![
-            title,
-            Space::new().height(10),
-            text("Import a curl or HTTPie command without pasting it into the URL bar.")
-                .size(11)
-                .color(Palette::text_muted()),
-            Space::new().height(6),
-            body,
-            Space::new().height(12),
-            row![
-                Space::new().width(Length::Fill),
-                button(text("Cancel").size(12).color(Palette::text_muted()))
-                    .on_press(Message::Request(RequestMsg::CloseImportDialog))
-                    .style(iced::widget::button::text)
-                    .padding([6, 14]),
-            ]
-            .align_y(iced::Alignment::Center),
-        ]
-        .spacing(0)
-        .width(440),
+    let rule = || -> Element<'static, Message> {
+        container(Space::new())
+            .width(1)
+            .height(84)
+            .style(|_| container::Style {
+                background: Some(Palette::border_subtle().into()),
+                ..Default::default()
+            })
+            .into()
+    };
+    let tiles = container(row![
+        tile(s.folders, "Folders", false),
+        rule(),
+        tile(s.requests, "Requests", false),
+        rule(),
+        tile(s.variables, "Variables", false),
+        rule(),
+        tile(s.environments, "Environments", s.environments > 0),
+    ])
+    .clip(true)
+    .style(|_| container::Style {
+        border: Border {
+            color: Palette::border_subtle(),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    });
+    let chip =
+        |icon: iced::widget::Text<'static>, label: String, fg: iced::Color, bg: iced::Color| {
+            container(
+                row![icon.size(12).color(fg), text(label).size(11).color(fg)]
+                    .spacing(6)
+                    .align_y(iced::Alignment::Center),
+            )
+            .padding([5, 10])
+            .style(move |_| container::Style {
+                background: Some(bg.into()),
+                border: Border {
+                    radius: 24.0.into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+        };
+    let mut chips = row![].spacing(8);
+    let supported = s.requests.saturating_sub(s.scripts_to_review);
+    if supported > 0 {
+        chips = chips.push(chip(
+            icons::check(),
+            format!("{supported} fully supported"),
+            Palette::SUCCESS,
+            Palette::success_soft(),
+        ));
+    }
+    if s.scripts_to_review > 0 {
+        chips = chips.push(chip(
+            icons::alert(),
+            format!("{} to review", s.scripts_to_review),
+            Palette::WARNING,
+            Palette::warning_soft(),
+        ));
+    }
+    let mut col = column![tiles, chips].spacing(12);
+    if s.scripts_to_review > 0 {
+        col = col.push(
+            text(
+                "Postman scripts are kept as comments in the request's Scripts tab; \
+                 Rustman scripts use their own language, so port them before relying on them.",
+            )
+            .size(11)
+            .color(Palette::text_muted()),
+        );
+    }
+    col.push(
+        text(
+            "Postman environments and collection variables become Rustman environments; \
+             importing the same files again updates them. Values stay on this device.",
+        )
+        .size(11)
+        .color(Palette::text_subtle()),
     )
-    .style(modal_card_style)
-    .padding([20, 24])
-    .width(440);
+    .into()
+}
 
-    modal_overlay(inner)
+pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
+    use crate::message::ImportMsg;
+    let busy = state.importing;
+    let action = |label: &'static str, msg| {
+        button(text(label).size(12).color(Palette::accent()))
+            .on_press_maybe((!busy).then_some(Message::Import(msg)))
+            .style(iced::widget::button::text)
+            .padding([5, 8])
+    };
+    let title = row![
+        text("Use Resources")
+            .size(TEXT_LG)
+            .font(crate::ui::theme::UI_FONT_MEDIUM)
+            .color(Palette::text()),
+        Space::new().width(Length::Fill),
+        crate::ui::components::atoms::compact_icon_button(
+            icons::close(),
+            "Close import",
+            Message::Request(RequestMsg::CloseImportDialog),
+            24.0
+        ),
+    ]
+    .align_y(iced::Alignment::Center);
+    let editor = text_editor(&state.import_editor)
+        .id("resource-import")
+        .placeholder("Paste cURL commands, an OpenAPI spec, or a Postman collection or environment")
+        .on_action(move |action| Message::Import(ImportMsg::Edited(action)))
+        .font(MONO)
+        .size(12)
+        .padding(10)
+        .height(if state.import_preview.is_some() {
+            240
+        } else {
+            140
+        })
+        .style(|theme, status| {
+            let mut style = text_editor::default(theme, status);
+            style.background = Palette::background().into();
+            style.border = Border {
+                color: if matches!(status, text_editor::Status::Focused { .. }) {
+                    Palette::accent()
+                } else {
+                    Palette::border()
+                },
+                width: 1.0,
+                radius: 5.0.into(),
+            };
+            style.value = Palette::text();
+            style.placeholder = Palette::text_subtle();
+            style
+        });
+    let drop_area = container(
+        column![
+            icons::import().size(22).color(Palette::text_muted()),
+            text(if busy {
+                "Importing resources..."
+            } else {
+                "Drop files or a folder here (a Postman data dump works as is)"
+            })
+            .size(13)
+            .font(crate::ui::theme::UI_FONT_MEDIUM)
+            .color(Palette::text()),
+            row![
+                text("Or select").size(12).color(Palette::text_muted()),
+                action("files", ImportMsg::ChooseFiles),
+                text("or").size(12).color(Palette::text_muted()),
+                action("folders", ImportMsg::ChooseFolder),
+            ]
+            .align_y(iced::Alignment::Center)
+            .spacing(2),
+        ]
+        .spacing(10)
+        .align_x(iced::Alignment::Center),
+    )
+    .width(Length::Fill)
+    .height(220)
+    .center_x(Length::Fill)
+    .center_y(220)
+    .style(|_| container::Style {
+        border: Border {
+            color: Palette::border(),
+            width: 1.0,
+            radius: 5.0.into(),
+        },
+        ..Default::default()
+    });
+    let mut body = column![
+        title,
+        row![
+            text("Resources").size(12).color(Palette::text_muted()),
+            container(text("Import").size(12).color(Palette::text()))
+                .padding([4, 8])
+                .style(|_| container::Style {
+                    background: Some(Palette::surface_high().into()),
+                    border: Border {
+                        radius: 4.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+        ]
+        .spacing(12)
+        .align_y(iced::Alignment::Center),
+        editor,
+        text("Postman collections + environments / OpenAPI / Rustman JSON / HTTPie / cURL")
+            .size(11)
+            .color(Palette::text_muted()),
+    ]
+    .spacing(12);
+    if state.import_truncated {
+        body = body.push(text("Large input: showing the first 4 KB. Clear to replace; the preview uses the full input.").size(11).color(Palette::text_muted()));
+    }
+    if state.import_parsing {
+        body = body.push(
+            text("Analyzing resources...")
+                .size(12)
+                .color(Palette::text_muted()),
+        );
+    }
+    let command_count = state
+        .import_preview
+        .as_deref()
+        .map(crate::services::import::resources::command_count)
+        .unwrap_or(0);
+    if let Some(resources) = &state.import_preview {
+        let collection_requests: usize = resources
+            .iter()
+            .map(|r| match r {
+                crate::services::import::resources::Resource::Collections(c) => {
+                    c.iter().map(|c| c.all_requests().len()).sum()
+                }
+                _ => 0,
+            })
+            .sum();
+        let summary = crate::services::import::resources::Summary::of(resources);
+        let heading = if summary.collections > 0 || summary.environments > 0 {
+            let mut parts = Vec::new();
+            if summary.collections > 0 {
+                parts.push(format!(
+                    "{} collection{}",
+                    summary.collections,
+                    if summary.collections == 1 { "" } else { "s" }
+                ));
+            }
+            if summary.environments > 0 {
+                parts.push(format!(
+                    "{} environment{}",
+                    summary.environments,
+                    if summary.environments == 1 { "" } else { "s" }
+                ));
+            }
+            format!("{} ready to import", parts.join(" and "))
+        } else {
+            format!(
+                "{} requests ready to import",
+                command_count + collection_requests
+            )
+        };
+        let mut preview = column![
+            text(heading)
+                .size(13)
+                .font(crate::ui::theme::UI_FONT_MEDIUM)
+                .color(Palette::text()),
+        ]
+        .spacing(9);
+        if command_count < 2 && (summary.collections > 0 || summary.environments > 0) {
+            preview = preview.push(import_summary(&summary));
+        }
+        if command_count > 1 {
+            preview = preview
+                .push(
+                    text("Collection name")
+                        .size(11)
+                        .color(Palette::text_muted()),
+                )
+                .push(
+                    text_input("Collection name", &state.import_collection_name)
+                        .on_input(|name| Message::Import(ImportMsg::CollectionNameChanged(name)))
+                        .style(crate::ui::styles::field_input)
+                        .size(12)
+                        .padding([7, 9]),
+                )
+                .push(
+                    text(format!(
+                        "Imports as a collection with {command_count} requests"
+                    ))
+                    .size(12)
+                    .color(Palette::text()),
+                );
+            if let Some(origin) = crate::services::import::resources::common_origin(resources) {
+                preview = preview.push(
+                    iced::widget::checkbox(state.import_create_environment)
+                        .label("Create and activate an environment with {{baseUrl}}")
+                        .on_toggle(|enabled| {
+                            Message::Import(ImportMsg::CreateEnvironmentChanged(enabled))
+                        })
+                        .size(14)
+                        .text_size(12),
+                );
+                preview = preview.push(
+                    text(origin)
+                        .font(MONO)
+                        .size(11)
+                        .color(Palette::text_muted()),
+                );
+            }
+        } else if command_count == 1 {
+            preview = preview.push(
+                text("Imports into a new request tab")
+                    .size(12)
+                    .color(Palette::text_muted()),
+            );
+        } else if summary.collections == 0 && summary.environments == 0 {
+            preview = preview.push(
+                text("Imports into Collections")
+                    .size(12)
+                    .color(Palette::text_muted()),
+            );
+        }
+        body = body.push(
+            container(preview)
+                .padding(14)
+                .width(Length::Fill)
+                .style(|_| container::Style {
+                    border: Border {
+                        color: Palette::border(),
+                        width: 1.0,
+                        radius: 6.0.into(),
+                    },
+                    ..Default::default()
+                }),
+        );
+    } else {
+        body = body.push(drop_area);
+    }
+    if let Some(error) = &state.import_error {
+        body = body.push(text(error).size(12).color(Palette::ERROR));
+    }
+    body = body.push(
+        row![
+            action("Paste from clipboard", ImportMsg::Clipboard),
+            action("Clear", ImportMsg::Clear),
+            Space::new().width(Length::Fill),
+            button(text("Cancel").size(12).color(Palette::text_muted()))
+                .on_press(Message::Request(RequestMsg::CloseImportDialog))
+                .style(iced::widget::button::text)
+                .padding([7, 14]),
+            button(text(if busy { "Importing..." } else { "Import" }).size(12))
+                .on_press_maybe(
+                    (!busy
+                        && !state.import_parsing
+                        && state.import_preview.is_some()
+                        && (command_count < 2 || !state.import_collection_name.trim().is_empty()))
+                    .then_some(Message::Import(ImportMsg::Submit))
+                )
+                .style(|theme, status| {
+                    let mut style = accent_btn_style(theme, status);
+                    style.shadow = iced::Shadow::default();
+                    if matches!(status, button::Status::Disabled) {
+                        style.background = Some(Palette::surface_high().into());
+                        style.text_color = Palette::text_muted();
+                    }
+                    style
+                })
+                .padding([7, 18]),
+        ]
+        .spacing(8)
+        .align_y(iced::Alignment::Center),
+    );
+    let card = container(body)
+        .padding(18)
+        .width(Length::Fill)
+        .max_width(848)
+        .style(|theme| container::Style {
+            shadow: iced::Shadow::default(),
+            ..modal_card_style(theme)
+        });
+    iced::widget::opaque(
+        container(
+            scrollable(container(card).center_x(Length::Fill).padding(24))
+                .height(Length::Fill)
+                .style(crate::ui::theme::thin_scrollbar),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(|_| container::Style {
+            background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.60).into()),
+            ..Default::default()
+        }),
+    )
+    .into()
 }
 
 fn editor_box<'a>(label: &'static str, editor: Element<'a, Message>) -> Element<'a, Message> {
@@ -731,77 +1181,79 @@ pub(super) fn global_scripts_modal(state: &AppState) -> Element<'_, Message> {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-/// Folder rows under `parent` for the save dialog's parent picker, indented
-/// by `depth` and sorted like the sidebar tree (issue #53).
+/// Folder rows under `parent_id` (recursively), indented by depth. With a
+/// query, only folders that match or contain a match are listed. Returns
+/// how many folders matched.
 fn save_dialog_groups<'a>(
     state: &'a AppState,
-    mut col: iced::widget::Column<'a, Message>,
+    out: &mut Vec<Element<'a, Message>>,
     parent_id: &str,
     parent_is_collection: bool,
-    depth: usize,
-) -> iced::widget::Column<'a, Message> {
+    depth: u16,
+    q: &str,
+) -> usize {
     let mut groups: Vec<&'a crate::domain::group::Group> = state
         .groups
         .iter()
         .filter(|g| g.parent_id == parent_id && g.parent_is_collection == parent_is_collection)
         .collect();
     groups.sort_by_key(|g| g.sort_order);
+    let mut hits = 0;
     for group in groups {
+        let mut children = Vec::new();
+        let child_hits = save_dialog_groups(state, &mut children, &group.id, false, depth + 1, q);
+        let own = q.is_empty() || group.name.to_lowercase().contains(q);
+        if !own && child_hits == 0 {
+            continue;
+        }
+        hits += usize::from(own) + child_hits;
         let selected =
             !state.save_dialog_new_col && state.save_dialog_group_id.as_deref() == Some(&group.id);
-        let gid = group.id.clone();
-        let label = format!("└ {}", group.name);
-        let row: Element<'static, Message> =
-            container(collection_radio_btn(label, selected, move || {
-                Message::SaveDialog(SaveDialogMsg::ParentSelected(gid.clone()))
-            }))
-            .padding(iced::Padding {
-                top: 0.0,
-                right: 0.0,
-                bottom: 0.0,
-                left: (depth as f32) * 16.0,
-            })
-            .into();
-        col = col.push(row);
-        col = save_dialog_groups(state, col, &group.id, false, depth + 1);
+        out.push(target_row(
+            icons::folder(),
+            group.name.clone(),
+            depth,
+            selected,
+            Message::SaveDialog(SaveDialogMsg::ParentSelected(group.id.clone())),
+        ));
+        out.extend(children);
     }
-    col
+    hits
 }
 
-fn collection_radio_btn(
-    label: String,
+/// One Save-to row: icon + name, indented 16px per level; the chosen row is
+/// accent-tinted with an accent icon, others highlight on hover.
+fn target_row(
+    icon: iced::widget::Text<'static>,
+    name: String,
+    depth: u16,
     selected: bool,
-    on_press: impl Fn() -> Message,
+    msg: Message,
 ) -> Element<'static, Message> {
     button(
         row![
-            container(Space::new().width(8).height(8))
-                .style(move |_| iced::widget::container::Style {
-                    background: Some(Background::Color(if selected {
-                        Palette::accent()
-                    } else {
-                        Palette::border()
-                    })),
-                    border: Border {
-                        radius: 4.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .width(8)
-                .height(8),
-            text(label).size(12).color(if selected {
+            icon.size(13).color(if selected {
                 Palette::accent()
             } else {
-                Palette::text_muted()
+                Palette::text_subtle()
             }),
+            text(name)
+                .size(12)
+                .color(if selected {
+                    Palette::text()
+                } else {
+                    Palette::text_muted()
+                })
+                .wrapping(iced::widget::text::Wrapping::None),
         ]
         .spacing(8)
         .align_y(iced::Alignment::Center),
     )
-    .on_press(on_press())
+    .on_press(msg)
     .style(move |_t, s| iced::widget::button::Style {
-        background: if selected || matches!(s, iced::widget::button::Status::Hovered) {
+        background: if selected {
+            Some(Background::Color(Palette::accent_soft()))
+        } else if matches!(s, iced::widget::button::Status::Hovered) {
             Some(Background::Color(Palette::surface_high()))
         } else {
             None
@@ -813,7 +1265,12 @@ fn collection_radio_btn(
         text_color: Palette::text(),
         ..Default::default()
     })
-    .padding([5, 8])
+    .padding(iced::Padding {
+        top: 6.0,
+        right: 8.0,
+        bottom: 6.0,
+        left: 8.0 + f32::from(depth) * 16.0,
+    })
     .width(Length::Fill)
     .into()
 }

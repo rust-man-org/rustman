@@ -229,6 +229,22 @@ pub fn update_group_order(conn: &Connection, id: &str, sort_order: i64) -> Resul
     Ok(())
 }
 
+/// Re-parent a group (drag into another folder or collection).
+pub fn update_group_parent(
+    conn: &Connection,
+    id: &str,
+    parent_id: &str,
+    parent_is_collection: bool,
+    sort_order: i64,
+) -> Result<(), String> {
+    conn.execute(
+        "UPDATE groups SET parent_id=?1, parent_is_collection=?2, sort_order=?3 WHERE id=?4",
+        params![parent_id, parent_is_collection, sort_order, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Delete a group and everything under it: descendant groups plus every
 /// request in the subtree.
 pub fn delete_group(conn: &Connection, id: &str) -> Result<(), String> {
@@ -484,6 +500,16 @@ pub fn replace_collection_contents(
     groups: &[Group],
     requests: &[SavedRequest],
 ) -> Result<(), String> {
+    replace_collection_and_environment(conn, collection, groups, requests, None)
+}
+
+pub fn replace_collection_and_environment(
+    conn: &Connection,
+    collection: &Collection,
+    groups: &[Group],
+    requests: &[SavedRequest],
+    environment: Option<&AppEnvironment>,
+) -> Result<(), String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     let collection_id = &collection.id;
     tx.execute(
@@ -509,6 +535,9 @@ pub fn replace_collection_contents(
         if !incoming.contains(old.id.as_str()) {
             delete_request(&tx, &old.id)?;
         }
+    }
+    if let Some(environment) = environment {
+        save_environment(&tx, environment)?;
     }
     tx.commit().map_err(|e| e.to_string())
 }

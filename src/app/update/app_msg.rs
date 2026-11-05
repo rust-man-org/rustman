@@ -63,6 +63,8 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
                 }
                 tab.is_loading = false;
                 tab.parsed_json = None;
+                tab.body_lang = None;
+                tab.body_preview = None;
                 tab.viewer_processing = true;
                 tab.response = Some(result.response.clone());
 

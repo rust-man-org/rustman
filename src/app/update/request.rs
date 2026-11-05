@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::app::AppState;
 use crate::app::request_ops::{format_body, save_request, send_request};
 use crate::app::session::persist_session;
-use crate::consts::{IMPORT_FILE_LIMIT, PASTE_GUARD_LEN, URL_GUARD_LEN};
+use crate::consts::{PASTE_GUARD_LEN, URL_GUARD_LEN};
 use crate::domain::request::{BodyType, sync_params_from_url, sync_url_from_params};
 use crate::jobs::JobKind;
 use crate::message::{AppMsg, FormatTarget, Message, RequestMsg};
@@ -27,9 +27,43 @@ const TAB_DRAG_ENABLED: bool = false;
 const ASYNC_IMPORT_LEN: usize = 256 * 1024;
 
 pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
+    if matches!(
+        &msg,
+        RequestMsg::UrlHovered(_)
+            | RequestMsg::UrlCompletionMoved(_)
+            | RequestMsg::UrlCompletionSelected(_)
+            | RequestMsg::UrlCompletionDismissed
+            | RequestMsg::UrlVariableValueChanged(_)
+            | RequestMsg::UrlVariableEnvironmentSelected(_)
+            | RequestMsg::UrlVariableEnvironmentNameChanged(_)
+            | RequestMsg::UrlVariableSave
+            | RequestMsg::UrlVariableDismissed
+    ) {
+        return handle_url_variables(state, msg);
+    }
+    if let RequestMsg::AutoHeadersToggled = msg {
+        state.show_auto_headers = !state.show_auto_headers;
+        return Task::none();
+    }
     let tab = state.tabs.active_tab_mut();
     record_undo(tab, &msg);
     match msg {
+        RequestMsg::UrlHovered(_)
+        | RequestMsg::UrlCompletionMoved(_)
+        | RequestMsg::UrlCompletionSelected(_)
+        | RequestMsg::UrlCompletionDismissed
+        | RequestMsg::UrlVariableValueChanged(_)
+        | RequestMsg::UrlVariableEnvironmentSelected(_)
+        | RequestMsg::UrlVariableEnvironmentNameChanged(_)
+        | RequestMsg::UrlVariableSave
+        | RequestMsg::UrlVariableDismissed
+        | RequestMsg::AutoHeadersToggled => unreachable!("handled above"),
+        RequestMsg::TitleChanged(value) => {
+            if tab.title != value {
+                tab.title = value;
+                tab.modified = true;
+            }
+        }
         RequestMsg::Undo => {
             if let Some(prev) = tab.undo.pop() {
                 tab.redo.push(tab.edit_snapshot());
@@ -63,8 +97,24 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             tab.modified = true;
         }
         RequestMsg::UrlEdited(action) => {
+            tab.url_hover = None;
             use iced::widget::text_editor::{Action as UrlAction, Edit as UrlEdit};
             match action {
+                UrlAction::Click(point) => {
+                    tab.url_editor.perform(UrlAction::Click(point));
+                    let key = crate::services::variables::variable_at(
+                        &tab.url,
+                        tab.url_editor.cursor().position.column,
+                    );
+                    tab.url_variable_draft = None;
+                    if let Some(key) = key.filter(|key| !key.is_empty()) {
+                        open_url_variable(state, key);
+                        if state.tabs.active_tab().url_variable_draft.is_some() {
+                            return iced::widget::operation::focus("url-variable-value");
+                        }
+                    }
+                    return Task::none();
+                }
                 // The bar is single-line by construction: Enter never lands
                 // (previously a no-op without `on_submit`, same as now).
                 UrlAction::Edit(UrlEdit::Enter) => return Task::none(),
@@ -86,6 +136,19 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                     };
                 }
                 UrlAction::Edit(UrlEdit::Paste(text)) => {
+                    // Detect command pastes before stripping line breaks: the
+                    // parser needs shell continuations and quoted bodies intact.
+                    match classify_pasted_command(&text) {
+                        PastedCommand::Curl => {
+                            return handle(state, RequestMsg::ImportCurl(text.to_string()));
+                        }
+                        PastedCommand::Httpie => {
+                            return handle(state, RequestMsg::ImportHttpie(text.to_string()));
+                        }
+                        PastedCommand::Other => {}
+                    }
+                    tab.url_completion_open = true;
+                    tab.url_completion_selected = 0;
                     // URLs are single-line: drop raw line breaks (a trailing
                     // newline from terminal copies is the common case) rather
                     // than growing the bar.
@@ -102,6 +165,9 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                     // content edits flow on to keep params, undo and dirty in
                     // step — exactly what `on_input` used to drive.
                     if edits {
+                        tab.url_variable_draft = None;
+                        tab.url_completion_open = true;
+                        tab.url_completion_selected = 0;
                         let new_url = tab.url_editor.text();
                         return handle(state, RequestMsg::UrlChanged(new_url));
                     }
@@ -256,6 +322,14 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             tab.headers.remove(i);
             tab.modified = true;
         }
+        RequestMsg::HeaderPresetApplied(value) => {
+            apply_content_type_preset(&mut tab.headers, &value);
+            tab.modified = true;
+        }
+        RequestMsg::HeadersCleared => {
+            tab.headers.clear();
+            tab.modified = true;
+        }
         RequestMsg::HeaderToggled(i) => {
             tab.headers[i].enabled = !tab.headers[i].enabled;
             tab.modified = true;
@@ -318,7 +392,7 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             if let Some(content) = tab.params_bulk.take() {
                 tab.params = parse_bulk_kv(&content.text(), true);
                 let url = sync_url_from_params(&tab.url, &tab.params);
-            tab.set_url(url);
+                tab.set_url(url);
             } else {
                 let text = serialize_bulk_kv(&tab.params);
                 tab.params_bulk = Some(iced::widget::text_editor::Content::with_text(&text));
@@ -331,7 +405,7 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                 let text = content.text();
                 tab.params = parse_bulk_kv(&text, true);
                 let url = sync_url_from_params(&tab.url, &tab.params);
-            tab.set_url(url);
+                tab.set_url(url);
                 tab.modified = true;
             }
         }
@@ -388,6 +462,22 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                     } else {
                         FormFieldType::Text
                     };
+                tab.modified = true;
+            }
+        }
+        RequestMsg::FormFieldTypeSet(i, kind) => {
+            state.sidebar.context_menu = None;
+            let tab = state.tabs.active_tab_mut();
+            if let Some(f) = tab.form_fields.get_mut(i)
+                && f.field_type != kind
+            {
+                f.field_type = kind;
+                tab.modified = true;
+            }
+        }
+        RequestMsg::FormFieldDescriptionChanged(i, v) => {
+            if let Some(f) = tab.form_fields.get_mut(i) {
+                f.description = v;
                 tab.modified = true;
             }
         }
@@ -456,7 +546,13 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                 state.importing = true;
                 return parse_command_off_thread(cmd, curl::parse);
             }
-            apply_parsed_command(tab, curl::parse(&cmd), cmd.len());
+            let parsed = curl::parse(&cmd);
+            if !command_has_url(&parsed) {
+                state.status_message =
+                    Some("The command needs a URL. Nothing was imported.".into());
+                return Task::none();
+            }
+            apply_parsed_command(tab, parsed, cmd.len());
         }
         RequestMsg::ImportHttpie(cmd) => {
             if cmd.len() > ASYNC_IMPORT_LEN {
@@ -464,10 +560,21 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                 state.importing = true;
                 return parse_command_off_thread(cmd, crate::services::import::httpie::parse);
             }
-            apply_parsed_command(tab, crate::services::import::httpie::parse(&cmd), cmd.len());
+            let parsed = crate::services::import::httpie::parse(&cmd);
+            if !command_has_url(&parsed) {
+                state.status_message =
+                    Some("The command needs a URL. Nothing was imported.".into());
+                return Task::none();
+            }
+            apply_parsed_command(tab, parsed, cmd.len());
         }
         RequestMsg::ImportCommandParsed { parsed, cmd_len } => {
             state.importing = false;
+            if !command_has_url(&parsed) {
+                state.status_message =
+                    Some("The command needs a URL. Nothing was imported.".into());
+                return Task::none();
+            }
             state.status_message = Some("Command imported.".to_owned());
             apply_parsed_command(tab, parsed, cmd_len);
         }
@@ -478,7 +585,7 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             ));
         }
         RequestMsg::OpenImportDialog => {
-            state.import_dialog_open = true;
+            return super::import::handle(state, crate::message::ImportMsg::OpenPostmanDialog);
         }
         RequestMsg::CloseImportDialog => {
             state.import_dialog_open = false;
@@ -498,53 +605,12 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             };
             return import_pasted_text(state, text);
         }
-        RequestMsg::ImportFromFile => {
-            state.import_dialog_open = false;
-            state.importing = true;
-            state.status_message = Some("Choose a file holding the command…".to_owned());
-            return Task::perform(
-                async move {
-                    let file = rfd::AsyncFileDialog::new()
-                        .set_title("Import curl / HTTPie command")
-                        .pick_file()
-                        .await;
-                    match file {
-                        Some(f) => Some((f.file_name(), f.read().await)),
-                        None => None,
-                    }
-                },
-                |res| Message::Request(RequestMsg::ImportFileReady(res)),
-            );
-        }
-        RequestMsg::ImportFileReady(res) => {
-            let Some((name, bytes)) = res else {
-                state.importing = false;
-                state.status_message = None;
-                return Task::none();
-            };
-            if bytes.len() > IMPORT_FILE_LIMIT {
-                state.importing = false;
-                state.status_message = Some(format!(
-                    "{name} is {} — past the {} import limit.",
-                    human_size(bytes.len()),
-                    human_size(IMPORT_FILE_LIMIT),
-                ));
-                return Task::none();
-            }
-            match String::from_utf8(bytes) {
-                Ok(text) => return import_pasted_text(state, text),
-                Err(_) => {
-                    state.importing = false;
-                    state.status_message =
-                        Some(format!("{name} is not valid text — nothing imported."));
-                    return Task::none();
-                }
-            }
-        }
         RequestMsg::SaveRequest => {
             let tab = state.tabs.active_tab();
             if tab.saved_as.is_none() {
-                let name = if tab.url.is_empty() {
+                let name = if tab.url.is_empty()
+                    || !matches!(tab.title.trim(), "" | "New Request" | "Untitled Request")
+                {
                     tab.title.clone()
                 } else {
                     tab.url.clone()
@@ -631,9 +697,16 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                 enabled: true,
                 file_name: None,
                 file_data: None,
+                description: String::new(),
                 mime_type: None,
             });
             tab.modified = true;
+        }
+        RequestMsg::FormFieldToggled(i) => {
+            if let Some(field) = tab.form_fields.get_mut(i) {
+                field.enabled = !field.enabled;
+                tab.modified = true;
+            }
         }
         RequestMsg::FormFieldRemoved(i) => {
             if i < tab.form_fields.len() {
@@ -746,7 +819,7 @@ enum EditClass {
 /// Whether a URL-bar editor action mutates the text (for undo coalescing
 /// and the `UrlChanged` follow-up). Navigation, selection and focus never
 /// count — cursor moves must not mark the tab modified.
-fn url_action_edits_content(action: &iced::widget::text_editor::Action) -> bool {
+pub(super) fn url_action_edits_content(action: &iced::widget::text_editor::Action) -> bool {
     use iced::widget::text_editor::{Action as UrlAction, Edit as UrlEdit};
     matches!(
         action,
@@ -763,6 +836,25 @@ fn url_action_edits_content(action: &iced::widget::text_editor::Action) -> bool 
 
 /// Record an undo checkpoint of the request fields *before* a mutating message is
 /// applied, coalescing runs of keystrokes in one field into a single entry.
+/// Headers "Presets": set the Content-Type row (first one, enabling it),
+/// add one when missing; an empty value removes every Content-Type row.
+fn apply_content_type_preset(headers: &mut Vec<crate::domain::request::KeyValue>, value: &str) {
+    let is_ct = |k: &str| k.trim().eq_ignore_ascii_case("content-type");
+    if value.is_empty() {
+        headers.retain(|h| !is_ct(&h.key));
+        return;
+    }
+    if let Some(h) = headers.iter_mut().find(|h| is_ct(&h.key)) {
+        h.value = value.to_owned();
+        h.enabled = true;
+        return;
+    }
+    let mut row = crate::domain::request::KeyValue::new_empty();
+    row.key = "Content-Type".to_owned();
+    row.value = value.to_owned();
+    headers.push(row);
+}
+
 fn record_undo(tab: &mut RequestTabState, msg: &RequestMsg) {
     match edit_class(msg) {
         EditClass::Skip => {}
@@ -784,6 +876,9 @@ fn edit_class(msg: &RequestMsg) -> EditClass {
     use RequestMsg as M;
     match msg {
         M::UrlChanged(_) => EditClass::Coalesce(K::Url),
+        M::UrlEdited(iced::widget::text_editor::Action::Edit(
+            iced::widget::text_editor::Edit::Paste(text),
+        )) if classify_pasted_command(text) != PastedCommand::Other => EditClass::Skip,
         M::UrlEdited(action) if url_action_edits_content(action) => EditClass::Coalesce(K::Url),
         M::HeaderKeyChanged(i, _) => EditClass::Coalesce(K::HeaderKey(*i)),
         M::HeaderValueChanged(i, _) => EditClass::Coalesce(K::HeaderValue(*i)),
@@ -807,11 +902,15 @@ fn edit_class(msg: &RequestMsg) -> EditClass {
         | M::ParamRemoved(_)
         | M::ParamToggled(_)
         | M::HeadersBulkToggle
+        | M::HeaderPresetApplied(_)
+        | M::HeadersCleared
+        | M::FormFieldToggled(_)
         | M::ParamsBulkToggle
         | M::MethodChanged(_)
         | M::AuthTypeChanged(_)
         | M::ApiKeyLocationChanged(_)
         | M::ImportCurl(_)
+        | M::ImportHttpie(_)
         | M::ImportCommandParsed { .. } => EditClass::Discrete,
         _ => EditClass::Skip,
     }
@@ -1157,11 +1256,40 @@ fn import_pasted_text(state: &mut AppState, text: String) -> Task<Message> {
     }
 }
 
-fn apply_parsed_command(
+fn command_has_url(command: &crate::services::curl::ParsedCurl) -> bool {
+    command
+        .url
+        .as_deref()
+        .is_some_and(|url| !url.trim().is_empty())
+}
+
+pub(super) fn apply_parsed_command(
     tab: &mut RequestTabState,
     parsed: crate::services::curl::ParsedCurl,
     cmd_len: usize,
 ) {
+    // A complete command describes a new HTTP payload. Preserve tab identity,
+    // title and scripts, but never carry old credentials/body to its endpoint.
+    // Incomplete typed commands keep the existing fields until a URL exists.
+    if parsed.url.is_some() {
+        tab.headers.clear();
+        tab.headers_bulk = None;
+        tab.params_bulk = None;
+        tab.auth_type = crate::domain::request::AuthType::None;
+        tab.bearer_token.clear();
+        tab.basic_user.clear();
+        tab.basic_pass.clear();
+        tab.api_key_name.clear();
+        tab.api_key_value.clear();
+        tab.jwt_secret.clear();
+        tab.jwt_subject.clear();
+        tab.cookie_string.clear();
+        tab.cookies.clear();
+        tab.body_type = BodyType::None;
+        tab.body_editor = crate::state::tabs::make_code_editor("", "txt");
+        tab.form_fields.clear();
+        tab.form_viewers.clear();
+    }
     // A paste that parses to no URL must not linger in the URL bar: a
     // multi-MB command would sit in the single-line URL input and freeze
     // layout every frame. The parsed content still applies below — only the
@@ -1274,6 +1402,7 @@ fn apply_parsed_command(
                     enabled: true,
                     file_name,
                     file_data: None,
+                    description: String::new(),
                     mime_type: None,
                 }
             })
@@ -1312,4 +1441,213 @@ fn guess_mime(name: &str) -> Option<String> {
         _ => return None,
     };
     Some(m.to_owned())
+}
+
+fn handle_url_variables(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
+    use crate::services::variables;
+    match msg {
+        RequestMsg::UrlVariableDismissed => {
+            state.tabs.active_tab_mut().url_variable_draft = None;
+        }
+        RequestMsg::UrlVariableValueChanged(value) => {
+            if let Some(draft) = &mut state.tabs.active_tab_mut().url_variable_draft {
+                draft.value = value;
+                draft.error = None;
+            }
+        }
+        RequestMsg::UrlVariableEnvironmentSelected(id) => {
+            if id
+                .as_ref()
+                .is_none_or(|id| state.environments.iter().any(|env| &env.id == id))
+                && let Some(draft) = &mut state.tabs.active_tab_mut().url_variable_draft
+            {
+                draft.environment_id = id;
+                draft.error = None;
+            }
+        }
+        RequestMsg::UrlVariableEnvironmentNameChanged(name) => {
+            if let Some(draft) = &mut state.tabs.active_tab_mut().url_variable_draft {
+                draft.environment_name = name;
+                draft.error = None;
+            }
+        }
+        RequestMsg::UrlVariableSave => {
+            if let Err(error) = save_url_variable(state)
+                && let Some(draft) = &mut state.tabs.active_tab_mut().url_variable_draft
+            {
+                draft.error = Some(error);
+            }
+        }
+        RequestMsg::UrlHovered(point) => {
+            let tab = state.tabs.active_tab_mut();
+            tab.url_hover = point
+                .filter(|p| p.x >= 0.0 && p.y >= 0.0)
+                .and_then(|point| {
+                    // Hit-test the already-shaped editor, including horizontal
+                    // scrolling and Unicode. Restore both caret and selection.
+                    let saved = tab.url_editor.cursor();
+                    tab.url_editor
+                        .perform(iced::widget::text_editor::Action::Click(point));
+                    let column = tab.url_editor.cursor().position.column;
+                    tab.url_editor.move_to(saved);
+                    variables::variable_at(&tab.url, column)
+                });
+        }
+        RequestMsg::UrlCompletionDismissed => {
+            state.tabs.active_tab_mut().url_completion_open = false;
+        }
+        RequestMsg::UrlCompletionMoved(delta) => {
+            let tab = state.tabs.active_tab();
+            if let Some((_, query)) =
+                variables::completion(&tab.url, tab.url_editor.cursor().position.column)
+            {
+                let n = variables::candidates(state.active_env(), query).len();
+                if n > 0 {
+                    let next =
+                        (tab.url_completion_selected as i32 + delta).rem_euclid(n as i32) as usize;
+                    state.tabs.active_tab_mut().url_completion_selected = next;
+                }
+            }
+        }
+        RequestMsg::UrlCompletionSelected(key) => {
+            let tab = state.tabs.active_tab();
+            let Some((range, query)) =
+                variables::completion(&tab.url, tab.url_editor.cursor().position.column)
+            else {
+                return Task::none();
+            };
+            let keys = variables::candidates(state.active_env(), query);
+            let Some(key) = key.or_else(|| {
+                keys.get(
+                    tab.url_completion_selected
+                        .min(keys.len().saturating_sub(1)),
+                )
+                .cloned()
+            }) else {
+                return Task::none();
+            };
+            if !keys.contains(&key) {
+                return Task::none();
+            }
+            let replacement = format!("{{{{{key}}}}}");
+            let caret = range.start + replacement.len();
+            let mut url = tab.url.clone();
+            url.replace_range(range, &replacement);
+            let _ = handle(state, RequestMsg::UrlChanged(url.clone()));
+            let tab = state.tabs.active_tab_mut();
+            tab.set_url(url);
+            tab.url_editor.move_to(iced_core::text::editor::Cursor {
+                position: iced_core::text::editor::Position {
+                    line: 0,
+                    column: caret,
+                },
+                selection: None,
+            });
+            return iced::widget::operation::focus("request-url");
+        }
+        _ => {}
+    }
+    Task::none()
+}
+
+pub(super) fn open_url_variable(state: &mut AppState, key: String) {
+    if state
+        .active_env()
+        .is_some_and(|env| env.variables.contains_key(&key))
+    {
+        return;
+    }
+    let environment_id = state
+        .active_env()
+        .or(state.environments.first())
+        .map(|env| env.id.clone());
+    let environments = state
+        .environments
+        .iter()
+        .map(|env| (env.id.clone(), env.name.clone()))
+        .collect();
+    let tab = state.tabs.active_tab_mut();
+    tab.url_completion_open = false;
+    tab.url_variable_draft = Some(crate::state::tabs::UrlVariableDraft {
+        key,
+        value: String::new(),
+        environment_id,
+        environment_name: String::new(),
+        environments,
+        error: None,
+    });
+}
+
+fn save_url_variable(state: &mut AppState) -> Result<(), String> {
+    use crate::{domain::environment::AppEnvironment, services::storage};
+    let Some(draft) = state.tabs.active_tab().url_variable_draft.clone() else {
+        return Ok(());
+    };
+    if draft.key.is_empty() || draft.key.contains(['{', '}', '\r', '\n']) {
+        return Err("Choose a valid variable name.".into());
+    }
+    // The token may have disappeared through another URL writer while open.
+    if !state
+        .tabs
+        .active_tab()
+        .url
+        .match_indices("{{")
+        .any(|(offset, _)| {
+            crate::services::variables::variable_at(&state.tabs.active_tab().url, offset).as_deref()
+                == Some(&draft.key)
+        })
+    {
+        return Err("This variable is no longer in the URL.".into());
+    }
+    let mut environment = match &draft.environment_id {
+        Some(id) => state
+            .environments
+            .iter()
+            .find(|env| &env.id == id)
+            .cloned()
+            .ok_or("The selected environment no longer exists.")?,
+        None => {
+            let name = draft.environment_name.trim();
+            if name.is_empty() {
+                return Err("Enter an environment name.".into());
+            }
+            AppEnvironment {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: name.into(),
+                variables: Default::default(),
+                is_active: true,
+            }
+        }
+    };
+    if environment.variables.contains_key(&draft.key) {
+        return Err(
+            "This environment already defines this variable. Edit it in Environments.".into(),
+        );
+    }
+    environment.variables.insert(draft.key.clone(), draft.value);
+    environment.is_active = true;
+    let db = state
+        .db
+        .as_ref()
+        .ok_or("Local storage is unavailable. Variable was not saved.")?;
+    // save_environment also deactivates the previous environment. Both writes
+    // must commit together before the UI or snippet can observe the new value.
+    let transaction = db.unchecked_transaction().map_err(|e| e.to_string())?;
+    storage::save_environment(&transaction, &environment)?;
+    transaction.commit().map_err(|e| e.to_string())?;
+    for env in &mut state.environments {
+        env.is_active = false;
+    }
+    let id = environment.id.clone();
+    match state.environments.iter_mut().find(|env| env.id == id) {
+        Some(existing) => *existing = environment,
+        None => state.environments.push(environment),
+    }
+    if state.sidebar.env_editing.as_deref() == Some(id.as_str()) {
+        let value = state.active_env().unwrap().variables[&draft.key].clone();
+        state.sidebar.env_edit_rows.push((draft.key, value));
+    }
+    state.tabs.active_tab_mut().url_variable_draft = None;
+    state.status_message = Some("Variable saved to environment".into());
+    Ok(())
 }

@@ -91,9 +91,8 @@ pub(super) fn handle(state: &mut AppState, msg: ResponseMsg) -> Task<Message> {
                 return Task::none();
             };
             if resp.is_binary || resp.body_stored {
-                state.status_message = Some(
-                    "Only complete text responses can be opened in the browser.".to_owned(),
-                );
+                state.status_message =
+                    Some("Only complete text responses can be opened in the browser.".to_owned());
                 return Task::none();
             }
             let html = resp.body.clone();
@@ -164,6 +163,20 @@ pub(super) fn handle(state: &mut AppState, msg: ResponseMsg) -> Task<Message> {
             let tab = state.tabs.active_tab_mut();
             let page = (tab.viewer_page + 1).min(tab.viewer_page_count().saturating_sub(1));
             tab.show_viewer_page(page);
+        }
+        ResponseMsg::ViewerWrapToggled => {
+            let editor = &mut state.tabs.active_tab_mut().response_editor;
+            editor.set_wrap_enabled(!editor.wrap_enabled());
+        }
+        ResponseMsg::BodyLangSelected(lang) => {
+            state.sidebar.context_menu = None;
+            let tab = state.tabs.active_tab_mut();
+            tab.body_preview = Some(false);
+            tab.set_body_lang(lang);
+        }
+        ResponseMsg::PreviewToggled => {
+            let tab = state.tabs.active_tab_mut();
+            tab.body_preview = Some(!tab.body_preview_on());
         }
         ResponseMsg::ConsoleEdited(action) => {
             let tab = state.tabs.active_tab_mut();

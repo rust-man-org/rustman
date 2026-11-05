@@ -13,6 +13,81 @@ pub fn content_surface(_theme: &iced::Theme) -> iced::widget::container::Style {
 
 // ── Text input ────────────────────────────────────────────────────────────────
 
+/// Mockup `.kv-row input`: transparent, bg-2 on hover, bd-2 frame on a
+/// bg-0 fill while focused.
+pub fn kv_input(
+    _theme: &iced::Theme,
+    status: iced::widget::text_input::Status,
+) -> iced::widget::text_input::Style {
+    use iced::widget::text_input::Status;
+    let accent = Palette::accent();
+    let (background, border) = match status {
+        Status::Focused { .. } => (Palette::surface(), Palette::border()),
+        Status::Hovered => (Palette::surface_high(), Color::TRANSPARENT),
+        _ => (Color::TRANSPARENT, Color::TRANSPARENT),
+    };
+    iced::widget::text_input::Style {
+        background: Background::Color(background),
+        border: Border {
+            color: border,
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        icon: Palette::text_muted(),
+        placeholder: Palette::text_subtle(),
+        value: Palette::text(),
+        selection: Color { a: 0.25, ..accent },
+    }
+}
+
+/// Mockup `.auth-input`: bg-1 field in a bd-1 frame, accent when focused.
+pub fn boxed_input(
+    _theme: &iced::Theme,
+    status: iced::widget::text_input::Status,
+) -> iced::widget::text_input::Style {
+    use iced::widget::text_input::Status;
+    let accent = Palette::accent();
+    iced::widget::text_input::Style {
+        background: Background::Color(Palette::background()),
+        border: Border {
+            color: match status {
+                Status::Focused { .. } => accent,
+                Status::Hovered => Palette::border(),
+                _ => Palette::border_subtle(),
+            },
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        icon: Palette::text_muted(),
+        placeholder: Palette::text_subtle(),
+        value: Palette::text(),
+        selection: Color { a: 0.25, ..accent },
+    }
+}
+
+/// Mockup `.auth-select` / `.bodypick`: bg-1 select in a bd-1 frame.
+pub fn boxed_pick_list(
+    _theme: &iced::Theme,
+    status: iced::widget::pick_list::Status,
+) -> iced::widget::pick_list::Style {
+    use iced::widget::pick_list::Status;
+    iced::widget::pick_list::Style {
+        text_color: Palette::text(),
+        placeholder_color: Palette::text_subtle(),
+        handle_color: Palette::text_subtle(),
+        background: Background::Color(Palette::background()),
+        border: Border {
+            color: match status {
+                Status::Opened { .. } => Palette::accent(),
+                Status::Hovered => Palette::border(),
+                _ => Palette::border_subtle(),
+            },
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+    }
+}
+
 /// For kv-table cells (params, headers, cookies).
 pub fn cell_input(
     _theme: &iced::Theme,
@@ -92,6 +167,37 @@ pub fn field_input(
 // ── Checkbox ────────────────────────────────────────────────────────────────────
 
 /// Accent checkbox matching the app palette (params/headers rows).
+/// Postman-style radio: hollow ring at rest, accent ring + dot when picked.
+pub fn radio(
+    _theme: &iced::Theme,
+    status: iced::widget::radio::Status,
+) -> iced::widget::radio::Style {
+    use iced::widget::radio::Status;
+    let (selected, hovered) = match status {
+        Status::Active { is_selected } => (is_selected, false),
+        Status::Hovered { is_selected } => (is_selected, true),
+    };
+    iced::widget::radio::Style {
+        background: Background::Color(if hovered {
+            Palette::surface_raised()
+        } else {
+            Palette::surface_high()
+        }),
+        dot_color: Palette::accent(),
+        border_width: 1.0,
+        border_color: if selected {
+            Palette::accent()
+        } else {
+            Palette::border()
+        },
+        text_color: Some(if selected {
+            Palette::text()
+        } else {
+            Palette::text_muted()
+        }),
+    }
+}
+
 pub fn checkbox(
     _theme: &iced::Theme,
     status: iced::widget::checkbox::Status,

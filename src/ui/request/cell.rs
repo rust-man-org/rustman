@@ -17,11 +17,7 @@ use iced::{
     widget::{container, row, text, text_input},
 };
 
-use crate::{
-    consts::INLINE_LIMIT,
-    message::Message,
-    ui::theme::Palette,
-};
+use crate::{consts::INLINE_LIMIT, message::Message, ui::theme::Palette};
 
 /// Chars of the leading line shown in a preview.
 const PREVIEW_CHARS: usize = 200;
@@ -48,7 +44,8 @@ pub fn text_cell<'a>(
             .size(size)
             .padding(padding)
             .width(width)
-            .style(crate::ui::styles::cell_input)
+            .font(crate::ui::theme::MONO)
+            .style(crate::ui::styles::kv_input)
             .into();
     }
     // Preview path: bounded head line + size. The full value never enters a
@@ -60,8 +57,13 @@ pub fn text_cell<'a>(
     head.push('…');
     container(
         row![
-            container(text(head).size(size).color(Palette::text()).width(Length::Fill))
-                .width(Length::Fill),
+            container(
+                text(head)
+                    .size(size)
+                    .color(Palette::text())
+                    .width(Length::Fill)
+            )
+            .width(Length::Fill),
             text(human_size(value.len()))
                 .size(10)
                 .color(Palette::text_subtle()),

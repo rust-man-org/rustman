@@ -10,4 +10,5 @@ pub mod scripts;
 pub mod tabs;
 pub mod url_bar;
 mod url_highlight;
+mod url_variables;
 pub mod websocket;

@@ -6,6 +6,7 @@ use super::AppState;
 
 mod app_msg;
 mod auth;
+mod collections_modal;
 mod drafts;
 mod environment_cell;
 mod examples;
@@ -27,6 +28,8 @@ mod sidebar_feedback_tests;
 mod sidebar_search;
 #[cfg(feature = "self-update")]
 mod updater;
+#[cfg(test)]
+mod url_variables_tests;
 mod ws;
 
 pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
@@ -43,6 +46,7 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
     // search, palette, restore…), so refresh after everything except the
     // high-frequency noise that cannot change the request.
     let refresh_snippet = state.snippet_open
+        && !matches!(&message, Message::Request(crate::message::RequestMsg::UrlEdited(action)) if !request::url_action_edits_content(action))
         && !matches!(
             &message,
             Message::Response(_)
@@ -61,6 +65,25 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
                         | crate::message::SidebarMsg::ContextMenuOpened(_)
                         | crate::message::SidebarMsg::ContextMenuClosed
                         | crate::message::SidebarMsg::EnvironmentVariableHover(..)
+                )
+                | Message::Import(
+                    crate::message::ImportMsg::Edited(_)
+                        | crate::message::ImportMsg::PreviewScheduled { .. }
+                        | crate::message::ImportMsg::PreviewReady { .. }
+                        | crate::message::ImportMsg::CollectionNameChanged(_)
+                        | crate::message::ImportMsg::CreateEnvironmentChanged(_)
+                        | crate::message::ImportMsg::Clear
+                )
+                | Message::Request(
+                    crate::message::RequestMsg::TitleChanged(_)
+                        | crate::message::RequestMsg::UrlHovered(_)
+                        | crate::message::RequestMsg::AutoHeadersToggled
+                        | crate::message::RequestMsg::UrlCompletionMoved(_)
+                        | crate::message::RequestMsg::UrlVariableValueChanged(_)
+                        | crate::message::RequestMsg::UrlVariableEnvironmentSelected(_)
+                        | crate::message::RequestMsg::UrlVariableEnvironmentNameChanged(_)
+                        | crate::message::RequestMsg::UrlVariableDismissed
+                        | crate::message::RequestMsg::UrlCompletionDismissed
                 )
                 | Message::Request(crate::message::RequestMsg::TabDragOver(_))
                 | Message::Palette(crate::message::PaletteMsg::Frame(_))
@@ -97,6 +120,9 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
 /// Expanded editors DO dirty on content edits (their write-back mutates the
 /// snapshot); navigation/selection/search inside them does not.
 pub(crate) fn marks_session_dirty(message: &Message) -> bool {
+    if let Message::Request(crate::message::RequestMsg::UrlEdited(action)) = message {
+        return request::url_action_edits_content(action);
+    }
     if matches!(
         message,
         Message::Sidebar(
@@ -141,6 +167,35 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
                 | crate::message::AppMsg::SpinnerTick
         )
         | Message::Palette(crate::message::PaletteMsg::Frame(_))
+        | Message::Import(
+            crate::message::ImportMsg::Clear
+                | crate::message::ImportMsg::CollectionNameChanged(_)
+                | crate::message::ImportMsg::CreateEnvironmentChanged(_)
+                | crate::message::ImportMsg::PreviewScheduled { .. }
+                | crate::message::ImportMsg::PreviewReady { .. }
+                | crate::message::ImportMsg::OpenPostmanDialog
+                | crate::message::ImportMsg::Edited(_)
+                | crate::message::ImportMsg::Submit
+                | crate::message::ImportMsg::Clipboard
+                | crate::message::ImportMsg::ClipboardReady(_)
+                | crate::message::ImportMsg::ChooseFiles
+                | crate::message::ImportMsg::ChooseFolder
+                | crate::message::ImportMsg::PathsSelected(_)
+                | crate::message::ImportMsg::ModalOpened(_)
+                | crate::message::ImportMsg::ModalClosed
+                | crate::message::ImportMsg::ModalTabSelected(_)
+                | crate::message::ImportMsg::ModalFilterChanged(_)
+                | crate::message::ImportMsg::PickChooseFolder
+                | crate::message::ImportMsg::PickChooseFiles
+                | crate::message::ImportMsg::PickScanned(_)
+                | crate::message::ImportMsg::PickToggled(_)
+                | crate::message::ImportMsg::PickToggledAll
+                | crate::message::ImportMsg::ExportToggled(_)
+                | crate::message::ImportMsg::ExportToggledAll
+                | crate::message::ImportMsg::ExportFormatChanged(_)
+                | crate::message::ImportMsg::ExportIncludeEnvToggled
+                | crate::message::ImportMsg::ExportSubmit
+        )
         // Expanded editors are transient UI: paging or expanding never
         // touches the persisted snapshot. A rejected oversized paste changes
         // nothing either — the old URL is kept. The import dialog chrome is
@@ -166,11 +221,18 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
             crate::message::RequestMsg::FormValueExpandToggled(_)
                 | crate::message::RequestMsg::FormValuePagePrev(_)
                 | crate::message::RequestMsg::FormValuePageNext(_)
+                | crate::message::RequestMsg::UrlHovered(_)
+                | crate::message::RequestMsg::UrlCompletionMoved(_)
+                | crate::message::RequestMsg::UrlVariableValueChanged(_)
+                | crate::message::RequestMsg::UrlVariableEnvironmentSelected(_)
+                | crate::message::RequestMsg::UrlVariableEnvironmentNameChanged(_)
+                | crate::message::RequestMsg::UrlVariableDismissed
+                | crate::message::RequestMsg::UrlCompletionDismissed
                 | crate::message::RequestMsg::OversizedUrlRejected(_)
                 | crate::message::RequestMsg::OpenImportDialog
                 | crate::message::RequestMsg::CloseImportDialog
                 | crate::message::RequestMsg::ImportFromClipboard
-                | crate::message::RequestMsg::ImportFromFile
+                | crate::message::RequestMsg::AutoHeadersToggled
         )
         // Saving or opening a response body only writes a file and a
         // transient status line; nothing in the persisted session snapshot
@@ -180,11 +242,21 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
                 | crate::message::ResponseMsg::BodySaved(_)
                 | crate::message::ResponseMsg::OpenBodyInBrowser
                 | crate::message::ResponseMsg::BodyOpened(_)
+                | crate::message::ResponseMsg::ViewerWrapToggled
+                | crate::message::ResponseMsg::BodyLangSelected(_)
+                | crate::message::ResponseMsg::PreviewToggled
         )
     )
 }
 
 fn dispatch(state: &mut AppState, message: Message) -> Task<Message> {
+    // Background request widgets can still emit keyboard messages beneath
+    // a stack. The modal owns keyboard input until it is closed.
+    if state.import_dialog_open
+        && matches!(&message, Message::Request(m) if !matches!(m, crate::message::RequestMsg::CloseImportDialog))
+    {
+        return Task::none();
+    }
     if (state.sidebar.collection_delete_id.is_some() || state.sidebar.request_delete.is_some())
         && matches!(&message, Message::Request(_) | Message::Palette(_))
     {
@@ -320,16 +392,21 @@ fn handle_layout(state: &mut AppState, msg: LayoutMsg) -> Task<Message> {
             crate::app::snippet::refresh(state);
         }
         LayoutMsg::SnippetWidthChanged(width) => {
-            state.snippet_width = width.clamp(crate::app::snippet::MIN_W, crate::app::snippet::MAX_W);
+            state.snippet_width =
+                width.clamp(crate::app::snippet::MIN_W, crate::app::snippet::MAX_W);
         }
         LayoutMsg::SnippetLangChanged(lang) => {
             state.snippet_lang = lang;
             crate::app::snippet::refresh(state);
         }
         LayoutMsg::SnippetCopied => {
-            return match crate::app::snippet::code(state.tabs.active_tab(), state.snippet_lang) {
+            return match crate::app::snippet::code(
+                state.tabs.active_tab(),
+                state.snippet_lang,
+                state.active_env(),
+            ) {
                 Ok(cmd) => {
-                    state.status_message = Some("cURL command copied!".to_owned());
+                    state.status_message = Some("Code snippet copied!".to_owned());
                     iced::clipboard::write::<Message>(cmd)
                 }
                 Err(err) => {

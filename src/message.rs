@@ -168,6 +168,16 @@ pub enum RequestMsg {
     /// the handler decides per action (see `handle`), which is what lets
     /// huge pastes route to import without ever entering the widget.
     UrlEdited(iced::widget::text_editor::Action),
+    UrlHovered(Option<iced::Point>),
+    UrlCompletionMoved(i32),
+    UrlCompletionSelected(Option<String>),
+    UrlCompletionDismissed,
+    UrlVariableValueChanged(String),
+    UrlVariableEnvironmentSelected(Option<String>),
+    UrlVariableEnvironmentNameChanged(String),
+    UrlVariableSave,
+    UrlVariableDismissed,
+    TitleChanged(String),
     MethodChanged(String),
     TabSelected(RequestTab),
     // Headers
@@ -178,6 +188,13 @@ pub enum RequestMsg {
     HeaderRemoved(usize),
     HeadersBulkToggle,
     HeadersBulkEdited(iced::widget::text_editor::Action),
+    /// Set (or with "None" remove) the Content-Type header from the
+    /// Presets menu.
+    HeaderPresetApplied(String),
+    /// Remove every header row.
+    HeadersCleared,
+    /// Show or hide the headers the client adds on send (view state).
+    AutoHeadersToggled,
     // Params
     ParamToggled(usize),
     ParamKeyChanged(usize, String),
@@ -192,6 +209,8 @@ pub enum RequestMsg {
     GraphQLVariablesEdited(iced_code_editor::Message),
     FormFieldAdded,
     FormFieldRemoved(usize),
+    /// Enable or disable one form field (disabled ones are not sent).
+    FormFieldToggled(usize),
     FormFieldKeyChanged(usize, String),
     FormFieldValueChanged(usize, String),
     /// Toggle the expanded (paged) editor for a big form value.
@@ -224,6 +243,9 @@ pub enum RequestMsg {
     JwtAlgoChanged(String),
     // Form file upload
     FormFieldTypeToggled(usize),
+    /// Text/File picked in a form row's type menu.
+    FormFieldTypeSet(usize, crate::domain::request::FormFieldType),
+    FormFieldDescriptionChanged(usize, String),
     FormFieldPickFile(usize), // open file dialog for row index
     FormFieldFilePicked(usize, String, String), // index, filename, base64_data
     // Scripts
@@ -270,8 +292,6 @@ pub enum RequestMsg {
     CloseImportDialog,
     ImportFromClipboard,
     ImportClipboardText(Option<String>),
-    ImportFromFile,
-    ImportFileReady(Option<(String, Vec<u8>)>),
     ExportCurl,
     CloseCurlModal,
     CopyCurlToClipboard,
@@ -311,6 +331,12 @@ pub enum ResponseMsg {
     /// Step the response viewer one page (see `page_starts` in state/tabs).
     ViewerPagePrev,
     ViewerPageNext,
+    /// Toggle soft line wrap in the response viewer.
+    ViewerWrapToggled,
+    /// Body format picked in the response toolbar (JSON, XML, … Raw).
+    BodyLangSelected(crate::state::tabs::BodyLang),
+    /// Preview (readable rendered HTML) on/off.
+    PreviewToggled,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
@@ -413,6 +439,8 @@ pub enum SaveDialogMsg {
     ParentSelected(String),
     ToggleNewCollection,
     NewCollectionNameChanged(String),
+    /// "Search collections and folders" box.
+    FilterChanged(String),
     Confirm,
 }
 
@@ -428,7 +456,12 @@ pub enum PaletteKind {
 }
 
 impl PaletteKind {
-    pub const ALL: [Self; 4] = [Self::Requests, Self::Tabs, Self::History, Self::Environments];
+    pub const ALL: [Self; 4] = [
+        Self::Requests,
+        Self::Tabs,
+        Self::History,
+        Self::Environments,
+    ];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -462,12 +495,47 @@ pub enum PaletteMsg {
 #[derive(Debug, Clone)]
 pub enum ImportMsg {
     OpenPostmanDialog,
+    Edited(iced::widget::text_editor::Action),
+    Submit,
+    Clipboard,
+    ClipboardReady(Option<String>),
+    ChooseFiles,
+    ChooseFolder,
+    PathsSelected(Vec<std::path::PathBuf>),
+    ResourcesParsed(Result<Vec<crate::services::import::resources::Resource>, String>),
+    PreviewScheduled {
+        revision: u64,
+        text: String,
+    },
+    PreviewReady {
+        revision: u64,
+        result: Result<Vec<crate::services::import::resources::Resource>, String>,
+    },
+    CollectionNameChanged(String),
+    CreateEnvironmentChanged(bool),
+    Clear,
     OpenExportDialog(String),
     CloseExportDialog,
     ExportCollection(String),
     ExportCollectionJson(String),
-    ExportAllCollections,
     PostmanLoaded(Vec<ImportedCollection>),
+    // ── Import / export collections modal ──
+    ModalOpened(crate::state::collections_modal::ModalTab),
+    ModalClosed,
+    ModalTabSelected(crate::state::collections_modal::ModalTab),
+    ModalFilterChanged(String),
+    PickChooseFolder,
+    PickChooseFiles,
+    /// Scan result: shown folder/file label and one row per file.
+    PickScanned(Result<(String, Vec<crate::services::import::resources::ScanEntry>), String>),
+    PickToggled(usize),
+    PickToggledAll,
+    PickSubmit,
+    ExportToggled(String),
+    ExportToggledAll,
+    ExportFormatChanged(crate::state::collections_modal::ExportFormat),
+    ExportIncludeEnvToggled,
+    ExportSubmit,
     ExportDone(String),
     Error(String),
 }

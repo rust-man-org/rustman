@@ -21,6 +21,45 @@ pub struct HttpResponse {
     pub binary_data: Option<Vec<u8>>,
     pub duration_ms: u64,
     pub error: Option<String>,
+    /// Phase timings and byte counts for the status-bar hover cards. Absent
+    /// (zero) for responses loaded from older history.
+    #[serde(default)]
+    pub timing: ResponseTiming,
+    #[serde(default)]
+    pub sizes: ResponseSizes,
+    #[serde(default)]
+    pub network: ResponseNetwork,
+}
+
+/// Connection facts for the network hover card.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResponseNetwork {
+    /// `HTTP/1.1`, `HTTP/2.0`, … (empty for older history).
+    pub http_version: String,
+    /// Server IP and port the response came from, when known.
+    pub remote_addr: Option<String>,
+    /// Sent over HTTPS (certificate verified by the client).
+    pub tls: bool,
+}
+
+/// Where the time went, in microseconds. `wait` runs from handing the request
+/// to the client until the response headers arrive, so it includes DNS,
+/// connect and TLS (the HTTP client does not report those separately).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResponseTiming {
+    pub prepare_us: u64,
+    pub wait_us: u64,
+    pub download_us: u64,
+    pub process_us: u64,
+}
+
+/// Bytes on the wire, as far as they are known before transfer encoding:
+/// header blocks counted as `Name: value\r\n` lines plus the start line.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResponseSizes {
+    pub response_headers: usize,
+    pub request_headers: usize,
+    pub request_body: usize,
 }
 
 /// What kind of rich preview (if any) a binary response's content-type calls for.

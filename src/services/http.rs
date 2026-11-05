@@ -59,7 +59,11 @@ pub async fn send(
     let start = Instant::now();
     match do_send(client, &tab_id, req, env, default_timeout_ms).await {
         Ok(mut resp) => {
-            resp.duration_ms = start.elapsed().as_millis() as u64;
+            let total = start.elapsed();
+            resp.duration_ms = total.as_millis() as u64;
+            let t = &mut resp.timing;
+            t.process_us =
+                (total.as_micros() as u64).saturating_sub(t.prepare_us + t.wait_us + t.download_us);
             HttpResult {
                 tab_id,
                 response: resp,
@@ -115,6 +119,7 @@ async fn do_send(
     env: Option<&AppEnvironment>,
     default_timeout_ms: u64,
 ) -> Result<HttpResponse, String> {
+    let started = Instant::now();
     let url = resolve_url(&req.url, env);
     // The query is sent from `params`; if the URL also carries one (e.g. older
     // imports), drop it so each value isn't sent twice (which APIs read as an array).
@@ -213,48 +218,42 @@ async fn do_send(
     }
 
     match &req.body_type {
+        // Postman semantics: form-data is always multipart; the explicit
+        // x-www-form-urlencoded mode covers plain HTML-style forms.
         BodyType::FormData => {
-            let has_file = req
+            let mut form = reqwest::multipart::Form::new();
+            for field in req.form_data_fields.iter().filter(|f| f.enabled) {
+                let key = substitute(&field.key, env);
+                if key.is_empty() {
+                    continue;
+                }
+                if let crate::domain::request::FormFieldType::File = field.field_type {
+                    let file_data = field.file_data.as_ref().ok_or_else(|| {
+                        format!("File field '{}' has no data — pick a file first", field.key)
+                    })?;
+                    let bytes = general_purpose::STANDARD
+                        .decode(file_data)
+                        .map_err(|e| format!("Base64 decode: {e}"))?;
+                    let fname = field.file_name.clone().unwrap_or_else(|| "file".to_owned());
+                    let mut part = reqwest::multipart::Part::bytes(bytes).file_name(fname);
+                    if let Some(mime) = &field.mime_type {
+                        part = part.mime_str(mime).map_err(|e| e.to_string())?;
+                    }
+                    form = form.part(key, part);
+                } else {
+                    form = form.text(key, substitute(&field.value, env));
+                }
+            }
+            builder = builder.multipart(form);
+        }
+        BodyType::UrlEncoded => {
+            let pairs: Vec<(String, String)> = req
                 .form_data_fields
                 .iter()
-                .any(|f| f.enabled && f.field_type == crate::domain::request::FormFieldType::File);
-
-            if has_file {
-                let mut form = reqwest::multipart::Form::new();
-                for field in &req.form_data_fields {
-                    if !field.enabled {
-                        continue;
-                    }
-                    if let crate::domain::request::FormFieldType::File = field.field_type {
-                        let file_data = field.file_data.as_ref().ok_or_else(|| {
-                            format!("File field '{}' has no data — pick a file first", field.key)
-                        })?;
-                        let bytes = general_purpose::STANDARD
-                            .decode(file_data)
-                            .map_err(|e| format!("Base64 decode: {e}"))?;
-                        let fname = field.file_name.clone().unwrap_or_else(|| "file".to_owned());
-                        let mut part = reqwest::multipart::Part::bytes(bytes).file_name(fname);
-                        if let Some(mime) = &field.mime_type {
-                            part = part.mime_str(mime).map_err(|e| e.to_string())?;
-                        }
-                        form = form.part(field.key.clone(), part);
-                    } else {
-                        form = form.text(field.key.clone(), field.value.clone());
-                    }
-                }
-                builder = builder.multipart(form);
-            } else {
-                // No file fields: send as application/x-www-form-urlencoded,
-                // which is what plain HTML-style forms (logins, etc.) expect —
-                // multipart/form-data would be syntactically wrong for them.
-                let pairs: Vec<(String, String)> = req
-                    .form_data_fields
-                    .iter()
-                    .filter(|f| f.enabled)
-                    .map(|f| (f.key.clone(), f.value.clone()))
-                    .collect();
-                builder = builder.form(&pairs);
-            }
+                .filter(|f| f.enabled && !f.key.is_empty())
+                .map(|f| (substitute(&f.key, env), substitute(&f.value, env)))
+                .collect();
+            builder = builder.form(&pairs);
         }
         BodyType::Json | BodyType::Text => {
             let body = substitute(&req.body, env);
@@ -274,9 +273,23 @@ async fn do_send(
         BodyType::None => {}
     }
 
-    let response = builder.send().await.map_err(|e| describe_send_error(&e))?;
+    // Build first so the request's size is known, then send it as-is.
+    let request = builder.build().map_err(|e| describe_send_error(&e))?;
+    let (request_headers, request_body) = request_sizes(&request);
+    let sending = Instant::now();
+    let response = client
+        .execute(request)
+        .await
+        .map_err(|e| describe_send_error(&e))?;
+    let headers_at = Instant::now();
 
     let status = response.status().as_u16();
+    let response_headers = response_header_size(&response);
+    let network = crate::domain::response::ResponseNetwork {
+        http_version: format!("{:?}", response.version()),
+        remote_addr: response.remote_addr().map(|a| a.to_string()),
+        tls: response.url().scheme() == "https",
+    };
     let status_text = response
         .status()
         .canonical_reason()
@@ -300,6 +313,19 @@ async fn do_send(
         .bytes()
         .await
         .map_err(|e| format!("Read body: {e}"))?;
+    let body_at = Instant::now();
+    let us = |d: Duration| d.as_micros() as u64;
+    let timing = crate::domain::response::ResponseTiming {
+        prepare_us: us(sending - started),
+        wait_us: us(headers_at - sending),
+        download_us: us(body_at - headers_at),
+        process_us: 0,
+    };
+    let sizes = crate::domain::response::ResponseSizes {
+        response_headers,
+        request_headers,
+        request_body,
+    };
     let body_size = raw_bytes.len();
     let is_large = body_size > INLINE_BODY_THRESHOLD;
 
@@ -341,6 +367,9 @@ async fn do_send(
             binary_data: None,
             duration_ms: 0, // filled by caller
             error: None,
+            timing,
+            sizes,
+            network: network.clone(),
         }),
         Err(_) => Ok(HttpResponse {
             status,
@@ -361,8 +390,50 @@ async fn do_send(
             },
             duration_ms: 0, // filled by caller
             error: None,
+            timing,
+            sizes,
+            network: network.clone(),
         }),
     }
+}
+
+/// Header block and body bytes of a built request. The header block counts
+/// the request line, `Host`, every header as `Name: value\r\n`, a
+/// `Content-Length` line when there is a body, and the closing blank line.
+/// A streamed (multipart) body has no length up front and counts as 0.
+fn request_sizes(request: &reqwest::Request) -> (usize, usize) {
+    let url = request.url();
+    let target = match url.query() {
+        Some(q) => format!("{}?{q}", url.path()),
+        None => url.path().to_owned(),
+    };
+    let body = request
+        .body()
+        .and_then(|b| b.as_bytes())
+        .map_or(0, <[u8]>::len);
+    let mut size = request.method().as_str().len() + 1 + target.len() + " HTTP/1.1\r\n".len();
+    size += "Host: \r\n".len() + url.host_str().map_or(0, str::len);
+    for (name, value) in request.headers() {
+        size += name.as_str().len() + 2 + value.len() + 2;
+    }
+    if body > 0
+        && !request
+            .headers()
+            .contains_key(reqwest::header::CONTENT_LENGTH)
+    {
+        size += "Content-Length: \r\n".len() + body.to_string().len();
+    }
+    (size + 2, body)
+}
+
+/// Status line plus every header as `Name: value\r\n` and the blank line.
+fn response_header_size(response: &reqwest::Response) -> usize {
+    let status = response.status();
+    let mut size = "HTTP/1.1 ".len() + 3 + 1 + status.canonical_reason().map_or(0, str::len) + 2;
+    for (name, value) in response.headers() {
+        size += name.as_str().len() + 2 + value.len() + 2;
+    }
+    size + 2
 }
 
 /// Truncates `text` to at most `max_bytes`, always cutting on a `char`
@@ -727,6 +798,7 @@ mod live_tests {
                 enabled: true,
                 file_name: None,
                 file_data: None,
+                description: String::new(),
                 mime_type: None,
             },
             FormField {
@@ -737,6 +809,7 @@ mod live_tests {
                 enabled: true,
                 file_name: Some("avatar.png".to_owned()),
                 file_data: Some(general_purpose::STANDARD.encode(b"fake png bytes")),
+                description: String::new(),
                 mime_type: Some("image/png".to_owned()),
             },
         ];
@@ -783,6 +856,7 @@ mod live_tests {
             enabled: true,
             file_name: Some("report.xlsx".to_owned()),
             file_data: Some(general_purpose::STANDARD.encode(b"fake xlsx bytes")),
+            description: String::new(),
             mime_type: Some(
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".to_owned(),
             ),
@@ -832,6 +906,7 @@ mod live_tests {
                 enabled: true,
                 file_name: None,
                 file_data: None,
+                description: String::new(),
                 mime_type: None,
             },
             FormField {
@@ -842,6 +917,7 @@ mod live_tests {
                 enabled: true,
                 file_name: None,
                 file_data: None,
+                description: String::new(),
                 mime_type: None,
             },
         ];

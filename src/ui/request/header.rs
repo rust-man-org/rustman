@@ -1,12 +1,12 @@
 //! Request header (layout parity, mockup `.crumb-row`): protocol tag,
-//! `COLLECTION › FOLDER` path, request name, then Save and Share.
+//! `COLLECTION › FOLDER` path, editable request name, then Save and Share.
 //!
 //! Save keeps today's Ctrl+S meaning (local draft for synced requests,
 //! C9). Save for review (08) lives in the draft banner until it ships.
 
 use iced::{
     Alignment, Background, Border, Element, Length,
-    widget::{Space, button, container, row, text},
+    widget::{Space, button, container, row, text, text_input},
 };
 
 use crate::{
@@ -34,6 +34,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
 
     let mut crumb = row![tag(protocol, Tone::Info)]
         .spacing(8)
+        .width(Length::Fill)
         .align_y(Alignment::Center);
     crumb = crumb.push(
         text(path.join(" › ").to_uppercase())
@@ -43,10 +44,13 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     crumb = crumb
         .push(text("›").size(TEXT_XS).color(Palette::text_subtle()))
         .push(
-            text(tab.title.clone())
+            text_input("Untitled Request", &tab.title)
+                .on_input(|title| Message::Request(RequestMsg::TitleChanged(title)))
                 .size(14)
-                .color(Palette::text())
-                .font(UI_FONT_MEDIUM),
+                .font(UI_FONT_MEDIUM)
+                .padding([4, 6])
+                .width(Length::Fill)
+                .style(crate::ui::styles::cell_input),
         );
 
     let menu_open = state.sidebar.context_menu.as_deref() == Some(SAVE_MENU);
@@ -58,7 +62,6 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
 
     row![
         crumb,
-        Space::new().width(Length::Fill),
         save_split(menu_open, tab.saved_as.is_some(), draft_id),
         share_button(),
     ]

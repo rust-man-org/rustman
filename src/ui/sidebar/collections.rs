@@ -86,11 +86,33 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
 }
 
 fn panel(state: &AppState) -> Element<'_, Message> {
-    let header = container(section_header(
-        "Collections",
-        state.sidebar.collections_collapsed,
-        SidebarMsg::CollectionsSectionToggled,
-    ))
+    // Mockup `.side-section` ⋯: import and export sit next to the label.
+    let section_open = state.sidebar.context_menu.as_deref() == Some(SECTION_MENU);
+    let section_more = crate::ui::widgets::mini::anchored_menu(
+        crate::ui::widgets::mini::icon_button(
+            icons::more(),
+            "Import / export collections",
+            Some(Message::Sidebar(SidebarMsg::ContextMenuOpened(
+                SECTION_MENU.to_owned(),
+            ))),
+            section_open,
+        ),
+        section_open,
+        more_menu_items(),
+        230.0,
+    );
+    let header = container(
+        row![
+            section_header(
+                "Collections",
+                state.sidebar.collections_collapsed,
+                SidebarMsg::CollectionsSectionToggled,
+            ),
+            section_more,
+        ]
+        .spacing(2)
+        .align_y(iced::Alignment::Center),
+    )
     .padding(Padding {
         top: 10.0,
         right: TREE_PAD_X,
@@ -205,23 +227,31 @@ pub(super) fn section_header(
 
 /// `⋯` dropdown: the less frequent collection-wide actions.
 fn more_menu() -> Element<'static, Message> {
-    menu(
-        vec![
-            menu_item(
-                Some(icons::import_box()),
-                "Import…",
-                Some(Message::Import(ImportMsg::OpenPostmanDialog)),
-                false,
-            ),
-            menu_item(
-                Some(icons::export()),
-                "Export all collections",
-                Some(Message::Import(ImportMsg::ExportAllCollections)),
-                false,
-            ),
-        ],
-        Length::Fixed(210.0),
-    )
+    menu(more_menu_items(), Length::Fixed(210.0))
+}
+
+/// `context_menu` slot id of the COLLECTIONS section's `⋯`.
+pub const SECTION_MENU: &str = "sidebar:collections-section";
+
+fn more_menu_items() -> Vec<Element<'static, Message>> {
+    vec![
+        menu_item(
+            Some(icons::import_box()),
+            "Import collections…",
+            Some(Message::Import(ImportMsg::ModalOpened(
+                crate::state::collections_modal::ModalTab::Import,
+            ))),
+            false,
+        ),
+        menu_item(
+            Some(icons::export()),
+            "Export collections…",
+            Some(Message::Import(ImportMsg::ModalOpened(
+                crate::state::collections_modal::ModalTab::Export,
+            ))),
+            false,
+        ),
+    ]
 }
 
 /// Mockup `.side-top`: filter box, `+` (new …), import, `⋯` (more); then
@@ -337,10 +367,7 @@ fn collection_view<'a>(
                 content,
                 BASE_INDENT,
                 COLLECTION_ROW_H,
-                drag_fill(
-                    dragging
-                        || state.sidebar.hovered_row.as_deref() == Some(collection.id.as_str()),
-                ),
+                container_fill(state, &collection.id, dragging),
                 Message::Sidebar(SidebarMsg::ItemDragStart(collection.id.clone())),
             ),
             &collection.id,
@@ -475,9 +502,7 @@ fn group_view<'a>(
                 content,
                 indent,
                 ROW_H,
-                drag_fill(
-                    dragging || state.sidebar.hovered_row.as_deref() == Some(group.id.as_str()),
-                ),
+                container_fill(state, &group.id, dragging),
                 Message::Sidebar(SidebarMsg::ItemDragStart(group.id.clone())),
             ),
             &group.id,
@@ -690,6 +715,16 @@ fn draggable<'a>(row_el: Element<'a, Message>, id: &str) -> Element<'a, Message>
 }
 
 const ACTION_W: f32 = 22.0;
+
+/// Collection / folder rows: outlined while a dragged row would drop into
+/// them, otherwise the usual drag / hover fill.
+fn container_fill(state: &AppState, id: &str, dragging: bool) -> RowFill {
+    if state.sidebar.drop_target.as_deref() == Some(id) {
+        RowFill::DropTarget
+    } else {
+        drag_fill(dragging || state.sidebar.hovered_row.as_deref() == Some(id))
+    }
+}
 
 fn drag_fill(dragging: bool) -> RowFill {
     if dragging {

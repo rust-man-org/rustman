@@ -81,9 +81,6 @@ pub fn eye_closed() -> Text<'static> {
 pub fn zap() -> Text<'static> {
     glyph('\u{e1b4}')
 } // zap
-pub fn timer() -> Text<'static> {
-    glyph('\u{e1e0}')
-} // timer
 pub fn globe() -> Text<'static> {
     glyph('\u{e0e8}')
 } // globe
@@ -169,4 +166,51 @@ pub fn panel_right_close() -> Text<'static> {
 }
 pub fn panel_right_open() -> Text<'static> {
     glyph('\u{e434}')
+}
+pub fn wrap_text() -> Text<'static> {
+    glyph('\u{e248}')
+} // text-wrap
+pub fn external_link() -> Text<'static> {
+    glyph('\u{e0b9}')
+}
+pub fn file_down() -> Text<'static> {
+    glyph('\u{e318}')
+}
+pub fn eraser() -> Text<'static> {
+    glyph('\u{e28f}')
+}
+/// `</>` (Lucide code), response formats XML / HTML.
+pub fn code() -> Text<'static> {
+    glyph('\u{e093}')
+}
+/// Lucide file-code-2, the JavaScript format.
+pub fn file_code() -> Text<'static> {
+    glyph('\u{e45e}')
+}
+/// Lucide letter-text, the Text format.
+pub fn letter_text() -> Text<'static> {
+    glyph('\u{e605}')
+}
+/// Lucide globe-lock, the response network card.
+pub fn globe_lock() -> Text<'static> {
+    glyph('\u{e5cd}')
+}
+/// Lucide timer, the response time card.
+pub fn timer() -> Text<'static> {
+    glyph('\u{e1e0}')
+}
+/// Lucide arrow-down / arrow-up, response / request size.
+pub fn arrow_down() -> Text<'static> {
+    glyph('\u{e042}')
+}
+pub fn arrow_up() -> Text<'static> {
+    glyph('\u{e04a}')
+}
+/// Lucide file-up, form-data file picker.
+pub fn file_up() -> Text<'static> {
+    glyph('\u{e32a}')
+}
+/// Lucide file-type, the Raw format.
+pub fn file_type() -> Text<'static> {
+    glyph('\u{e329}')
 }

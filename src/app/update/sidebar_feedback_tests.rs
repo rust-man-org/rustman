@@ -32,6 +32,16 @@ fn fixture() -> (AppState, std::path::PathBuf) {
     (state, dir)
 }
 #[test]
+fn sidebar_import_opens_the_shared_dialog_before_choosing_a_file() {
+    let (mut state, dir) = fixture();
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    assert!(state.import_dialog_open);
+    assert!(!state.importing);
+    assert_eq!(state.collections.len(), 1);
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+#[test]
 fn sidebar_feedback_delete_requires_typed_confirmation() {
     let (mut state, dir) = fixture();
     let _ = super::update(
@@ -265,6 +275,419 @@ fn sidebar_feedback_request_delete_waits_for_confirmation() {
             .unwrap()
             .is_empty()
     );
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn resource_import_keeps_errors_in_dialog_and_commands_preserve_current_tab() {
+    use crate::services::import::resources;
+    let (mut state, dir) = fixture();
+    state
+        .tabs
+        .active_tab_mut()
+        .set_url("https://keep.example/edited".into());
+    let original = state.tabs.active;
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ResourcesParsed(
+            resources::parse("invalid input").map(|r| vec![r]),
+        )),
+    );
+    assert!(state.import_dialog_open);
+    assert!(state.import_error.is_some());
+    assert_eq!(state.tabs.active_tab().url, "https://keep.example/edited");
+    // An old request widget must not handle a keyboard shortcut under the modal.
+    let _ = super::update(
+        &mut state,
+        Message::Request(crate::message::RequestMsg::UrlChanged(
+            "https://wrong.example".into(),
+        )),
+    );
+    assert_eq!(state.tabs.active_tab().url, "https://keep.example/edited");
+    let _ = super::update(&mut state, Message::Import(ImportMsg::Submit));
+    // Supply a completed background parse, as the task runtime would.
+    state.import_error = None;
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ResourcesParsed(
+            resources::parse("curl -X POST https://example.com/imported -H 'X-Test: yes'")
+                .map(|r| vec![r]),
+        )),
+    );
+    assert!(!state.import_dialog_open);
+    assert!(!state.importing);
+    assert_eq!(state.tabs.tabs[original].url, "https://keep.example/edited");
+    assert_eq!(state.tabs.active_tab().url, "https://example.com/imported");
+    assert_eq!(state.tabs.active_tab().method.as_str(), "POST");
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn editing_import_is_transient_and_postman_results_populate_sidebar() {
+    let (mut state, dir) = fixture();
+    state.session_dirty = false;
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::Edited(iced::widget::text_editor::Action::Edit(
+            iced::widget::text_editor::Edit::Insert('x'),
+        ))),
+    );
+    assert!(!state.session_dirty);
+    let mut imported = data();
+    imported.collection.id = "another-collection".into();
+    imported.requests.clear();
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ResourcesParsed(Ok(vec![
+            crate::services::import::resources::Resource::Collections(vec![imported]),
+        ]))),
+    );
+    assert!(!state.import_dialog_open);
+    assert!(state.sidebar.expanded.contains("another-collection"));
+    assert_eq!(state.collections.len(), 2);
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn batch_curl_preview_requires_confirmation_then_saves_collection_and_environment() {
+    let (mut state, dir) = fixture();
+    let input = (0..6).map(|i| format!("curl -X POST 'https://httpbin.org/post?i={i}' -H 'Content-Type: application/json' --data-raw '{{\"i\":{i}}}'")).collect::<Vec<_>>().join("\n");
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let resources = vec![crate::services::import::resources::parse(&input).unwrap()];
+    let revision = state.import_revision;
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::PreviewReady {
+            revision,
+            result: Ok(resources),
+        }),
+    );
+    assert_eq!(
+        state.collections.len(),
+        1,
+        "preview must not persist anything"
+    );
+    assert_eq!(state.import_collection_name, "Httpbin API");
+    assert!(state.environments.is_empty());
+    let tabs_before = state.tabs.tabs.len();
+    let _ = super::update(&mut state, Message::Import(ImportMsg::Submit));
+    assert!(!state.import_dialog_open);
+    assert_eq!(
+        state.tabs.tabs.len(),
+        tabs_before,
+        "a batch belongs in the sidebar, not six tabs"
+    );
+    let collection = state
+        .collections
+        .iter()
+        .find(|c| c.name == "Httpbin API")
+        .unwrap();
+    let requests = &state.requests[&collection.id];
+    assert_eq!(requests.len(), 6);
+    for (index, request) in requests.iter().enumerate() {
+        assert_eq!(request.url, format!("{{{{baseUrl}}}}/post?i={index}"));
+        assert_eq!(request.sort_order, index as i64);
+        assert_eq!(request.body, format!("{{\"i\":{index}}}"));
+    }
+    assert_eq!(
+        storage::get_requests(state.db.as_ref().unwrap(), &collection.id)
+            .unwrap()
+            .len(),
+        6
+    );
+    assert_eq!(
+        state.active_env().unwrap().variables["baseUrl"],
+        "https://httpbin.org"
+    );
+    assert_eq!(
+        storage::get_environments(state.db.as_ref().unwrap()).unwrap()[0].name,
+        "Httpbin API"
+    );
+    assert!(state.session_dirty);
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn batch_environment_write_failure_rolls_back_the_collection_and_active_environment() {
+    let (mut state, dir) = fixture();
+    let old = crate::domain::environment::AppEnvironment {
+        id: "old-env".into(),
+        name: "Existing".into(),
+        is_active: true,
+        variables: Default::default(),
+    };
+    storage::save_environment(state.db.as_ref().unwrap(), &old).unwrap();
+    state.environments.push(old);
+    state.db.as_ref().unwrap().execute_batch("CREATE TRIGGER reject_batch_env BEFORE INSERT ON environments BEGIN SELECT RAISE(ABORT, 'test failure'); END;").unwrap();
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let revision = state.import_revision;
+    let resource = crate::services::import::resources::parse(
+        "curl https://httpbin.org/get\ncurl https://httpbin.org/post",
+    )
+    .unwrap();
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::PreviewReady {
+            revision,
+            result: Ok(vec![resource]),
+        }),
+    );
+    let _ = super::update(&mut state, Message::Import(ImportMsg::Submit));
+    assert!(state.import_dialog_open);
+    assert!(state.import_error.is_some());
+    assert_eq!(state.collections.len(), 1);
+    assert_eq!(
+        storage::get_collections(state.db.as_ref().unwrap())
+            .unwrap()
+            .len(),
+        1
+    );
+    let persisted = storage::get_environments(state.db.as_ref().unwrap()).unwrap();
+    assert_eq!(persisted.len(), 1);
+    assert!(persisted[0].is_active);
+    assert_eq!(state.active_env().unwrap().id, "old-env");
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn cleared_import_ignores_a_late_preview_result() {
+    let (mut state, dir) = fixture();
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let revision = state.import_revision;
+    let _ = super::update(&mut state, Message::Import(ImportMsg::Clear));
+    let result = Ok(vec![
+        crate::services::import::resources::parse("curl https://example.com").unwrap(),
+    ]);
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::PreviewReady { revision, result }),
+    );
+    assert!(state.import_preview.is_none());
+    assert!(state.import_editor.is_empty());
+    assert_eq!(state.collections.len(), 1);
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn reopen_import_resumes_full_large_source_instead_of_the_truncated_editor() {
+    let (mut state, dir) = fixture();
+    let input = format!("curl https://example.com -d '{}'", "x".repeat(5000));
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ClipboardReady(Some(input.clone()))),
+    );
+    assert!(state.import_truncated);
+    let previous_revision = state.import_revision;
+    let _ = super::update(
+        &mut state,
+        Message::Request(crate::message::RequestMsg::CloseImportDialog),
+    );
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    assert!(state.import_parsing);
+    assert!(state.import_revision > previous_revision);
+    let Some(crate::app::ImportSource::Text(retained)) = &state.import_source else {
+        panic!("missing full source")
+    };
+    assert_eq!(retained, &input);
+    let revision = state.import_revision;
+    let result = Ok(vec![
+        crate::services::import::resources::parse(retained).unwrap(),
+    ]);
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::PreviewReady { revision, result }),
+    );
+    let _ = super::update(&mut state, Message::Import(ImportMsg::Submit));
+    assert_eq!(state.tabs.active_tab().body_editor.content().len(), 5000);
+    assert!(state.import_source.is_none());
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn reopen_import_resumes_a_pending_file_selection() {
+    let (mut state, dir) = fixture();
+    let path = dir.join("pending.curl");
+    std::fs::write(&path, "curl https://example.com").unwrap();
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::PathsSelected(vec![path.clone()])),
+    );
+    let previous_revision = state.import_revision;
+    let _ = super::update(
+        &mut state,
+        Message::Request(crate::message::RequestMsg::CloseImportDialog),
+    );
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    assert!(state.import_parsing);
+    assert!(state.import_revision > previous_revision);
+    let Some(crate::app::ImportSource::Paths(paths)) = &state.import_source else {
+        panic!("missing file selection")
+    };
+    assert_eq!(paths, &[path]);
+    assert!(state.import_editor.is_empty());
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn repeated_command_pastes_without_newlines_add_six_requests() {
+    use iced::widget::text_editor::{Action, Edit};
+    let (mut state, dir) = fixture();
+    let command = r#"curl --request POST 'https://httpbin.org/post' \
+ --header 'Content-Type: application/json' \
+ --data-raw '{"message":"Tes import cURL"}'"#;
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    for _ in 0..6 {
+        let action = Action::Edit(Edit::Paste(std::sync::Arc::new(command.into())));
+        let _ = super::update(&mut state, Message::Import(ImportMsg::Edited(action)));
+    }
+    let crate::app::ImportSource::Text(source) = state.import_source.as_ref().unwrap() else {
+        panic!("text source expected")
+    };
+    let resources = vec![crate::services::import::resources::parse(source).unwrap()];
+    assert_eq!(
+        crate::services::import::resources::command_count(&resources),
+        6
+    );
+    assert!(!source.contains("}'curl"));
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn repeated_clipboard_pastes_keep_appending_after_the_preview_is_truncated() {
+    let (mut state, dir) = fixture();
+    let command = format!(
+        "curl https://httpbin.org/post --data-raw '{}'",
+        "x".repeat(600)
+    );
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    for _ in 0..12 {
+        let _ = super::update(
+            &mut state,
+            Message::Import(ImportMsg::ClipboardReady(Some(command.clone()))),
+        );
+    }
+    assert!(state.import_truncated);
+    let Some(crate::app::ImportSource::Text(source)) = &state.import_source else {
+        panic!("full source expected")
+    };
+    let resources = vec![crate::services::import::resources::parse(source).unwrap()];
+    assert_eq!(
+        crate::services::import::resources::command_count(&resources),
+        12
+    );
+    assert_eq!(
+        source,
+        &std::iter::repeat_n(command, 12)
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn command_paste_replaces_selection_and_keeps_quoted_body_text_unchanged() {
+    use iced::widget::text_editor::{Action, Edit};
+    let (mut state, dir) = fixture();
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ClipboardReady(Some(
+            "curl https://old.example".into(),
+        ))),
+    );
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::Edited(Action::SelectAll)),
+    );
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ClipboardReady(Some(
+            "curl https://new.example".into(),
+        ))),
+    );
+    assert_eq!(state.import_editor.text(), "curl https://new.example");
+    let prefix = "curl https://httpbin.org/post --data-raw 'before ";
+    state.import_editor = iced::widget::text_editor::Content::with_text(&format!("{prefix}after'"));
+    state
+        .import_editor
+        .move_to(iced_core::text::editor::Cursor {
+            position: iced_core::text::editor::Position {
+                line: 0,
+                column: prefix.len(),
+            },
+            selection: None,
+        });
+    let action = Action::Edit(Edit::Paste(std::sync::Arc::new(
+        "curl stays in body ".into(),
+    )));
+    let _ = super::update(&mut state, Message::Import(ImportMsg::Edited(action)));
+    let parsed = crate::services::import::resources::parse(&state.import_editor.text()).unwrap();
+    let crate::services::import::resources::Resource::Command(command, _) = parsed else {
+        panic!("one command expected")
+    };
+    assert_eq!(
+        command.body.as_deref(),
+        Some("before curl stays in body after")
+    );
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn postman_environments_import_activate_and_update_in_place() {
+    let (mut state, dir) = fixture();
+    for env in &mut state.environments {
+        env.is_active = false;
+    }
+    let env = |value: &str| {
+        crate::services::import::postman::import_environment(&format!(
+            r#"{{"id": "e1", "name": "Staging", "values": [{{"key": "host", "value": "{value}", "enabled": true}}]}}"#
+        ))
+        .unwrap()
+    };
+    let import = |state: &mut crate::app::AppState, e| {
+        let _ = super::update(state, Message::Import(ImportMsg::OpenPostmanDialog));
+        let _ = super::update(
+            state,
+            Message::Import(ImportMsg::ResourcesParsed(Ok(vec![
+                crate::services::import::resources::Resource::Environments(vec![e]),
+            ]))),
+        );
+    };
+    let before = state.environments.len();
+    import(&mut state, env("a.test"));
+    assert!(!state.import_dialog_open);
+    assert_eq!(state.environments.len(), before + 1);
+    let imported = state
+        .environments
+        .iter()
+        .find(|e| e.id == "postman-env-e1")
+        .expect("saved");
+    assert!(imported.is_active, "first Postman env is activated when none is");
+
+    import(&mut state, env("b.test"));
+    assert_eq!(state.environments.len(), before + 1, "re-import updates in place");
+    let updated = state
+        .environments
+        .iter()
+        .find(|e| e.id == "postman-env-e1")
+        .unwrap();
+    assert_eq!(updated.variables["host"], "b.test");
+    assert!(updated.is_active);
     drop(state);
     let _ = std::fs::remove_dir_all(dir);
 }
