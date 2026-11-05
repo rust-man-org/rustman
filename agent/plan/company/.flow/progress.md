@@ -95,7 +95,15 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
   sync → Git panel, Discard local changes when a draft exists); Share is an
   outlined link button. Resolved-URL line under the URL bar removed (not in
   the mockup, per user). Gates 263/255.
-- Pending (user request 2026-11-05, Postman reference): header search like
+- Done (`ui/command_palette.rs`): global search popup, near window wide (max
+  1280px, 40px gutter), anchored at the top, no dim; eases in (unroll, 160ms)
+  and out (110ms) via window frames only while animating. Type chips
+  Requests / Open tabs / History / Environments + Clear all; `>` or
+  Ctrl+Shift+P lists app commands with key caps; Ctrl+K and Ctrl+P open it;
+  rows show a method tile (DEL/OPT/PTCH short forms), bold name, muted URL,
+  detail line and relative time. Collections are not listed yet (no "open
+  collection" action); no "Find in workspace" row. Gates 269/261.
+- Original note (user request 2026-11-05, Postman reference): header search like
   Postman's. The field reads "Search (Ctrl+K)" with the shortcut inside the
   label and a hover state. Opening it shows a large popup anchored under the
   top bar (about 1080px wide) with:
