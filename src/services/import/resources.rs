@@ -6,6 +6,73 @@ pub enum Resource {
     Collections(Vec<crate::domain::group::ImportedCollection>),
     Command(crate::services::curl::ParsedCurl, usize),
     Commands(Vec<(crate::services::curl::ParsedCurl, usize)>),
+    /// Postman environments, and collection variables mapped to one.
+    Environments(Vec<crate::domain::environment::AppEnvironment>),
+}
+
+/// What an import will create, for the dialog's review panel.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Summary {
+    pub collections: usize,
+    pub folders: usize,
+    pub requests: usize,
+    pub variables: usize,
+    pub environments: usize,
+    /// Requests whose Postman scripts were kept as comments.
+    pub scripts_to_review: usize,
+}
+
+impl Summary {
+    pub fn of(resources: &[Resource]) -> Self {
+        let marker = super::postman::SCRIPT_MARKER;
+        let mut s = Summary::default();
+        for r in resources {
+            match r {
+                Resource::Collections(cols) => {
+                    for c in cols {
+                        s.collections += 1;
+                        s.folders += c.all_groups().len();
+                        let requests = c.all_requests();
+                        s.requests += requests.len();
+                        s.scripts_to_review += requests
+                            .iter()
+                            .filter(|r| {
+                                r.pre_request_script.starts_with(marker)
+                                    || r.test_script.starts_with(marker)
+                            })
+                            .count();
+                    }
+                }
+                Resource::Command(..) => s.requests += 1,
+                Resource::Commands(batch) => s.requests += batch.len(),
+                Resource::Environments(envs) => {
+                    s.environments += envs.len();
+                    s.variables += envs.iter().map(|e| e.variables.len()).sum::<usize>();
+                }
+            }
+        }
+        s
+    }
+}
+
+/// [`parse`] plus what rides along: a Postman collection's variables come
+/// back as an environment, and a data dump's `archive.json` index (no data)
+/// yields nothing instead of an error.
+pub fn parse_all(input: &str) -> Result<Vec<Resource>, String> {
+    if input.len() <= crate::consts::IMPORT_FILE_LIMIT && super::postman::is_dump_index(input) {
+        return Ok(Vec::new());
+    }
+    let resource = parse(input)?;
+    let mut out = Vec::with_capacity(2);
+    if matches!(resource, Resource::Collections(_))
+        && let Some(env) = super::postman::collection_environment(input)
+    {
+        out.push(resource);
+        out.push(Resource::Environments(vec![env]));
+    } else {
+        out.push(resource);
+    }
+    Ok(out)
 }
 
 pub fn parse(input: &str) -> Result<Resource, String> {
@@ -46,7 +113,10 @@ pub fn parse(input: &str) -> Result<Resource, String> {
         .or_else(|_| super::httpie_export::import(input))
         .or_else(|_| super::swagger::import(input))
         .map(Resource::Collections)
-        .map_err(|_| "Unrecognized resource. Paste a cURL or HTTPie command, Postman collection, OpenAPI spec, or Rustman JSON.".into())
+        .or_else(|_| {
+            super::postman::import_environment(input).map(|env| Resource::Environments(vec![env]))
+        })
+        .map_err(|_| "Unrecognized resource. Paste a cURL or HTTPie command, Postman collection or environment, OpenAPI spec, or Rustman JSON.".into())
 }
 
 /// Split pasted commands only at unquoted shell boundaries. Quoted JSON,
@@ -192,19 +262,27 @@ pub fn read_paths(paths: Vec<std::path::PathBuf>) -> Result<Vec<Resource>, Strin
             continue;
         }
         let mut bytes = Vec::new();
-        let remaining = crate::consts::IMPORT_FILE_LIMIT.saturating_sub(total);
+        let remaining = crate::consts::IMPORT_TOTAL_LIMIT
+            .saturating_sub(total)
+            .min(crate::consts::IMPORT_FILE_LIMIT);
         std::fs::File::open(&path)
             .map_err(|e| e.to_string())?
             .take(remaining as u64 + 1)
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())?;
+        if bytes.len() > crate::consts::IMPORT_FILE_LIMIT {
+            return Err(format!(
+                "{} exceeds the 32 MB import limit.",
+                path.display()
+            ));
+        }
         total += bytes.len();
-        if total > crate::consts::IMPORT_FILE_LIMIT {
-            return Err("Selection exceeds the 32 MB import limit.".into());
+        if total > crate::consts::IMPORT_TOTAL_LIMIT {
+            return Err("Selection exceeds the 256 MB import limit.".into());
         }
         let input = String::from_utf8(bytes)
             .map_err(|_| format!("{} is not UTF-8 text.", path.display()))?;
-        resources.push(parse(&input).map_err(|e| format!("{}: {e}", path.display()))?);
+        resources.extend(parse_all(&input).map_err(|e| format!("{}: {e}", path.display()))?);
     }
     if resources.is_empty() {
         return Err("No supported resources found in this selection.".into());

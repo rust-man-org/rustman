@@ -559,6 +559,122 @@ pub(super) fn curl_modal(state: &AppState) -> Element<'_, Message> {
     modal_overlay(inner)
 }
 
+/// Mockup import review: four counters (the environment one accented),
+/// then "supported" / "to review" chips and where variables end up.
+fn import_summary(s: &crate::services::import::resources::Summary) -> Element<'static, Message> {
+    let tile = |n: usize, label: &'static str, accent: bool| -> Element<'static, Message> {
+        container(
+            column![
+                text(n.to_string())
+                    .size(20)
+                    .font(iced::Font {
+                        weight: iced::font::Weight::Semibold,
+                        ..crate::ui::theme::UI_FONT
+                    })
+                    .color(if accent {
+                        Palette::accent()
+                    } else {
+                        Palette::text()
+                    }),
+                text(label).size(11).color(Palette::text_subtle()),
+            ]
+            .spacing(14),
+        )
+        .padding([14, 16])
+        .width(Length::Fill)
+        .height(84)
+        .style(move |_| container::Style {
+            background: accent.then(|| Palette::accent_soft().into()),
+            ..Default::default()
+        })
+        .into()
+    };
+    let rule = || -> Element<'static, Message> {
+        container(Space::new())
+            .width(1)
+            .height(84)
+            .style(|_| container::Style {
+                background: Some(Palette::border_subtle().into()),
+                ..Default::default()
+            })
+            .into()
+    };
+    let tiles = container(
+        row![
+            tile(s.folders, "Folders", false),
+            rule(),
+            tile(s.requests, "Requests", false),
+            rule(),
+            tile(s.variables, "Variables", false),
+            rule(),
+            tile(s.environments, "Environments", s.environments > 0),
+        ],
+    )
+    .clip(true)
+    .style(|_| container::Style {
+        border: Border {
+            color: Palette::border_subtle(),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    });
+    let chip = |icon: iced::widget::Text<'static>, label: String, fg: iced::Color, bg: iced::Color| {
+        container(
+            row![icon.size(12).color(fg), text(label).size(11).color(fg)]
+                .spacing(6)
+                .align_y(iced::Alignment::Center),
+        )
+        .padding([5, 10])
+        .style(move |_| container::Style {
+            background: Some(bg.into()),
+            border: Border {
+                radius: 24.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    };
+    let mut chips = row![].spacing(8);
+    let supported = s.requests.saturating_sub(s.scripts_to_review);
+    if supported > 0 {
+        chips = chips.push(chip(
+            icons::check(),
+            format!("{supported} fully supported"),
+            Palette::SUCCESS,
+            Palette::success_soft(),
+        ));
+    }
+    if s.scripts_to_review > 0 {
+        chips = chips.push(chip(
+            icons::alert(),
+            format!("{} to review", s.scripts_to_review),
+            Palette::WARNING,
+            Palette::warning_soft(),
+        ));
+    }
+    let mut col = column![tiles, chips].spacing(12);
+    if s.scripts_to_review > 0 {
+        col = col.push(
+            text(
+                "Postman scripts are kept as comments in the request's Scripts tab; \
+                 Rustman scripts use their own language, so port them before relying on them.",
+            )
+            .size(11)
+            .color(Palette::text_muted()),
+        );
+    }
+    col.push(
+        text(
+            "Postman environments and collection variables become Rustman environments; \
+             importing the same files again updates them. Values stay on this device.",
+        )
+        .size(11)
+        .color(Palette::text_subtle()),
+    )
+    .into()
+}
+
 pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
     use crate::message::ImportMsg;
     let busy = state.importing;
@@ -584,7 +700,7 @@ pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
     .align_y(iced::Alignment::Center);
     let editor = text_editor(&state.import_editor)
         .id("resource-import")
-        .placeholder("Paste cURL commands, an OpenAPI spec, or collection JSON")
+        .placeholder("Paste cURL commands, an OpenAPI spec, or a Postman collection or environment")
         .on_action(move |action| Message::Import(ImportMsg::Edited(action)))
         .font(MONO)
         .size(12)
@@ -616,7 +732,7 @@ pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
             text(if busy {
                 "Importing resources..."
             } else {
-                "Drop files or folders here to import"
+                "Drop files or a folder here (a Postman data dump works as is)"
             })
             .size(13)
             .font(crate::ui::theme::UI_FONT_MEDIUM)
@@ -663,7 +779,7 @@ pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
         .spacing(12)
         .align_y(iced::Alignment::Center),
         editor,
-        text("Postman / OpenAPI / Rustman JSON / HTTPie / cURL")
+        text("Postman collections + environments / OpenAPI / Rustman JSON / HTTPie / cURL")
             .size(11)
             .color(Palette::text_muted()),
     ]
@@ -693,16 +809,40 @@ pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
                 _ => 0,
             })
             .sum();
-        let mut preview = column![
-            text(format!(
+        let summary = crate::services::import::resources::Summary::of(resources);
+        let heading = if summary.collections > 0 || summary.environments > 0 {
+            let mut parts = Vec::new();
+            if summary.collections > 0 {
+                parts.push(format!(
+                    "{} collection{}",
+                    summary.collections,
+                    if summary.collections == 1 { "" } else { "s" }
+                ));
+            }
+            if summary.environments > 0 {
+                parts.push(format!(
+                    "{} environment{}",
+                    summary.environments,
+                    if summary.environments == 1 { "" } else { "s" }
+                ));
+            }
+            format!("{} ready to import", parts.join(" and "))
+        } else {
+            format!(
                 "{} requests ready to import",
                 command_count + collection_requests
-            ))
-            .size(13)
-            .font(crate::ui::theme::UI_FONT_MEDIUM)
-            .color(Palette::text()),
+            )
+        };
+        let mut preview = column![
+            text(heading)
+                .size(13)
+                .font(crate::ui::theme::UI_FONT_MEDIUM)
+                .color(Palette::text()),
         ]
         .spacing(9);
+        if command_count < 2 && (summary.collections > 0 || summary.environments > 0) {
+            preview = preview.push(import_summary(&summary));
+        }
         if command_count > 1 {
             preview = preview
                 .push(
@@ -747,7 +887,7 @@ pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
                     .size(12)
                     .color(Palette::text_muted()),
             );
-        } else {
+        } else if summary.collections == 0 && summary.environments == 0 {
             preview = preview.push(
                 text("Imports into Collections")
                     .size(12)

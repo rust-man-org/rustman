@@ -71,7 +71,7 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
             Task::perform(
                 async move {
                     tokio::task::spawn_blocking(move || {
-                        crate::services::import::resources::parse(&text).map(|r| vec![r])
+                        crate::services::import::resources::parse_all(&text)
                     })
                     .await
                     .unwrap_or_else(|e| Err(e.to_string()))
@@ -206,6 +206,7 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
                     let origin = crate::services::import::resources::common_origin(&resources);
                     let mut collections = Vec::new();
                     let mut commands = Vec::new();
+                    let mut environments = Vec::new();
                     for resource in resources {
                         match resource {
                             crate::services::import::resources::Resource::Collections(data) => {
@@ -216,6 +217,9 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
                             }
                             crate::services::import::resources::Resource::Commands(batch) => {
                                 commands.extend(batch)
+                            }
+                            crate::services::import::resources::Resource::Environments(envs) => {
+                                environments.extend(envs)
                             }
                         }
                     }
@@ -248,6 +252,10 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
                         handle(state, ImportMsg::PostmanLoaded(collections))
                     };
                     if state.import_error.is_some() {
+                        return task;
+                    }
+                    if let Err(error) = apply_environments(state, environments) {
+                        state.import_error = Some(error);
                         return task;
                     }
                     let count = commands.len();
@@ -450,6 +458,49 @@ fn apply_collections(
         Some(detail),
         crate::state::notifications::ToastPlacement::BottomRight,
     )
+}
+
+/// Save imported environments. One with an id already present (the same
+/// Postman environment or collection imported again) is updated in place
+/// and keeps its active flag. When nothing is active yet, the first real
+/// Postman environment is activated so imported requests resolve at once.
+fn apply_environments(
+    state: &mut AppState,
+    envs: Vec<crate::domain::environment::AppEnvironment>,
+) -> Result<(), String> {
+    if envs.is_empty() {
+        return Ok(());
+    }
+    let count = envs.len();
+    // Prefer a real Postman environment; else a collection's variables.
+    let mut activate = (!state.environments.iter().any(|e| e.is_active))
+        .then(|| {
+            envs.iter()
+                .find(|e| e.id.starts_with("postman-env-"))
+                .or(envs.first())
+                .map(|e| e.id.clone())
+        })
+        .flatten();
+    let db = state.db.as_ref().ok_or("Local storage is unavailable.")?;
+    for mut env in envs {
+        if let Some(existing) = state.environments.iter_mut().find(|e| e.id == env.id) {
+            env.is_active = existing.is_active;
+            crate::services::storage::save_environment(db, &env)?;
+            *existing = env;
+            continue;
+        }
+        if activate.as_deref() == Some(env.id.as_str()) {
+            env.is_active = true;
+            activate = None;
+        }
+        crate::services::storage::save_environment(db, &env)?;
+        state.environments.push(env);
+    }
+    state.sidebar.environments_collapsed = false;
+    if state.status_message.is_none() {
+        state.status_message = Some(format!("Imported {count} environment(s)"));
+    }
+    Ok(())
 }
 
 fn schedule_preview(state: &mut AppState, text: String) -> Task<Message> {

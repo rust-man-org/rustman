@@ -646,3 +646,48 @@ fn command_paste_replaces_selection_and_keeps_quoted_body_text_unchanged() {
     drop(state);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn postman_environments_import_activate_and_update_in_place() {
+    let (mut state, dir) = fixture();
+    for env in &mut state.environments {
+        env.is_active = false;
+    }
+    let env = |value: &str| {
+        crate::services::import::postman::import_environment(&format!(
+            r#"{{"id": "e1", "name": "Staging", "values": [{{"key": "host", "value": "{value}", "enabled": true}}]}}"#
+        ))
+        .unwrap()
+    };
+    let import = |state: &mut crate::app::AppState, e| {
+        let _ = super::update(state, Message::Import(ImportMsg::OpenPostmanDialog));
+        let _ = super::update(
+            state,
+            Message::Import(ImportMsg::ResourcesParsed(Ok(vec![
+                crate::services::import::resources::Resource::Environments(vec![e]),
+            ]))),
+        );
+    };
+    let before = state.environments.len();
+    import(&mut state, env("a.test"));
+    assert!(!state.import_dialog_open);
+    assert_eq!(state.environments.len(), before + 1);
+    let imported = state
+        .environments
+        .iter()
+        .find(|e| e.id == "postman-env-e1")
+        .expect("saved");
+    assert!(imported.is_active, "first Postman env is activated when none is");
+
+    import(&mut state, env("b.test"));
+    assert_eq!(state.environments.len(), before + 1, "re-import updates in place");
+    let updated = state
+        .environments
+        .iter()
+        .find(|e| e.id == "postman-env-e1")
+        .unwrap();
+    assert_eq!(updated.variables["host"], "b.test");
+    assert!(updated.is_active);
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}

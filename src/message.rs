@@ -209,6 +209,8 @@ pub enum RequestMsg {
     GraphQLVariablesEdited(iced_code_editor::Message),
     FormFieldAdded,
     FormFieldRemoved(usize),
+    /// Enable or disable one form field (disabled ones are not sent).
+    FormFieldToggled(usize),
     FormFieldKeyChanged(usize, String),
     FormFieldValueChanged(usize, String),
     /// Toggle the expanded (paged) editor for a big form value.

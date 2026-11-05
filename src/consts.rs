@@ -26,6 +26,10 @@ pub const URL_GUARD_LEN: usize = 65_536;
 /// point the file is almost certainly not a command at all.
 pub const IMPORT_FILE_LIMIT: usize = 32 * 1024 * 1024;
 
+/// Total read for one folder/multi-file import (a Postman data dump holds
+/// many collections; each file still has to fit `IMPORT_FILE_LIMIT`).
+pub const IMPORT_TOTAL_LIMIT: usize = 256 * 1024 * 1024;
+
 /// Table-cell values at or below this size *and* on a single line stay
 /// editable in a single-line input (`ui::request::cell`). 32 KB shapes in
 /// well under a millisecond per layout; megabytes freeze the app, and

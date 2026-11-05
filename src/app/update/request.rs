@@ -685,6 +685,12 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
             });
             tab.modified = true;
         }
+        RequestMsg::FormFieldToggled(i) => {
+            if let Some(field) = tab.form_fields.get_mut(i) {
+                field.enabled = !field.enabled;
+                tab.modified = true;
+            }
+        }
         RequestMsg::FormFieldRemoved(i) => {
             if i < tab.form_fields.len() {
                 let id = tab.form_fields[i].id.clone();
@@ -881,6 +887,7 @@ fn edit_class(msg: &RequestMsg) -> EditClass {
         | M::HeadersBulkToggle
         | M::HeaderPresetApplied(_)
         | M::HeadersCleared
+        | M::FormFieldToggled(_)
         | M::ParamsBulkToggle
         | M::MethodChanged(_)
         | M::AuthTypeChanged(_)

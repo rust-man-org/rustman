@@ -1,5 +1,5 @@
 use iced::{
-    Background, Border, Color, Element, Length,
+    Background, Border, Element, Length,
     widget::{Space, button, column, container, pick_list, row, scrollable, text},
 };
 
@@ -332,31 +332,48 @@ fn pane_label(label: &'static str) -> Element<'static, Message> {
         .into()
 }
 
+/// form-data in the shared `.kv` table: check, key with a Text/File chip,
+/// value (or file picker), delete; a placeholder row adds a field.
 fn form_data_view(tab: &RequestTabState) -> Element<'_, Message> {
     let fields = &tab.form_fields;
-    let mut col = column![].spacing(0);
+    let mut rows: Vec<Element<Message>> = vec![crate::ui::widgets::kv_table::head("Key", "Value")];
     for (i, field) in fields.iter().enumerate() {
         let is_file = field.field_type == FormFieldType::File;
         let accent = Palette::accent();
         let muted = Palette::text_muted();
 
         let type_btn = button(
-            text(if is_file { "File" } else { "Text" })
-                .size(10)
-                .color(if is_file { accent } else { muted }),
+            row![
+                text(if is_file { "File" } else { "Text" })
+                    .size(10)
+                    .color(if is_file { accent } else { muted }),
+                icons::chevron_down().size(9).color(if is_file {
+                    accent
+                } else {
+                    Palette::text_subtle()
+                }),
+            ]
+            .spacing(3)
+            .align_y(iced::Alignment::Center),
         )
         .on_press(Message::Request(RequestMsg::FormFieldTypeToggled(i)))
-        .style(move |_, _| iced::widget::button::Style {
+        .style(move |_, s| iced::widget::button::Style {
             background: if is_file {
                 Some(Background::Color(Palette::accent_soft()))
+            } else if matches!(s, iced::widget::button::Status::Hovered) {
+                Some(Background::Color(Palette::surface_high()))
             } else {
                 None
             },
             text_color: if is_file { accent } else { muted },
             border: iced::Border {
-                color: if is_file { accent } else { Color::TRANSPARENT },
+                color: if is_file {
+                    accent
+                } else {
+                    Palette::border_subtle()
+                },
                 width: 1.0,
-                radius: 6.0.into(),
+                radius: 4.0.into(),
             },
             ..Default::default()
         })
@@ -379,11 +396,11 @@ fn form_data_view(tab: &RequestTabState) -> Element<'_, Message> {
                         border: iced::Border {
                             color: Palette::border_subtle(),
                             width: 1.0,
-                            radius: 6.0.into()
+                            radius: 4.0.into()
                         },
                         ..Default::default()
                     })
-                    .padding([4, 10])
+                    .padding([5, 10])
                     .width(Length::Fill),
             ]
             .width(Length::Fill)
@@ -393,68 +410,65 @@ fn form_data_view(tab: &RequestTabState) -> Element<'_, Message> {
                 "Value",
                 &field.value,
                 12.0,
-                [4, 6],
+                [5, 7],
                 Length::Fill,
                 move |s| Message::Request(RequestMsg::FormFieldValueChanged(i, s)),
             )
         };
 
-        let row_el = container(
+        let cells = crate::ui::widgets::kv_table::kv_row(
+            iced::widget::checkbox(field.enabled)
+                .on_toggle(move |_| Message::Request(RequestMsg::FormFieldToggled(i)))
+                .size(13)
+                .spacing(0)
+                .style(crate::ui::styles::checkbox)
+                .into(),
             row![
-                type_btn,
                 crate::ui::request::cell::text_cell(
                     "Key",
                     &field.key,
                     12.0,
-                    [4, 6],
-                    120,
+                    [5, 7],
+                    Length::Fill,
                     move |s| Message::Request(RequestMsg::FormFieldKeyChanged(i, s)),
                 ),
-                value_widget,
-                preview_actions(tab, field, i),
-                button(icons::close().size(10).color(Palette::text_muted()))
-                    .on_press(Message::Request(RequestMsg::FormFieldRemoved(i)))
-                    .style(iced::widget::button::text)
-                    .padding([3, 6]),
+                type_btn,
             ]
             .spacing(6)
-            .align_y(iced::Alignment::Center),
-        )
-        .style(move |_| iced::widget::container::Style {
-            background: if i % 2 == 0 {
-                Some(Background::Color(Palette::row_odd()))
-            } else {
-                None
-            },
-            ..Default::default()
-        })
-        .padding(iced::Padding {
-            top: 2.0,
-            right: 8.0,
-            bottom: 2.0,
-            left: 8.0,
-        })
-        .width(Length::Fill);
-        col = col.push(row_el);
-        if let Some(expanded) = form_value_viewer(tab, field) {
-            col = col.push(expanded);
+            .align_y(iced::Alignment::Center)
+            .into(),
+            row![value_widget, preview_actions(tab, field, i)]
+                .spacing(4)
+                .align_y(iced::Alignment::Center)
+                .into(),
+            crate::ui::widgets::kv_table::remove_button(Message::Request(
+                RequestMsg::FormFieldRemoved(i),
+            )),
+        );
+        match form_value_viewer(tab, field) {
+            Some(expanded) => rows.push(
+                column![cells, container(expanded).padding([0, 12])]
+                    .spacing(4)
+                    .into(),
+            ),
+            None => rows.push(cells),
         }
     }
-    col = col.push(
-        container(
-            button(
-                row![
-                    text("+").size(13).color(Palette::accent()),
-                    text(" Add field").size(11).color(Palette::text_muted()),
-                ]
-                .spacing(4)
-                .align_y(iced::Alignment::Center),
-            )
-            .on_press(Message::Request(RequestMsg::FormFieldAdded))
-            .style(iced::widget::button::text)
-            .padding([6, 14]),
-        )
-        .width(Length::Fill),
-    );
-    scrollable(col).height(Length::Fill).into()
+    rows.push(crate::ui::widgets::kv_table::add_row(Message::Request(
+        RequestMsg::FormFieldAdded,
+    )));
+    scrollable(column![
+        container(crate::ui::widgets::kv_table::frame(rows)).padding(iced::Padding {
+            top: 0.0,
+            right: 16.0,
+            bottom: 14.0,
+            left: 16.0,
+        })
+    ])
+    .height(Length::Fill)
+    .direction(iced::widget::scrollable::Direction::Vertical(
+        crate::ui::theme::grabbable_scrollbar(),
+    ))
+    .style(crate::ui::theme::thin_scrollbar)
+    .into()
 }
