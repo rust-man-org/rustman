@@ -57,6 +57,9 @@ pub struct RequestTabState {
     /// canonical value — every writer goes through `set_url` so the two can
     /// never disagree.
     pub url_editor: text_editor::Content,
+    pub url_hover: Option<String>,
+    pub url_completion_open: bool,
+    pub url_completion_selected: usize,
     pub headers: Vec<KeyValue>,
     pub params: Vec<KeyValue>,
     pub body_type: BodyType,
@@ -190,6 +193,9 @@ impl RequestTabState {
             method: HttpMethod::Get,
             url: String::new(),
             url_editor: text_editor::Content::new(),
+            url_hover: None,
+            url_completion_open: false,
+            url_completion_selected: 0,
             headers: Vec::new(),
             params: Vec::new(),
             body_type: BodyType::None,
@@ -249,6 +255,8 @@ impl RequestTabState {
     /// is correct there. Per-keystroke typing must NOT go through here: it
     /// performs into the existing editor so the cursor survives.
     pub fn set_url(&mut self, url: String) {
+        self.url_hover = None;
+        self.url_completion_open = false;
         self.url = url;
         self.url_editor = text_editor::Content::with_text(&self.url);
     }

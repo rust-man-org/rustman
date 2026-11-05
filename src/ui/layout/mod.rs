@@ -262,6 +262,7 @@ fn main_area(state: &AppState) -> Element<'_, Message> {
             request::header::view(state),
             request::url_bar::view(
                 active_tab,
+                active_env,
                 state.sidebar.context_menu.as_deref() == Some(request::url_bar::SEND_MENU),
             )
         ]

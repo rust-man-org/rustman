@@ -87,10 +87,10 @@ pub struct AppState {
     pub git_clone_url: String,
     pub curl_modal_open: bool,
     pub curl_modal_command: String,
-    /// Import-command dialog: clipboard/file import that bypasses text
-    /// widgets entirely (pasting megabytes into an input freezes iced's
-    /// per-grapheme shaping for minutes — see `URL_GUARD_LEN`).
+    /// Shared resource dialog; large clipboard/file imports parse off-thread.
     pub import_dialog_open: bool,
+    pub import_editor: iced::widget::text_editor::Content,
+    pub import_error: Option<String>,
     /// A background command parse is running (see `ImportCommandParsed`).
     pub importing: bool,
     pub git_user_name: String,

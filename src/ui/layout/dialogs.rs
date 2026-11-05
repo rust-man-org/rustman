@@ -560,86 +560,163 @@ pub(super) fn curl_modal(state: &AppState) -> Element<'_, Message> {
 }
 
 pub(super) fn import_dialog(state: &AppState) -> Element<'_, Message> {
-    let title = row![
-        text("Import Command")
-            .size(TEXT_LG)
-            .color(Palette::text())
-            .font(crate::ui::theme::UI_FONT_MEDIUM),
-        Space::new().width(Length::Fill),
-        button(icons::close().size(16).color(Palette::text_muted()))
-            .on_press(Message::Request(RequestMsg::CloseImportDialog))
+    use crate::message::ImportMsg;
+    let busy = state.importing;
+    let action = |label: &'static str, msg| {
+        button(text(label).size(12).color(Palette::accent()))
+            .on_press_maybe((!busy).then_some(Message::Import(msg)))
             .style(iced::widget::button::text)
-            .padding([2, 6]),
+            .padding([5, 8])
+    };
+    let title = row![
+        text("Use Resources")
+            .size(TEXT_LG)
+            .font(crate::ui::theme::UI_FONT_MEDIUM)
+            .color(Palette::text()),
+        Space::new().width(Length::Fill),
+        crate::ui::components::atoms::compact_icon_button(
+            icons::close(),
+            "Close import",
+            Message::Request(RequestMsg::CloseImportDialog),
+            24.0
+        ),
     ]
     .align_y(iced::Alignment::Center);
-
-    // Huge commands must not go through a text widget: pasting megabytes
-    // into an input freezes iced's shaping for minutes (see `URL_GUARD_LEN`).
-    // Both sources below hand raw bytes to the importer, never to a widget.
-    let body: Element<Message> = if state.importing {
+    let editor = text_editor(&state.import_editor)
+        .id("resource-import")
+        .placeholder("Paste a cURL command, OpenAPI spec, or collection JSON")
+        .on_action(move |action| Message::Import(ImportMsg::Edited(action)))
+        .font(MONO)
+        .size(12)
+        .padding(10)
+        .height(140)
+        .style(|theme, status| {
+            let mut style = text_editor::default(theme, status);
+            style.background = Palette::background().into();
+            style.border = Border {
+                color: if matches!(status, text_editor::Status::Focused { .. }) {
+                    Palette::accent()
+                } else {
+                    Palette::border()
+                },
+                width: 1.0,
+                radius: 5.0.into(),
+            };
+            style.value = Palette::text();
+            style.placeholder = Palette::text_subtle();
+            style
+        });
+    let drop_area = container(
         column![
-            Space::new().height(8),
-            text("Working…").size(12).color(Palette::text_muted()),
-            Space::new().height(8),
-        ]
-        .spacing(4)
-        .into()
-    } else {
-        column![
-            button(
-                row![
-                    icons::copy().size(12).color(Palette::text_muted()),
-                    text("Paste from clipboard").size(12).color(Palette::text()),
-                ]
-                .spacing(8)
-                .align_y(iced::Alignment::Center),
-            )
-            .on_press(Message::Request(RequestMsg::ImportFromClipboard))
-            .style(iced::widget::button::text)
-            .padding([8, 12]),
-            button(
-                row![
-                    icons::import().size(12).color(Palette::text_muted()),
-                    text("Choose a file…").size(12).color(Palette::text()),
-                ]
-                .spacing(8)
-                .align_y(iced::Alignment::Center),
-            )
-            .on_press(Message::Request(RequestMsg::ImportFromFile))
-            .style(iced::widget::button::text)
-            .padding([8, 12]),
-        ]
-        .spacing(2)
-        .into()
-    };
-
-    let inner = container(
-        column![
-            title,
-            Space::new().height(10),
-            text("Import a curl or HTTPie command without pasting it into the URL bar.")
-                .size(11)
-                .color(Palette::text_muted()),
-            Space::new().height(6),
-            body,
-            Space::new().height(12),
+            icons::import().size(22).color(Palette::text_muted()),
+            text(if busy {
+                "Importing resources..."
+            } else {
+                "Drop files or folders here to import"
+            })
+            .size(13)
+            .font(crate::ui::theme::UI_FONT_MEDIUM)
+            .color(Palette::text()),
             row![
-                Space::new().width(Length::Fill),
-                button(text("Cancel").size(12).color(Palette::text_muted()))
-                    .on_press(Message::Request(RequestMsg::CloseImportDialog))
-                    .style(iced::widget::button::text)
-                    .padding([6, 14]),
+                text("Or select").size(12).color(Palette::text_muted()),
+                action("files", ImportMsg::ChooseFiles),
+                text("or").size(12).color(Palette::text_muted()),
+                action("folders", ImportMsg::ChooseFolder),
             ]
-            .align_y(iced::Alignment::Center),
+            .align_y(iced::Alignment::Center)
+            .spacing(2),
         ]
-        .spacing(0)
-        .width(440),
+        .spacing(10)
+        .align_x(iced::Alignment::Center),
     )
-    .style(modal_card_style)
-    .padding([20, 24])
-    .width(440);
-
-    modal_overlay(inner)
+    .width(Length::Fill)
+    .height(220)
+    .center_x(Length::Fill)
+    .center_y(220)
+    .style(|_| container::Style {
+        border: Border {
+            color: Palette::border(),
+            width: 1.0,
+            radius: 5.0.into(),
+        },
+        ..Default::default()
+    });
+    let mut body = column![
+        title,
+        row![
+            text("Resources").size(12).color(Palette::text_muted()),
+            container(text("Import").size(12).color(Palette::text()))
+                .padding([4, 8])
+                .style(|_| container::Style {
+                    background: Some(Palette::surface_high().into()),
+                    border: Border {
+                        radius: 4.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+        ]
+        .spacing(12)
+        .align_y(iced::Alignment::Center),
+        editor,
+        drop_area,
+        text("Postman / OpenAPI / Rustman JSON / HTTPie / cURL")
+            .size(11)
+            .color(Palette::text_muted()),
+    ]
+    .spacing(12);
+    if let Some(error) = &state.import_error {
+        body = body.push(text(error).size(12).color(Palette::ERROR));
+    }
+    body = body.push(
+        row![
+            action("Paste from clipboard", ImportMsg::Clipboard),
+            Space::new().width(Length::Fill),
+            button(text("Cancel").size(12).color(Palette::text_muted()))
+                .on_press(Message::Request(RequestMsg::CloseImportDialog))
+                .style(iced::widget::button::text)
+                .padding([7, 14]),
+            button(text(if busy { "Importing..." } else { "Import" }).size(12))
+                .on_press_maybe(
+                    (!busy && !state.import_editor.text().trim().is_empty())
+                        .then_some(Message::Import(ImportMsg::Submit))
+                )
+                .style(|theme, status| {
+                    let mut style = accent_btn_style(theme, status);
+                    style.shadow = iced::Shadow::default();
+                    if matches!(status, button::Status::Disabled) {
+                        style.background = Some(Palette::surface_high().into());
+                        style.text_color = Palette::text_muted();
+                    }
+                    style
+                })
+                .padding([7, 18]),
+        ]
+        .spacing(8)
+        .align_y(iced::Alignment::Center),
+    );
+    let card = container(body)
+        .padding(18)
+        .width(Length::Fill)
+        .max_width(848)
+        .style(|theme| container::Style {
+            shadow: iced::Shadow::default(),
+            ..modal_card_style(theme)
+        });
+    iced::widget::opaque(
+        container(
+            scrollable(container(card).center_x(Length::Fill).padding(24))
+                .height(Length::Fill)
+                .style(crate::ui::theme::thin_scrollbar),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(|_| container::Style {
+            background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.60).into()),
+            ..Default::default()
+        }),
+    )
+    .into()
 }
 
 fn editor_box<'a>(label: &'static str, editor: Element<'a, Message>) -> Element<'a, Message> {

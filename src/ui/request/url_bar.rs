@@ -23,6 +23,7 @@ pub const SEND_MENU: &str = "request:send";
 
 pub fn view<'a>(
     tab: &'a RequestTabState,
+    env: Option<&'a crate::domain::environment::AppEnvironment>,
     send_menu_open: bool,
 ) -> Element<'a, Message> {
     // A ws:// or wss:// URL is not an HTTP request: there is no method, no
@@ -108,7 +109,7 @@ pub fn view<'a>(
     // Unlike the old single-line input it never shapes megabytes on paste:
     // huge pastes route to import before they can enter the widget, which is
     // what keeps Ctrl+V instant no matter the size.
-    let url_input = url_field(tab);
+    let url_input = url_field(tab, env);
 
     let inner_divider = container(Space::new().width(1).height(Length::Fill)).style(|_| {
         iced::widget::container::Style {
@@ -303,25 +304,59 @@ fn method_color(method: &HttpMethod) -> Color {
 
 /// The URL field itself: a multi-line editor constrained to one line,
 /// invisible inside the pill (the pill owns the border).
-fn url_field<'a>(tab: &'a RequestTabState) -> Element<'a, Message> {
-    container(
-        text_editor(&tab.url_editor)
-            .placeholder("https://api.example.com/path  —  or paste a cURL command")
-            .on_action(|action| Message::Request(RequestMsg::UrlEdited(action)))
-            .size(TEXT_MD)
-            .font(crate::ui::theme::MONO)
-            .height(Length::Shrink)
-            .padding([4, URL_PAD_X as u16])
-            .wrapping(iced_core::text::Wrapping::None)
-            .style(url_editor_style)
-            .highlight_with::<super::url_highlight::UrlHighlighter>(
-                (),
-                super::url_highlight::format,
-            ),
-    )
-    .align_y(iced::Alignment::Center)
-    .width(Length::Fill)
-    .into()
+fn url_field<'a>(
+    tab: &'a RequestTabState,
+    env: Option<&'a crate::domain::environment::AppEnvironment>,
+) -> Element<'a, Message> {
+    let completing = !super::url_variables::matches(tab, env).is_empty();
+    let editor = text_editor(&tab.url_editor)
+        .id("request-url")
+        .placeholder("https://api.example.com/path  —  or paste a cURL command")
+        .on_action(|action| Message::Request(RequestMsg::UrlEdited(action)))
+        .size(TEXT_MD)
+        .font(crate::ui::theme::MONO)
+        .height(Length::Shrink)
+        .padding([4, URL_PAD_X as u16])
+        .wrapping(iced_core::text::Wrapping::None)
+        .style(url_editor_style)
+        .highlight_with::<super::url_highlight::UrlHighlighter>((), super::url_highlight::format)
+        .key_binding(move |press| {
+            use iced::{
+                keyboard::{Key, key::Named},
+                widget::text_editor::{Binding, Status},
+            };
+            if completing
+                && matches!(press.status, Status::Focused { .. })
+                && !press.modifiers.command()
+                && !press.modifiers.alt()
+            {
+                let msg = match press.key {
+                    Key::Named(Named::ArrowDown) => Some(RequestMsg::UrlCompletionMoved(1)),
+                    Key::Named(Named::ArrowUp) => Some(RequestMsg::UrlCompletionMoved(-1)),
+                    Key::Named(Named::Enter | Named::Tab) => {
+                        Some(RequestMsg::UrlCompletionSelected(None))
+                    }
+                    Key::Named(Named::Escape) => Some(RequestMsg::UrlCompletionDismissed),
+                    _ => None,
+                };
+                if let Some(msg) = msg {
+                    return Some(Binding::Custom(Message::Request(msg)));
+                }
+            }
+            Binding::from_key_press(press)
+        });
+    let editor = iced::widget::mouse_area(editor)
+        .on_move(|p| {
+            Message::Request(RequestMsg::UrlHovered(Some(iced::Point::new(
+                p.x - URL_PAD_X,
+                p.y - 4.0,
+            ))))
+        })
+        .on_exit(Message::Request(RequestMsg::UrlHovered(None)));
+    container(super::url_variables::wrap(editor.into(), tab, env))
+        .align_y(iced::Alignment::Center)
+        .width(Length::Fill)
+        .into()
 }
 
 /// The URL editor itself is invisible inside the pill — the pill owns the border.

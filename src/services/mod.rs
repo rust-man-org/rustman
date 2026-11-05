@@ -15,4 +15,5 @@ pub mod storage;
 #[cfg(feature = "self-update")]
 pub mod update;
 pub mod vcs;
+pub mod variables;
 pub mod websocket;

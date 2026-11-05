@@ -168,6 +168,10 @@ pub enum RequestMsg {
     /// the handler decides per action (see `handle`), which is what lets
     /// huge pastes route to import without ever entering the widget.
     UrlEdited(iced::widget::text_editor::Action),
+    UrlHovered(Option<iced::Point>),
+    UrlCompletionMoved(i32),
+    UrlCompletionSelected(Option<String>),
+    UrlCompletionDismissed,
     MethodChanged(String),
     TabSelected(RequestTab),
     // Headers
@@ -270,8 +274,6 @@ pub enum RequestMsg {
     CloseImportDialog,
     ImportFromClipboard,
     ImportClipboardText(Option<String>),
-    ImportFromFile,
-    ImportFileReady(Option<(String, Vec<u8>)>),
     ExportCurl,
     CloseCurlModal,
     CopyCurlToClipboard,
@@ -462,6 +464,14 @@ pub enum PaletteMsg {
 #[derive(Debug, Clone)]
 pub enum ImportMsg {
     OpenPostmanDialog,
+    Edited(iced::widget::text_editor::Action),
+    Submit,
+    Clipboard,
+    ClipboardReady(Option<String>),
+    ChooseFiles,
+    ChooseFolder,
+    PathsSelected(Vec<std::path::PathBuf>),
+    ResourcesParsed(Result<Vec<crate::services::import::resources::Resource>, String>),
     OpenExportDialog(String),
     CloseExportDialog,
     ExportCollection(String),

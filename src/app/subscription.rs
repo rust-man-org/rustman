@@ -11,7 +11,9 @@ use super::AppState;
 
 pub(crate) fn subscription(state: &AppState) -> Subscription<Message> {
     let global = event::listen_with(global_keys);
-    let kbd = if state.palette_open {
+    let kbd = if state.import_dialog_open {
+        event::listen_with(import_events)
+    } else if state.palette_open {
         Subscription::batch([global, event::listen_with(palette_keys)])
     } else {
         global
@@ -77,7 +79,7 @@ pub(crate) fn subscription(state: &AppState) -> Subscription<Message> {
                 .map(|_| Message::App(crate::message::AppMsg::AutoSaveSession)),
         );
     }
-    if !code_editor_focused {
+    if !code_editor_focused && !state.import_dialog_open {
         all.push(event::listen_with(tab_key));
     }
     if state.tabs.tabs.iter().any(|t| t.is_loading) {
@@ -88,6 +90,28 @@ pub(crate) fn subscription(state: &AppState) -> Subscription<Message> {
     }
     all.extend(ws_subs);
     Subscription::batch(all)
+}
+
+fn import_events(event: Event, _status: event::Status, _window: window::Id) -> Option<Message> {
+    use crate::message::{ImportMsg, RequestMsg};
+    match event {
+        Event::Window(window::Event::CloseRequested) => Some(Message::App(
+            crate::message::AppMsg::WindowCloseRequested(_window),
+        )),
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(keyboard::key::Named::Escape),
+            ..
+        }) => Some(Message::Request(RequestMsg::CloseImportDialog)),
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(keyboard::key::Named::Enter),
+            modifiers,
+            ..
+        }) if modifiers.command() => Some(Message::Import(ImportMsg::Submit)),
+        Event::Window(window::Event::FileDropped(path)) => {
+            Some(Message::Import(ImportMsg::PathsSelected(vec![path])))
+        }
+        _ => None,
+    }
 }
 
 fn collection_delete_keys(
@@ -181,7 +205,10 @@ fn ws_stream(conn: &WsConn) -> impl iced::futures::Stream<Item = Message> + use<
     )
 }
 
-fn tab_key(event: Event, _status: event::Status, _window_id: window::Id) -> Option<Message> {
+fn tab_key(event: Event, status: event::Status, _window_id: window::Id) -> Option<Message> {
+    if status == event::Status::Captured {
+        return None;
+    }
     let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event else {
         return None;
     };
@@ -221,11 +248,11 @@ fn global_keys(event: Event, _status: event::Status, window_id: window::Id) -> O
             Some(Message::Palette(PaletteMsg::Open))
         }
         // Postman's tab search: the open-tabs list with its search box.
-        keyboard::Key::Character("a") if modifiers.command() && modifiers.shift() => {
-            Some(Message::Sidebar(crate::message::SidebarMsg::ContextMenuOpened(
+        keyboard::Key::Character("a") if modifiers.command() && modifiers.shift() => Some(
+            Message::Sidebar(crate::message::SidebarMsg::ContextMenuOpened(
                 crate::ui::layout::tab_menus::TABS_MENU.to_owned(),
-            )))
-        }
+            )),
+        ),
         keyboard::Key::Character("t") if modifiers.command() => {
             Some(Message::Request(RequestMsg::NewTab))
         }
@@ -325,6 +352,20 @@ fn sidebar_drag_end(event: Event, _status: event::Status, _window: window::Id) -
 #[cfg(test)]
 mod sidebar_drag_tests {
     use super::*;
+
+    #[test]
+    fn import_dialog_keeps_window_close_requests_working() {
+        assert!(matches!(
+            import_events(
+                Event::Window(window::Event::CloseRequested),
+                event::Status::Ignored,
+                window::Id::unique(),
+            ),
+            Some(Message::App(crate::message::AppMsg::WindowCloseRequested(
+                _
+            )))
+        ));
+    }
 
     #[test]
     fn drag_ends_even_when_release_was_captured_or_window_loses_focus() {

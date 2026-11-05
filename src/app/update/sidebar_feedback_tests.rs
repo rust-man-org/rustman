@@ -32,6 +32,16 @@ fn fixture() -> (AppState, std::path::PathBuf) {
     (state, dir)
 }
 #[test]
+fn sidebar_import_opens_the_shared_dialog_before_choosing_a_file() {
+    let (mut state, dir) = fixture();
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    assert!(state.import_dialog_open);
+    assert!(!state.importing);
+    assert_eq!(state.collections.len(), 1);
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+#[test]
 fn sidebar_feedback_delete_requires_typed_confirmation() {
     let (mut state, dir) = fixture();
     let _ = super::update(
@@ -265,6 +275,80 @@ fn sidebar_feedback_request_delete_waits_for_confirmation() {
             .unwrap()
             .is_empty()
     );
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn resource_import_keeps_errors_in_dialog_and_commands_preserve_current_tab() {
+    use crate::services::import::resources;
+    let (mut state, dir) = fixture();
+    state
+        .tabs
+        .active_tab_mut()
+        .set_url("https://keep.example/edited".into());
+    let original = state.tabs.active;
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ResourcesParsed(
+            resources::parse("invalid input").map(|r| vec![r]),
+        )),
+    );
+    assert!(state.import_dialog_open);
+    assert!(state.import_error.is_some());
+    assert_eq!(state.tabs.active_tab().url, "https://keep.example/edited");
+    // An old request widget must not handle a keyboard shortcut under the modal.
+    let _ = super::update(
+        &mut state,
+        Message::Request(crate::message::RequestMsg::UrlChanged(
+            "https://wrong.example".into(),
+        )),
+    );
+    assert_eq!(state.tabs.active_tab().url, "https://keep.example/edited");
+    let _ = super::update(&mut state, Message::Import(ImportMsg::Submit));
+    // Supply a completed background parse, as the task runtime would.
+    state.import_error = None;
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ResourcesParsed(
+            resources::parse("curl -X POST https://example.com/imported -H 'X-Test: yes'")
+                .map(|r| vec![r]),
+        )),
+    );
+    assert!(!state.import_dialog_open);
+    assert!(!state.importing);
+    assert_eq!(state.tabs.tabs[original].url, "https://keep.example/edited");
+    assert_eq!(state.tabs.active_tab().url, "https://example.com/imported");
+    assert_eq!(state.tabs.active_tab().method.as_str(), "POST");
+    drop(state);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn editing_import_is_transient_and_postman_results_populate_sidebar() {
+    let (mut state, dir) = fixture();
+    state.session_dirty = false;
+    let _ = super::update(&mut state, Message::Import(ImportMsg::OpenPostmanDialog));
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::Edited(iced::widget::text_editor::Action::Edit(
+            iced::widget::text_editor::Edit::Insert('x'),
+        ))),
+    );
+    assert!(!state.session_dirty);
+    let mut imported = data();
+    imported.collection.id = "another-collection".into();
+    imported.requests.clear();
+    let _ = super::update(
+        &mut state,
+        Message::Import(ImportMsg::ResourcesParsed(Ok(vec![
+            crate::services::import::resources::Resource::Collections(vec![imported]),
+        ]))),
+    );
+    assert!(!state.import_dialog_open);
+    assert!(state.sidebar.expanded.contains("another-collection"));
+    assert_eq!(state.collections.len(), 2);
     drop(state);
     let _ = std::fs::remove_dir_all(dir);
 }

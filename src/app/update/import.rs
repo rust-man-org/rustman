@@ -5,34 +5,167 @@ use crate::message::{AppMsg, ImportMsg, Message};
 
 pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
     match msg {
-        ImportMsg::OpenPostmanDialog => Task::perform(
-            async {
-                let file = rfd::AsyncFileDialog::new()
-                    .add_filter("JSON | YAML", &["json", "yml", "yaml"])
-                    .set_title("Import Collection (Postman / HTTPie / Rustman)")
-                    .pick_file()
-                    .await;
-                if let Some(f) = file {
-                    let bytes = f.read().await;
-                    Some(String::from_utf8_lossy(&bytes).to_string())
-                } else {
-                    None
+        ImportMsg::OpenPostmanDialog => {
+            if state.importing && !state.import_dialog_open {
+                return Task::none();
+            }
+            state.import_dialog_open = true;
+            state.import_error = None;
+            state.sidebar.context_menu = None;
+            iced::widget::operation::focus("resource-import")
+        }
+        ImportMsg::Edited(action) => {
+            if state.importing {
+                return Task::none();
+            }
+            // Never hand a huge paste to iced's per-grapheme text shaping.
+            if let iced::widget::text_editor::Action::Edit(
+                iced::widget::text_editor::Edit::Paste(value),
+            ) = &action
+            {
+                if value.len() > crate::consts::PASTE_GUARD_LEN {
+                    return parse_text(state, value.to_string());
                 }
-            },
-            |content| match content {
-                Some(json) => {
-                    let result = crate::services::import::postman::import(&json)
-                        .or_else(|_| crate::services::import::native_import(&json))
-                        .or_else(|_| crate::services::import::httpie_export::import(&json))
-                        .or_else(|_| crate::services::import::swagger::import(&json));
-                    match result {
-                        Ok(data) => Message::Import(ImportMsg::PostmanLoaded(data)),
-                        Err(e) => Message::Import(ImportMsg::Error(e)),
+            }
+            state.import_editor.perform(action);
+            state.import_error = None;
+            Task::none()
+        }
+        ImportMsg::Submit => {
+            if state.importing {
+                return Task::none();
+            }
+            parse_text(state, state.import_editor.text())
+        }
+        ImportMsg::Clipboard => {
+            if state.importing {
+                return Task::none();
+            }
+            iced::clipboard::read().map(|text| Message::Import(ImportMsg::ClipboardReady(text)))
+        }
+        ImportMsg::ClipboardReady(text) => {
+            if state.importing || !state.import_dialog_open {
+                return Task::none();
+            }
+            match text {
+                Some(text) => parse_text(state, text),
+                None => {
+                    state.import_error = Some("Clipboard is empty.".into());
+                    Task::none()
+                }
+            }
+        }
+        ImportMsg::ChooseFiles | ImportMsg::ChooseFolder => {
+            if state.importing {
+                return Task::none();
+            }
+            let folder = matches!(msg, ImportMsg::ChooseFolder);
+            Task::perform(
+                async move {
+                    let dialog = rfd::AsyncFileDialog::new().set_title("Import resources");
+                    if folder {
+                        dialog
+                            .pick_folder()
+                            .await
+                            .into_iter()
+                            .map(|f| f.path().to_path_buf())
+                            .collect()
+                    } else {
+                        dialog
+                            .pick_files()
+                            .await
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|f| f.path().to_path_buf())
+                            .collect()
                     }
+                },
+                |paths| Message::Import(ImportMsg::PathsSelected(paths)),
+            )
+        }
+        ImportMsg::PathsSelected(paths) => {
+            if state.importing || !state.import_dialog_open || paths.is_empty() {
+                return Task::none();
+            }
+            state.importing = true;
+            state.import_error = None;
+            Task::perform(
+                async move {
+                    tokio::task::spawn_blocking(move || {
+                        crate::services::import::resources::read_paths(paths)
+                    })
+                    .await
+                    .unwrap_or_else(|e| Err(e.to_string()))
+                },
+                |result| Message::Import(ImportMsg::ResourcesParsed(result)),
+            )
+        }
+        ImportMsg::ResourcesParsed(result) => {
+            state.importing = false;
+            // Closing the dialog cancels applying an in-flight parse. Wait
+            // for that worker to finish before another dialog can be opened.
+            if !state.import_dialog_open {
+                return Task::none();
+            }
+            match result {
+                Err(error) => {
+                    state.import_error = Some(error);
+                    Task::none()
                 }
-                None => Message::App(AppMsg::Noop),
-            },
-        ),
+                Ok(resources) => {
+                    state.import_error = None;
+                    let mut collections = Vec::new();
+                    let mut commands = Vec::new();
+                    for resource in resources {
+                        match resource {
+                            crate::services::import::resources::Resource::Collections(data) => {
+                                collections.extend(data)
+                            }
+                            crate::services::import::resources::Resource::Command(parsed, len) => {
+                                commands.push((parsed, len))
+                            }
+                        }
+                    }
+                    if !commands.is_empty() && super::examples::dirty(state) {
+                        state.import_error = Some(
+                            "Save or discard the open example before importing a command.".into(),
+                        );
+                        return Task::none();
+                    }
+                    // Validate and persist collections before opening command tabs.
+                    let task = if collections.is_empty() {
+                        Task::none()
+                    } else {
+                        handle(state, ImportMsg::PostmanLoaded(collections))
+                    };
+                    if state.import_error.is_some() {
+                        return task;
+                    }
+                    let count = commands.len();
+                    if count > 0 {
+                        state.close_environment_workspace();
+                        state.examples.editor = None;
+                        state.sidebar.selected_request = None;
+                    }
+                    for (parsed, len) in commands {
+                        state.tabs.new_tab();
+                        super::request::apply_parsed_command(
+                            state.tabs.active_tab_mut(),
+                            parsed,
+                            len,
+                        );
+                    }
+                    if count > 0 {
+                        state.status_message =
+                            Some(format!("Imported {count} command(s) into new tabs"));
+                    }
+                    state.import_dialog_open = false;
+                    state.import_editor = iced::widget::text_editor::Content::new();
+                    state.import_error = None;
+                    task
+                }
+            }
+        }
 
         ImportMsg::OpenExportDialog(col_id) => {
             state.export_dialog_collection = Some(col_id);
@@ -163,6 +296,7 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
             for imported in data {
                 let id = imported.collection.id.clone();
                 if let Err(error) = crate::app::tree::try_insert_collection(state, imported) {
+                    state.import_error = Some(error.clone());
                     state.status_message = Some(format!("Import error: {error}"));
                     return Task::none();
                 }
@@ -192,4 +326,23 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
             Task::none()
         }
     }
+}
+
+fn parse_text(state: &mut AppState, text: String) -> Task<Message> {
+    if text.trim().is_empty() {
+        state.import_error = Some("Paste a command or collection to import.".into());
+        return Task::none();
+    }
+    state.importing = true;
+    state.import_error = None;
+    Task::perform(
+        async move {
+            tokio::task::spawn_blocking(move || {
+                crate::services::import::resources::parse(&text).map(|r| vec![r])
+            })
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()))
+        },
+        |result| Message::Import(ImportMsg::ResourcesParsed(result)),
+    )
 }
