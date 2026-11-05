@@ -63,6 +63,7 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
                         | crate::message::SidebarMsg::EnvironmentVariableHover(..)
                 )
                 | Message::Request(crate::message::RequestMsg::TabDragOver(_))
+                | Message::Palette(crate::message::PaletteMsg::Frame(_))
         );
     let task = dispatch(state, message);
     if refresh_snippet {
@@ -139,6 +140,7 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
                 | crate::message::AppMsg::Noop
                 | crate::message::AppMsg::SpinnerTick
         )
+        | Message::Palette(crate::message::PaletteMsg::Frame(_))
         // Expanded editors are transient UI: paging or expanding never
         // touches the persisted snapshot. A rejected oversized paste changes
         // nothing either — the old URL is kept. The import dialog chrome is

@@ -76,12 +76,12 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         right = right.push(avatar);
     }
 
-    // `.hdr-search`: no shortcut hint in the mockup (Ctrl+P still works).
+    // Global search: Ctrl+K like Postman (Ctrl+P still works).
     let bar = row![
         container(left).width(Length::FillPortion(1)),
         search_field(
             "Search requests, environments…",
-            None,
+            Some("Ctrl+K"),
             340.0,
             Message::Palette(PaletteMsg::Open),
         ),

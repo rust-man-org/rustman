@@ -44,6 +44,10 @@ pub(crate) fn subscription(state: &AppState) -> Subscription<Message> {
         .collect();
 
     let mut all = vec![kbd];
+    // Frames only while the search popup eases in or out.
+    if state.palette_anim.is_some() {
+        all.push(iced::window::frames().map(|t| Message::Palette(PaletteMsg::Frame(t))));
+    }
     if state.sidebar.collection_delete_id.is_some() {
         all.push(event::listen_with(collection_delete_keys));
     }
@@ -206,6 +210,13 @@ fn global_keys(event: Event, _status: event::Status, window_id: window::Id) -> O
     };
 
     match key.as_ref() {
+        keyboard::Key::Character("p") if modifiers.command() && modifiers.shift() => {
+            Some(Message::Palette(PaletteMsg::OpenCommands))
+        }
+        // Postman's global search key; Ctrl+P keeps working.
+        keyboard::Key::Character("k") if modifiers.command() => {
+            Some(Message::Palette(PaletteMsg::Open))
+        }
         keyboard::Key::Character("p") if modifiers.command() => {
             Some(Message::Palette(PaletteMsg::Open))
         }

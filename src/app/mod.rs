@@ -53,6 +53,11 @@ pub struct AppState {
     pub palette_open: bool,
     pub palette_query: String,
     pub palette_selected: usize,
+    pub palette_kind: Option<crate::message::PaletteKind>,
+    /// Open/close animation: (start, closing). `None` when settled.
+    pub palette_anim: Option<(std::time::Instant, bool)>,
+    /// Latest animation frame time (drives the popup easing).
+    pub palette_now: std::time::Instant,
     /// Footer taps toward the creator easter egg (resets on unlock).
     pub creator_taps: u8,
     /// Triple-tapped footer: show the hidden creator card.
