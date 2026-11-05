@@ -214,6 +214,7 @@ mod tests {
             binary_data: None,
             duration_ms: 5,
             error: None,
+            ..Default::default()
         };
 
         let pre = pre_request_host_input(&tab, None);
@@ -322,6 +323,7 @@ mod tests {
             binary_data: None,
             duration_ms: 5,
             error: None,
+            ..Default::default()
         };
 
         let input = test_host_input(&tab, None, &resp);
@@ -354,6 +356,7 @@ mod tests {
             binary_data: None,
             duration_ms: 5,
             error: None,
+            ..Default::default()
         };
 
         let input = test_host_input(&tab, None, &resp);

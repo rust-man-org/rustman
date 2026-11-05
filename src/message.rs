@@ -330,6 +330,10 @@ pub enum ResponseMsg {
     ViewerPageNext,
     /// Toggle soft line wrap in the response viewer.
     ViewerWrapToggled,
+    /// Body format picked in the response toolbar (JSON, XML, … Raw).
+    BodyLangSelected(crate::state::tabs::BodyLang),
+    /// Preview (readable rendered HTML) on/off.
+    PreviewToggled,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]

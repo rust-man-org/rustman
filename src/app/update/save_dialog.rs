@@ -10,6 +10,7 @@ pub(super) fn handle(state: &mut AppState, msg: SaveDialogMsg) -> Task<Message> 
     match msg {
         SaveDialogMsg::Close => {
             state.save_dialog_open = false;
+            state.example_after_save = false;
             state.save_dialog_new_col = false;
             state.save_dialog_new_col_name = String::new();
         }
@@ -90,7 +91,13 @@ pub(super) fn handle(state: &mut AppState, msg: SaveDialogMsg) -> Task<Message> 
             tab.title = name.clone();
             tab.saved_as = Some((col_id.clone(), req_id.clone()));
 
-            return save_request(state);
+            let saved = save_request(state);
+            if std::mem::take(&mut state.example_after_save) {
+                return saved.chain(Task::done(Message::Example(
+                    crate::message::example::ExampleMsg::SaveResponse,
+                )));
+            }
+            return saved;
         }
     }
     Task::none()

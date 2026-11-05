@@ -119,6 +119,19 @@ pub(super) fn handle(state: &mut AppState, msg: ExampleMsg) -> Task<Message> {
     {
         return Task::none();
     }
+    // Like Postman: an unsaved request is saved first (the save dialog),
+    // then its response becomes the example.
+    if matches!(msg, ExampleMsg::SaveResponse) && state.tabs.active_tab().saved_as.is_none() {
+        state.example_after_save = true;
+        let task = super::update(
+            state,
+            Message::Request(crate::message::RequestMsg::SaveRequest),
+        );
+        // Save can be refused (e.g. an example editor is open): no dialog,
+        // so nothing may run after a later, unrelated save.
+        state.example_after_save &= state.save_dialog_open;
+        return task;
+    }
     let result = apply(state, msg);
     if let Err(error) = result {
         state.status_message = Some(error);
@@ -453,6 +466,35 @@ mod tests {
             .unwrap()
             .body_stored = true;
         assert!(apply(&mut s, ExampleMsg::SaveResponse).is_err());
+        drop(s);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn save_example_on_unsaved_request_saves_request_first() {
+        let (mut s, dir, _) = setup();
+        let _ = super::super::update(&mut s, Message::Request(crate::message::RequestMsg::NewTab));
+        s.tabs
+            .active_tab_mut()
+            .set_url("https://example.test/new".into());
+        s.tabs.active_tab_mut().response = Some(HttpResponse {
+            status: 200,
+            status_text: "OK".into(),
+            body: "{\"ok\":true}".into(),
+            ..Default::default()
+        });
+        let _ = handle(&mut s, ExampleMsg::SaveResponse);
+        assert!(s.save_dialog_open, "the save dialog asks where to save");
+        assert!(s.example_after_save);
+        let _ = super::super::update(
+            &mut s,
+            Message::SaveDialog(crate::message::SaveDialogMsg::Confirm),
+        );
+        assert!(!s.example_after_save);
+        let (_, id) = s.tabs.active_tab().saved_as.clone().expect("request saved");
+        // The chained SaveResponse runs as a task; run it directly here.
+        apply(&mut s, ExampleMsg::SaveResponse).unwrap();
+        assert_eq!(s.examples.items[&id][0].response.body, "{\"ok\":true}");
         drop(s);
         let _ = std::fs::remove_dir_all(dir);
     }

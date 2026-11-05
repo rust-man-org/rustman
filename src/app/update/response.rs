@@ -168,6 +168,16 @@ pub(super) fn handle(state: &mut AppState, msg: ResponseMsg) -> Task<Message> {
             let editor = &mut state.tabs.active_tab_mut().response_editor;
             editor.set_wrap_enabled(!editor.wrap_enabled());
         }
+        ResponseMsg::BodyLangSelected(lang) => {
+            state.sidebar.context_menu = None;
+            let tab = state.tabs.active_tab_mut();
+            tab.body_preview = Some(false);
+            tab.set_body_lang(lang);
+        }
+        ResponseMsg::PreviewToggled => {
+            let tab = state.tabs.active_tab_mut();
+            tab.body_preview = Some(!tab.body_preview_on());
+        }
         ResponseMsg::ConsoleEdited(action) => {
             let tab = state.tabs.active_tab_mut();
             tab.console_editor.perform(action);

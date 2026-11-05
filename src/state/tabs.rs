@@ -31,6 +31,52 @@ pub struct WsMessage {
 /// the response arrives (see `AppMsg::SpreadsheetPreviewReady`). `None` means
 /// either the response isn't binary, the binary type has no richer preview,
 /// or the preview hasn't finished parsing yet.
+/// Response body format, like Postman's body format menu. `Raw` shows the
+/// body exactly as received (no pretty-printing, no highlighting).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BodyLang {
+    Json,
+    Xml,
+    Html,
+    JavaScript,
+    Text,
+    Raw,
+}
+
+impl BodyLang {
+    pub const ALL: [BodyLang; 6] = [
+        BodyLang::Json,
+        BodyLang::Xml,
+        BodyLang::Html,
+        BodyLang::JavaScript,
+        BodyLang::Text,
+        BodyLang::Raw,
+    ];
+
+    pub fn syntax(self) -> &'static str {
+        match self {
+            BodyLang::Json => "json",
+            BodyLang::Xml => "xml",
+            BodyLang::Html => "html",
+            BodyLang::JavaScript => "javascript",
+            BodyLang::Text | BodyLang::Raw => "txt",
+        }
+    }
+}
+
+impl std::fmt::Display for BodyLang {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            BodyLang::Json => "JSON",
+            BodyLang::Xml => "XML",
+            BodyLang::Html => "HTML",
+            BodyLang::JavaScript => "JavaScript",
+            BodyLang::Text => "Text",
+            BodyLang::Raw => "Raw",
+        })
+    }
+}
+
 #[derive(Default)]
 pub enum ResponsePreview {
     #[default]
@@ -124,6 +170,12 @@ pub struct RequestTabState {
     /// Currently shown page into `viewer_page_starts`.
     pub viewer_page: usize,
     pub viewer_full_is_json: bool,
+    /// Body format picked in the response toolbar; `None` = detect from
+    /// the response. Reset on every new response.
+    pub body_lang: Option<BodyLang>,
+    /// Preview (rendered HTML as readable text) on/off; `None` = on for
+    /// HTML responses. Reset on every new response.
+    pub body_preview: Option<bool>,
     pub viewer_processing: bool,
     pub parsed_json: Option<serde_json::Value>,
     pub response_preview: ResponsePreview,
@@ -244,6 +296,8 @@ impl RequestTabState {
             html_fallback_text: None,
             viewer_page: 0,
             viewer_full_is_json: false,
+            body_lang: None,
+            body_preview: None,
             viewer_processing: false,
             parsed_json: None,
             response_preview: ResponsePreview::default(),
@@ -355,6 +409,60 @@ impl RequestTabState {
         self.show_viewer_page(0);
     }
 
+    /// The body format in effect: the toolbar pick, else detected from the
+    /// response (parsed JSON, then the Content-Type).
+    pub fn body_lang(&self) -> BodyLang {
+        if let Some(lang) = self.body_lang {
+            return lang;
+        }
+        if self.viewer_full_is_json {
+            return BodyLang::Json;
+        }
+        let ct = self
+            .response
+            .as_ref()
+            .and_then(|r| {
+                r.headers
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("content-type"))
+                    .map(|(_, v)| v.to_ascii_lowercase())
+            })
+            .unwrap_or_default();
+        if ct.contains("html") {
+            BodyLang::Html
+        } else if ct.contains("xml") {
+            BodyLang::Xml
+        } else if ct.contains("javascript") {
+            BodyLang::JavaScript
+        } else {
+            BodyLang::Text
+        }
+    }
+
+    /// Whether the readable HTML preview is shown instead of the source.
+    pub fn body_preview_on(&self) -> bool {
+        self.html_fallback_text.is_some() && self.body_preview.unwrap_or(true)
+    }
+
+    /// Re-fill the viewer for a toolbar format pick: `Raw` shows the body as
+    /// received; anything else pretty-prints when the body is JSON.
+    pub fn set_body_lang(&mut self, lang: BodyLang) {
+        self.body_lang = Some(lang);
+        let Some(body) = self.response.as_ref().map(|r| r.body.clone()) else {
+            return;
+        };
+        let pretty = (lang != BodyLang::Raw)
+            .then(|| {
+                self.parsed_json
+                    .as_ref()
+                    .and_then(|v| crate::services::format::pretty_value(v, self.body_indent_tabs))
+            })
+            .flatten();
+        let is_json = pretty.is_some();
+        let text = pretty.unwrap_or(body);
+        self.set_viewer_content(&text, is_json);
+    }
+
     /// Number of viewer pages for the current body (1 when it fits a page).
     pub fn viewer_page_count(&self) -> usize {
         self.viewer_page_starts.len().max(1)
@@ -393,11 +501,7 @@ impl RequestTabState {
             None
         };
         self.response_viewer_lines = lines;
-        let syntax = if self.viewer_full_is_json {
-            "json"
-        } else {
-            "txt"
-        };
+        let syntax = self.body_lang().syntax();
         // A new page or body keeps the wrap choice of the toolbar toggle.
         let wrap = self.response_editor.wrap_enabled();
         self.response_editor = make_code_editor(&display, syntax);
@@ -1235,6 +1339,43 @@ mod viewer_page_tests {
                 .iter()
                 .all(|p| p.lines().count() <= VIEWER_PAGE_LINES + 1)
         );
+    }
+
+    #[test]
+    fn body_format_detects_and_raw_shows_the_body_as_received() {
+        let mut tab = RequestTabState::new();
+        tab.response = Some(HttpResponse {
+            status: 200,
+            body: "{\"a\":1}".into(),
+            headers: vec![("Content-Type".into(), "application/json".into())]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        });
+        tab.parsed_json = Some(serde_json::json!({"a": 1}));
+        tab.set_viewer_content("{\n  \"a\": 1\n}", true);
+        assert_eq!(tab.body_lang(), BodyLang::Json);
+        tab.set_body_lang(BodyLang::Raw);
+        assert_eq!(tab.viewer_full, "{\"a\":1}");
+        tab.set_body_lang(BodyLang::Json);
+        assert_eq!(tab.viewer_full, "{\n  \"a\": 1\n}");
+
+        // HTML (e.g. a Laravel dd() page) opens in Preview by default.
+        let mut html = RequestTabState::new();
+        html.response = Some(HttpResponse {
+            status: 200,
+            body: "<pre>x</pre>".into(),
+            headers: vec![("content-type".into(), "text/html; charset=UTF-8".into())]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        });
+        html.set_viewer_content("<pre>x</pre>", false);
+        html.html_fallback_text = Some("x".into());
+        assert_eq!(html.body_lang(), BodyLang::Html);
+        assert!(html.body_preview_on());
+        html.body_preview = Some(false);
+        assert!(!html.body_preview_on());
     }
 
     #[test]

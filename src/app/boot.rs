@@ -225,6 +225,7 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
         parsed_cache: crate::services::cache::ParsedBodyCache::default(),
         export_dialog_collection: None,
         save_dialog_open: false,
+        example_after_save: false,
         save_dialog_name: String::new(),
         save_dialog_collection_id: None,
         save_dialog_group_id: None,

@@ -299,7 +299,11 @@ fn main_area(state: &AppState) -> Element<'_, Message> {
         .width(Length::Fill);
 
     let resp_body: Element<Message> = match active_tab.active_response_tab {
-        ResponseTab::Body => response::body::view(active_tab, state.spinner_frame),
+        ResponseTab::Body => response::body::view(
+            active_tab,
+            state.spinner_frame,
+            state.sidebar.context_menu.as_deref() == Some(response::body::FORMAT_MENU),
+        ),
         ResponseTab::Headers => response::headers::view(active_tab),
         ResponseTab::Cookies => response::cookies::view(active_tab),
         ResponseTab::Tests => response::tests::view(active_tab),

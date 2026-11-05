@@ -243,6 +243,8 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
                 | crate::message::ResponseMsg::OpenBodyInBrowser
                 | crate::message::ResponseMsg::BodyOpened(_)
                 | crate::message::ResponseMsg::ViewerWrapToggled
+                | crate::message::ResponseMsg::BodyLangSelected(_)
+                | crate::message::ResponseMsg::PreviewToggled
         )
     )
 }

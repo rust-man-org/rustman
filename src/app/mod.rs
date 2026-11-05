@@ -72,6 +72,9 @@ pub struct AppState {
     pub parsed_cache: crate::services::cache::ParsedBodyCache,
     pub export_dialog_collection: Option<String>,
     pub save_dialog_open: bool,
+    /// "Save example" on an unsaved request opened the save dialog; its
+    /// Confirm saves the request and then the response as an example.
+    pub example_after_save: bool,
     pub save_dialog_name: String,
     pub save_dialog_collection_id: Option<String>,
     /// Parent picked in the save dialog when it is a group (an id in

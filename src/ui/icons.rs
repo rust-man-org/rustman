@@ -179,3 +179,19 @@ pub fn file_down() -> Text<'static> {
 pub fn eraser() -> Text<'static> {
     glyph('\u{e28f}')
 }
+/// `</>` (Lucide code), response formats XML / HTML.
+pub fn code() -> Text<'static> {
+    glyph('\u{e093}')
+}
+/// Lucide file-code-2, the JavaScript format.
+pub fn file_code() -> Text<'static> {
+    glyph('\u{e45e}')
+}
+/// Lucide letter-text, the Text format.
+pub fn letter_text() -> Text<'static> {
+    glyph('\u{e605}')
+}
+/// Lucide file-type, the Raw format.
+pub fn file_type() -> Text<'static> {
+    glyph('\u{e329}')
+}

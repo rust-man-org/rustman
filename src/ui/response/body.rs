@@ -7,7 +7,7 @@ use crate::{
     domain::response::HttpResponse,
     message::{Message, ResponseMsg},
     services::spreadsheet::ParsedSheet,
-    state::tabs::{RequestTabState, ResponsePreview},
+    state::tabs::{BodyLang, RequestTabState, ResponsePreview},
     ui::{
         icons,
         theme::{MONO, Palette, TEXT_LG, TEXT_SM, TEXT_XS},
@@ -15,7 +15,90 @@ use crate::{
     },
 };
 
-pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
+/// Context-menu key of the body format menu (shared app-wide slot).
+pub const FORMAT_MENU: &str = "response:format";
+
+/// Postman's format button: a filled `{ } JSON ⌄` chip whose menu lists
+/// each format with its icon and a check on the current one; Raw sits
+/// under a divider.
+fn format_menu(current: BodyLang, open: bool) -> Element<'static, Message> {
+    use crate::ui::components::molecules::menu::{menu_divider, menu_item};
+    let icon = |lang: BodyLang| match lang {
+        BodyLang::Json => icons::braces(),
+        BodyLang::Xml | BodyLang::Html => icons::code(),
+        BodyLang::JavaScript => icons::file_code(),
+        BodyLang::Text => icons::letter_text(),
+        BodyLang::Raw => icons::file_type(),
+    };
+    let chip = button(
+        container(
+            row![
+                icon(current).size(12).color(Palette::text()),
+                text(current.to_string())
+                    .size(12)
+                    .font(crate::ui::theme::UI_FONT_MEDIUM)
+                    .color(Palette::text()),
+                icons::chevron_down().size(11).color(Palette::text_muted()),
+            ]
+            .spacing(6)
+            .align_y(Alignment::Center),
+        )
+        .height(26)
+        .center_y(26),
+    )
+    .on_press(Message::Sidebar(
+        crate::message::SidebarMsg::ContextMenuOpened(FORMAT_MENU.to_owned()),
+    ))
+    .padding([0, 10])
+    .style(move |_, status| iced::widget::button::Style {
+        background: Some(Background::Color(
+            if open || matches!(status, iced::widget::button::Status::Hovered) {
+                Palette::hover()
+            } else {
+                Palette::surface_high()
+            },
+        )),
+        text_color: Palette::text(),
+        border: Border {
+            radius: 5.0.into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let mut items = Vec::new();
+    for lang in BodyLang::ALL {
+        if lang == BodyLang::Raw {
+            items.push(menu_divider());
+        }
+        let mark: Element<'static, Message> = if lang == current {
+            icons::check().size(12).color(Palette::text()).into()
+        } else {
+            Space::new().width(12).into()
+        };
+        items.push(
+            row![
+                container(mark).width(16).padding(iced::padding::left(6)),
+                menu_item(
+                    Some(icon(lang)),
+                    lang.to_string(),
+                    Some(Message::Response(ResponseMsg::BodyLangSelected(lang))),
+                    false,
+                ),
+            ]
+            .align_y(Alignment::Center)
+            .into(),
+        );
+    }
+    // Left-aligned under the button, like Postman's.
+    crate::ui::widgets::popup::popup_left(
+        chip.into(),
+        crate::ui::components::molecules::menu::menu(items, Length::Fixed(168.0)),
+        Message::Sidebar(crate::message::SidebarMsg::ContextMenuClosed),
+        open,
+    )
+}
+
+pub fn view(tab: &RequestTabState, spinner_frame: u32, format_open: bool) -> Element<'_, Message> {
     if tab.is_loading {
         return loading_view(spinner_frame);
     }
@@ -46,13 +129,12 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
         };
     }
 
-    // HTML has no rendered preview: show the readable-text conversion, with
-    // the raw source still available via Save or Copy.
-    if resp.is_html()
-        && let Some(rendered) = tab.html_fallback_text.as_deref()
-    {
-        return simple_html_view(rendered, !resp.body_stored);
-    }
+    // HTML (e.g. a Laravel `dd()` page) defaults to Preview: the readable
+    // text of the page. The format menu switches to the highlighted source.
+    let preview = tab
+        .html_fallback_text
+        .as_deref()
+        .filter(|_| tab.body_preview_on());
 
     let page_count = tab.viewer_page_count();
     let size_note: Element<Message> = match tab.response_truncated_bytes {
@@ -110,37 +192,40 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
         Space::new().into()
     };
 
-    // Mockup `.rsp-tools`: format chip and line count on the left; wrap,
-    // search and copy icons on the right. Save lives in the head's ⋯ menu.
-    let format_chip = container(
-        text(if tab.viewer_full_is_json {
-            "JSON"
-        } else {
-            "Text"
-        })
-        .size(10)
-        .font(crate::ui::theme::UI_FONT_MEDIUM)
-        .color(Palette::text_muted()),
-    )
-    .height(24)
-    .center_y(24)
-    .padding([0, 9])
-    .style(|_| iced::widget::container::Style {
-        background: Some(Background::Color(Palette::background())),
-        border: Border {
-            color: Palette::border_subtle(),
-            width: 1.0,
-            radius: 4.0.into(),
-        },
-        ..Default::default()
-    });
+    // Postman-style toolbar: body format menu (JSON, XML, HTML, …, Raw) and
+    // Preview on the left; wrap, search and copy icons on the right.
+    let format_menu = format_menu(tab.body_lang(), format_open);
+    let preview_btn: Element<Message> = if tab.html_fallback_text.is_some() {
+        mini::icon_button(
+            icons::eye(),
+            if preview.is_some() {
+                "Show source"
+            } else {
+                "Preview the page as readable text"
+            },
+            Some(Message::Response(ResponseMsg::PreviewToggled)),
+            preview.is_some(),
+        )
+    } else {
+        Space::new().width(0).into()
+    };
     let wrap_on = tab.response_editor.wrap_enabled();
+    let lines_note: Element<Message> = if preview.is_some() {
+        text("Preview")
+            .size(10)
+            .color(Palette::text_subtle())
+            .into()
+    } else {
+        text(format!("{} lines", tab.response_viewer_lines))
+            .size(10)
+            .color(Palette::text_subtle())
+            .into()
+    };
     let toolbar = container(
         row![
-            format_chip,
-            text(format!("{} lines", tab.response_viewer_lines))
-                .size(10)
-                .color(Palette::text_subtle()),
+            format_menu,
+            preview_btn,
+            lines_note,
             size_note,
             Space::new().width(Length::Fill),
             page_nav,
@@ -180,7 +265,9 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
     })
     .width(Length::Fill);
 
-    let body: Element<Message> = if tab.viewer_processing {
+    let body: Element<Message> = if let Some(rendered) = preview {
+        simple_html_view(rendered, !resp.body_stored)
+    } else if tab.viewer_processing {
         container(text("Parsing…").size(TEXT_SM).color(Palette::text_subtle()))
             .padding([8, 12])
             .width(Length::Fill)
@@ -214,7 +301,7 @@ fn simple_html_view<'a>(rendered: &'a str, full_body: bool) -> Element<'a, Messa
     container(
         column![
             row![
-                text("HTML shown as readable text. Open or save the response for the full source.")
+                text("Page shown as readable text (dumps keep their layout). Open in browser for the full page.")
                     .size(TEXT_XS)
                     .color(Palette::text_subtle()),
                 Space::new().width(Length::Fill),
@@ -222,7 +309,13 @@ fn simple_html_view<'a>(rendered: &'a str, full_body: bool) -> Element<'a, Messa
                 save_action,
             ]
             .align_y(Alignment::Center),
-            scrollable(text(rendered).size(TEXT_SM).color(Palette::text())).height(Length::Fill),
+            scrollable(
+                text(rendered)
+                    .size(TEXT_SM)
+                    .font(crate::ui::theme::MONO)
+                    .color(Palette::text())
+            )
+            .height(Length::Fill),
         ]
         .spacing(4)
         .height(Length::Fill),

@@ -67,7 +67,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     let mut right = row![].spacing(8).align_y(Alignment::Center);
     if let Some(resp) = tab.response.as_ref().filter(|_| !tab.is_loading) {
         let text_ok = resp.error.is_none() && !resp.is_binary;
-        let can_example = tab.saved_as.is_some() && text_ok && !resp.body_stored;
+        let can_example = text_ok && !resp.body_stored;
         right = right
             .push(super::status_bar::chip(resp))
             .push(super::status_bar::meta(resp))
@@ -79,7 +79,13 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
                         crate::message::example::ExampleMsg::SaveResponse,
                     )),
                 ),
-                "Save this response as an example",
+                if !can_example {
+                    "Only complete text responses can be saved as an example"
+                } else if tab.saved_as.is_none() {
+                    "Save the request, then this response as an example"
+                } else {
+                    "Save this response as an example"
+                },
             ));
 
         let open = state.sidebar.context_menu.as_deref() == Some(MORE_MENU);
