@@ -191,6 +191,10 @@ pub fn file_code() -> Text<'static> {
 pub fn letter_text() -> Text<'static> {
     glyph('\u{e605}')
 }
+/// Lucide file-up, form-data file picker.
+pub fn file_up() -> Text<'static> {
+    glyph('\u{e32a}')
+}
 /// Lucide file-type, the Raw format.
 pub fn file_type() -> Text<'static> {
     glyph('\u{e329}')

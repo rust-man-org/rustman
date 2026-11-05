@@ -125,6 +125,9 @@ struct PostmanFormField {
     field_type: String,
     #[serde(default)]
     disabled: bool,
+    /// A string, or `{content, type}` in some exports.
+    #[serde(default)]
+    description: Option<serde_json::Value>,
 }
 
 // ── Import ────────────────────────────────────────────────────────────────────
@@ -191,6 +194,14 @@ fn value_text(v: Option<&serde_json::Value>) -> String {
         Some(serde_json::Value::String(s)) => s.clone(),
         Some(serde_json::Value::Null) | None => String::new(),
         Some(other) => other.to_string(),
+    }
+}
+
+/// A Postman description: a plain string or `{content, type}`.
+fn description_text(v: Option<&serde_json::Value>) -> String {
+    match v {
+        Some(serde_json::Value::Object(o)) => value_text(o.get("content")),
+        other => value_text(other),
     }
 }
 
@@ -470,7 +481,7 @@ fn convert_request(collection_id: &str, item: &PostmanRequestItem) -> SavedReque
                 };
                 (raw, body_type, vec![], String::new())
             }
-            // Text-only form fields go out url-encoded (see services::http).
+            // x-www-form-urlencoded keeps its own mode (see services::http).
             Some("urlencoded") => {
                 let fields = b
                     .urlencoded
@@ -485,10 +496,11 @@ fn convert_request(collection_id: &str, item: &PostmanRequestItem) -> SavedReque
                         enabled: !f.disabled,
                         file_name: None,
                         file_data: None,
+                        description: description_text(f.description.as_ref()),
                         mime_type: None,
                     })
                     .collect();
-                (String::new(), BodyType::FormData, fields, String::new())
+                (String::new(), BodyType::UrlEncoded, fields, String::new())
             }
             Some("graphql") => {
                 let gql = b.graphql.as_ref();
@@ -522,6 +534,7 @@ fn convert_request(collection_id: &str, item: &PostmanRequestItem) -> SavedReque
                         enabled: !f.disabled,
                         file_name: None,
                         file_data: None,
+                        description: description_text(f.description.as_ref()),
                         mime_type: None,
                     })
                     .collect();
@@ -616,10 +629,28 @@ fn export_request(req: &SavedRequest) -> serde_json::Value {
                                 "key": f.key,
                                 "value": f.value,
                                 "type": match f.field_type { FormFieldType::File => "file", FormFieldType::Text => "text" },
+                                "description": f.description,
+                                "disabled": !f.enabled,
                             })
                         })
                         .collect();
             json!({ "mode": "formdata", "formdata": fields })
+        }
+        BodyType::UrlEncoded => {
+            let fields: Vec<Value> = req
+                .form_data_fields
+                .iter()
+                .map(|f| {
+                    json!({
+                        "key": f.key,
+                        "value": f.value,
+                        "type": "text",
+                        "description": f.description,
+                        "disabled": !f.enabled,
+                    })
+                })
+                .collect();
+            json!({ "mode": "urlencoded", "urlencoded": fields })
         }
         BodyType::GraphQL => json!({
             "mode": "graphql",
@@ -755,11 +786,17 @@ mod tests {
     fn raw_language_picks_text_or_json() {
         let json = r#"{"info": {"name": "R"}, "item": [
           {"name": "xml", "request": {"method": "POST", "url": "u", "body": {"mode": "raw", "raw": "<a/>", "options": {"raw": {"language": "xml"}}}}},
-          {"name": "form", "request": {"method": "POST", "url": "u", "body": {"mode": "urlencoded", "urlencoded": [{"key": "a", "value": "1"}]}}}
+          {"name": "form", "request": {"method": "POST", "url": "u", "body": {"mode": "urlencoded", "urlencoded": [{"key": "a", "value": "1", "description": {"content": "the a field"}}]}}}
         ]}"#;
         let col = import(json).unwrap().remove(0);
         assert_eq!(col.requests[0].body_type, BodyType::Text);
-        assert_eq!(col.requests[1].body_type, BodyType::FormData);
+        assert_eq!(col.requests[1].body_type, BodyType::UrlEncoded);
         assert_eq!(col.requests[1].form_data_fields.len(), 1);
+        assert_eq!(
+            col.requests[1].form_data_fields[0].description,
+            "the a field"
+        );
+        let out: serde_json::Value = serde_json::from_str(&export(&col)).unwrap();
+        assert_eq!(out["item"][1]["request"]["body"]["mode"], "urlencoded");
     }
 }

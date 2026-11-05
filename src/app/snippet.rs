@@ -42,6 +42,14 @@ pub(crate) fn curl_input(tab: &RequestTabState) -> Result<GenerateCurlInput, Str
                 }
             }
         }
+    } else if tab.body_type == BodyType::UrlEncoded {
+        let pairs: Vec<String> = tab
+            .form_fields
+            .iter()
+            .filter(|f| f.enabled && !f.key.is_empty())
+            .map(|f| format!("{}={}", form_encode(&f.key), form_encode(&f.value)))
+            .collect();
+        (!pairs.is_empty()).then(|| pairs.join("&"))
     } else if body_text.trim().is_empty() {
         None
     } else {
@@ -66,6 +74,17 @@ pub(crate) fn curl_input(tab: &RequestTabState) -> Result<GenerateCurlInput, Str
         headers.push(KvPair {
             key: "Content-Type".to_owned(),
             value: "application/json".to_owned(),
+        });
+    }
+    if tab.body_type == BodyType::UrlEncoded
+        && body.is_some()
+        && !headers
+            .iter()
+            .any(|h| h.key.eq_ignore_ascii_case("content-type"))
+    {
+        headers.push(KvPair {
+            key: "Content-Type".to_owned(),
+            value: "application/x-www-form-urlencoded".to_owned(),
         });
     }
     let form_fields: Vec<FormFieldInput> = if tab.body_type == BodyType::FormData {
@@ -122,6 +141,23 @@ pub(crate) fn curl_input(tab: &RequestTabState) -> Result<GenerateCurlInput, Str
         api_key_location: api_loc,
     };
     Ok(input)
+}
+
+/// `application/x-www-form-urlencoded` encoding of one key or value:
+/// unreserved bytes kept, space as `+`, everything else `%XX`.
+/// Braces stay as they are so `{{var}}` placeholders still resolve.
+fn form_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'*' | b'{' | b'}' => {
+                out.push(b as char)
+            }
+            b' ' => out.push('+'),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
 }
 
 /// Literal secrets replaced by [`MASK`]; `{{placeholders}}` are kept, so the
@@ -224,6 +260,34 @@ pub(crate) fn refresh(state: &mut AppState) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn urlencoded_body_is_encoded_with_its_content_type() {
+        assert_eq!(form_encode("a b&c={{x}}"), "a+b%26c%3D{{x}}");
+        let mut tab = RequestTabState::new();
+        tab.set_url("https://x.test/login".into());
+        tab.body_type = BodyType::UrlEncoded;
+        tab.form_fields = vec![crate::domain::request::FormField {
+            id: "1".into(),
+            key: "user".into(),
+            value: "a b".into(),
+            field_type: crate::domain::request::FormFieldType::Text,
+            enabled: true,
+            file_name: None,
+            file_data: None,
+            mime_type: None,
+            description: "ignored".into(),
+        }];
+        let input = curl_input(&tab).unwrap();
+        assert_eq!(input.body.as_deref(), Some("user=a+b"));
+        assert!(
+            input
+                .headers
+                .iter()
+                .any(|h| h.key == "Content-Type" && h.value == "application/x-www-form-urlencoded")
+        );
+        assert!(input.form_fields.is_empty());
+    }
 
     #[test]
     fn snippet_resolves_the_active_environment_url() {

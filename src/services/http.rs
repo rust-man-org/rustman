@@ -218,48 +218,42 @@ async fn do_send(
     }
 
     match &req.body_type {
+        // Postman semantics: form-data is always multipart; the explicit
+        // x-www-form-urlencoded mode covers plain HTML-style forms.
         BodyType::FormData => {
-            let has_file = req
+            let mut form = reqwest::multipart::Form::new();
+            for field in req.form_data_fields.iter().filter(|f| f.enabled) {
+                let key = substitute(&field.key, env);
+                if key.is_empty() {
+                    continue;
+                }
+                if let crate::domain::request::FormFieldType::File = field.field_type {
+                    let file_data = field.file_data.as_ref().ok_or_else(|| {
+                        format!("File field '{}' has no data — pick a file first", field.key)
+                    })?;
+                    let bytes = general_purpose::STANDARD
+                        .decode(file_data)
+                        .map_err(|e| format!("Base64 decode: {e}"))?;
+                    let fname = field.file_name.clone().unwrap_or_else(|| "file".to_owned());
+                    let mut part = reqwest::multipart::Part::bytes(bytes).file_name(fname);
+                    if let Some(mime) = &field.mime_type {
+                        part = part.mime_str(mime).map_err(|e| e.to_string())?;
+                    }
+                    form = form.part(key, part);
+                } else {
+                    form = form.text(key, substitute(&field.value, env));
+                }
+            }
+            builder = builder.multipart(form);
+        }
+        BodyType::UrlEncoded => {
+            let pairs: Vec<(String, String)> = req
                 .form_data_fields
                 .iter()
-                .any(|f| f.enabled && f.field_type == crate::domain::request::FormFieldType::File);
-
-            if has_file {
-                let mut form = reqwest::multipart::Form::new();
-                for field in &req.form_data_fields {
-                    if !field.enabled {
-                        continue;
-                    }
-                    if let crate::domain::request::FormFieldType::File = field.field_type {
-                        let file_data = field.file_data.as_ref().ok_or_else(|| {
-                            format!("File field '{}' has no data — pick a file first", field.key)
-                        })?;
-                        let bytes = general_purpose::STANDARD
-                            .decode(file_data)
-                            .map_err(|e| format!("Base64 decode: {e}"))?;
-                        let fname = field.file_name.clone().unwrap_or_else(|| "file".to_owned());
-                        let mut part = reqwest::multipart::Part::bytes(bytes).file_name(fname);
-                        if let Some(mime) = &field.mime_type {
-                            part = part.mime_str(mime).map_err(|e| e.to_string())?;
-                        }
-                        form = form.part(field.key.clone(), part);
-                    } else {
-                        form = form.text(field.key.clone(), field.value.clone());
-                    }
-                }
-                builder = builder.multipart(form);
-            } else {
-                // No file fields: send as application/x-www-form-urlencoded,
-                // which is what plain HTML-style forms (logins, etc.) expect —
-                // multipart/form-data would be syntactically wrong for them.
-                let pairs: Vec<(String, String)> = req
-                    .form_data_fields
-                    .iter()
-                    .filter(|f| f.enabled)
-                    .map(|f| (f.key.clone(), f.value.clone()))
-                    .collect();
-                builder = builder.form(&pairs);
-            }
+                .filter(|f| f.enabled && !f.key.is_empty())
+                .map(|f| (substitute(&f.key, env), substitute(&f.value, env)))
+                .collect();
+            builder = builder.form(&pairs);
         }
         BodyType::Json | BodyType::Text => {
             let body = substitute(&req.body, env);
@@ -797,6 +791,7 @@ mod live_tests {
                 enabled: true,
                 file_name: None,
                 file_data: None,
+                description: String::new(),
                 mime_type: None,
             },
             FormField {
@@ -807,6 +802,7 @@ mod live_tests {
                 enabled: true,
                 file_name: Some("avatar.png".to_owned()),
                 file_data: Some(general_purpose::STANDARD.encode(b"fake png bytes")),
+                description: String::new(),
                 mime_type: Some("image/png".to_owned()),
             },
         ];
@@ -853,6 +849,7 @@ mod live_tests {
             enabled: true,
             file_name: Some("report.xlsx".to_owned()),
             file_data: Some(general_purpose::STANDARD.encode(b"fake xlsx bytes")),
+            description: String::new(),
             mime_type: Some(
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".to_owned(),
             ),
@@ -902,6 +899,7 @@ mod live_tests {
                 enabled: true,
                 file_name: None,
                 file_data: None,
+                description: String::new(),
                 mime_type: None,
             },
             FormField {
@@ -912,6 +910,7 @@ mod live_tests {
                 enabled: true,
                 file_name: None,
                 file_data: None,
+                description: String::new(),
                 mime_type: None,
             },
         ];

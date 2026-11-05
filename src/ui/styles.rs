@@ -167,6 +167,37 @@ pub fn field_input(
 // ── Checkbox ────────────────────────────────────────────────────────────────────
 
 /// Accent checkbox matching the app palette (params/headers rows).
+/// Postman-style radio: hollow ring at rest, accent ring + dot when picked.
+pub fn radio(
+    _theme: &iced::Theme,
+    status: iced::widget::radio::Status,
+) -> iced::widget::radio::Style {
+    use iced::widget::radio::Status;
+    let (selected, hovered) = match status {
+        Status::Active { is_selected } => (is_selected, false),
+        Status::Hovered { is_selected } => (is_selected, true),
+    };
+    iced::widget::radio::Style {
+        background: Background::Color(if hovered {
+            Palette::surface_raised()
+        } else {
+            Palette::surface_high()
+        }),
+        dot_color: Palette::accent(),
+        border_width: 1.0,
+        border_color: if selected {
+            Palette::accent()
+        } else {
+            Palette::border()
+        },
+        text_color: Some(if selected {
+            Palette::text()
+        } else {
+            Palette::text_muted()
+        }),
+    }
+}
+
 pub fn checkbox(
     _theme: &iced::Theme,
     status: iced::widget::checkbox::Status,

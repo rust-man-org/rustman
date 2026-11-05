@@ -465,6 +465,22 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                 tab.modified = true;
             }
         }
+        RequestMsg::FormFieldTypeSet(i, kind) => {
+            state.sidebar.context_menu = None;
+            let tab = state.tabs.active_tab_mut();
+            if let Some(f) = tab.form_fields.get_mut(i)
+                && f.field_type != kind
+            {
+                f.field_type = kind;
+                tab.modified = true;
+            }
+        }
+        RequestMsg::FormFieldDescriptionChanged(i, v) => {
+            if let Some(f) = tab.form_fields.get_mut(i) {
+                f.description = v;
+                tab.modified = true;
+            }
+        }
         RequestMsg::FormFieldPickFile(i) => {
             return Task::perform(
                 async move {
@@ -681,6 +697,7 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
                 enabled: true,
                 file_name: None,
                 file_data: None,
+                description: String::new(),
                 mime_type: None,
             });
             tab.modified = true;
@@ -1385,6 +1402,7 @@ pub(super) fn apply_parsed_command(
                     enabled: true,
                     file_name,
                     file_data: None,
+                    description: String::new(),
                     mime_type: None,
                 }
             })

@@ -1421,6 +1421,7 @@ mod viewer_page_tests {
             enabled: true,
             file_name: None,
             file_data: None,
+            description: String::new(),
             mime_type: None,
         });
 

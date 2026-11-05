@@ -243,6 +243,9 @@ pub enum RequestMsg {
     JwtAlgoChanged(String),
     // Form file upload
     FormFieldTypeToggled(usize),
+    /// Text/File picked in a form row's type menu.
+    FormFieldTypeSet(usize, crate::domain::request::FormFieldType),
+    FormFieldDescriptionChanged(usize, String),
     FormFieldPickFile(usize), // open file dialog for row index
     FormFieldFilePicked(usize, String, String), // index, filename, base64_data
     // Scripts

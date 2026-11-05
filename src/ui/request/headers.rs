@@ -277,6 +277,7 @@ pub fn auto_headers(tab: &RequestTabState) -> Vec<(String, String)> {
     match tab.body_type {
         BodyType::Json | BodyType::GraphQL => add("Content-Type", "application/json"),
         BodyType::FormData => add("Content-Type", CALCULATED),
+        BodyType::UrlEncoded => add("Content-Type", "application/x-www-form-urlencoded"),
         _ => {}
     }
     if tab.body_type != BodyType::None {

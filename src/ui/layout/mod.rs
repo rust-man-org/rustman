@@ -282,7 +282,7 @@ fn main_area(state: &AppState) -> Element<'_, Message> {
             state.show_auto_headers,
             state.sidebar.context_menu.as_deref(),
         ),
-        RequestTab::Body => request::body::view(active_tab),
+        RequestTab::Body => request::body::view(active_tab, state.sidebar.context_menu.as_deref()),
         RequestTab::Auth => request::auth::view(active_tab),
         RequestTab::Scripts => request::scripts::view(active_tab),
         // No longer a real tab (timeout moved to global Settings) — only

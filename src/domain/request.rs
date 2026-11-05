@@ -65,6 +65,9 @@ pub enum BodyType {
     Json,
     Text,
     FormData,
+    /// `application/x-www-form-urlencoded`; uses `form_data_fields` (text
+    /// fields only).
+    UrlEncoded,
     GraphQL,
 }
 
@@ -75,6 +78,7 @@ impl BodyType {
             Self::Json => "json",
             Self::Text => "text",
             Self::FormData => "form-data",
+            Self::UrlEncoded => "urlencoded",
             Self::GraphQL => "graphql",
         }
     }
@@ -87,6 +91,7 @@ impl std::str::FromStr for BodyType {
             "json" => Ok(Self::Json),
             "text" => Ok(Self::Text),
             "form-data" => Ok(Self::FormData),
+            "urlencoded" => Ok(Self::UrlEncoded),
             "graphql" => Ok(Self::GraphQL),
             _ => Ok(Self::None),
         }
@@ -310,6 +315,9 @@ pub struct FormField {
     pub file_name: Option<String>,
     pub file_data: Option<String>,
     pub mime_type: Option<String>,
+    /// Free-text note (Postman's Description column). Never sent.
+    #[serde(default)]
+    pub description: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

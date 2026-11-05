@@ -104,6 +104,97 @@ pub fn kv_row<'a>(
     .into()
 }
 
+/// Postman's form tables (form-data, x-www-form-urlencoded): Key, Value
+/// and Description in equal columns.
+pub fn head3<'a>(trailing: Element<'a, Message>) -> Element<'a, Message> {
+    let title = |s: &'static str| {
+        text(s)
+            .size(11)
+            .font(iced::Font {
+                weight: iced::font::Weight::Semibold,
+                ..crate::ui::theme::UI_FONT
+            })
+            .color(Palette::text_subtle())
+    };
+    container(
+        row![
+            Space::new().width(CHECK_W),
+            container(title("Key")).width(Length::FillPortion(1)),
+            container(title("Value")).width(Length::FillPortion(1)),
+            container(title("Description")).width(Length::FillPortion(1)),
+            container(trailing).width(ACTION_W).center_x(ACTION_W),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center),
+    )
+    .padding([9, 12])
+    .width(Length::Fill)
+    .style(|_| container::Style {
+        background: Some(Background::Color(Palette::background())),
+        ..Default::default()
+    })
+    .into()
+}
+
+/// A [`head3`] table row: check, key, value, description, delete.
+pub fn kv_row3<'a>(
+    check: Element<'a, Message>,
+    key: Element<'a, Message>,
+    value: Element<'a, Message>,
+    description: Element<'a, Message>,
+    action: Element<'a, Message>,
+) -> Element<'a, Message> {
+    container(
+        row![
+            container(check).width(CHECK_W).center_x(CHECK_W),
+            container(key).width(Length::FillPortion(1)),
+            container(value).width(Length::FillPortion(1)),
+            container(description).width(Length::FillPortion(1)),
+            container(action).width(ACTION_W).center_x(ACTION_W),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center),
+    )
+    .padding([4, 12])
+    .width(Length::Fill)
+    .into()
+}
+
+/// [`head3`] placeholder row: "Key / Value / Description"; a click adds one.
+pub fn add_row3<'a>(msg: Message) -> Element<'a, Message> {
+    let ph = |s: &'static str| {
+        container(
+            text(s)
+                .size(12)
+                .font(crate::ui::theme::MONO)
+                .color(Palette::text_subtle()),
+        )
+        .padding([6, 7])
+    };
+    button(
+        row![
+            container(icons::plus().size(12).color(Palette::text_subtle()))
+                .width(CHECK_W)
+                .center_x(CHECK_W),
+            container(ph("Key")).width(Length::FillPortion(1)),
+            container(ph("Value")).width(Length::FillPortion(1)),
+            container(ph("Description")).width(Length::FillPortion(1)),
+            Space::new().width(ACTION_W),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center),
+    )
+    .on_press(msg)
+    .padding([4, 12])
+    .width(Length::Fill)
+    .style(|_, status| button::Style {
+        background: matches!(status, button::Status::Hovered)
+            .then(|| Background::Color(Palette::background())),
+        ..Default::default()
+    })
+    .into()
+}
+
 /// Trailing placeholder row: muted "Key / Value", a click adds a row.
 pub fn add_row<'a>(msg: Message) -> Element<'a, Message> {
     let ph = |s: &'static str| {
