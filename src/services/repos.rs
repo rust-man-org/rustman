@@ -13,6 +13,10 @@ pub struct GitRepo {
     pub remote_url: Option<String>,
     #[serde(default)]
     pub collection_ids: Vec<String>,
+    /// An import-only source (e.g. a cloned Postman export): its collections
+    /// are read into the app but its working tree is never rewritten.
+    #[serde(default)]
+    pub protected: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -39,6 +43,7 @@ pub fn load(data_dir: &PathBuf) -> Vec<GitRepo> {
                 path: data_dir.join("collections"),
                 remote_url: None,
                 collection_ids: Vec::new(),
+                protected: false,
             },
         );
     }

@@ -4,8 +4,10 @@ use std::path::PathBuf;
 use iced::Task;
 
 use crate::app::AppState;
+use crate::domain::environment::AppEnvironment;
 use crate::domain::group::ImportedCollection;
 use crate::message::{GitMsg, GitView, Message, RepoAddPayload, RepoSummary, SyncPayload};
+use crate::services::repo_import::{self, RepoScan};
 use crate::services::repos::{self, GitRepo};
 use crate::services::{storage, vcs};
 
@@ -48,13 +50,21 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
                 async move {
                     tokio::task::spawn_blocking(move || {
                         vcs::clone_repo(&url, &dest)?;
-                        let collections = vcs::load_collections_from(&dest)?;
+                        let scan = repo_import::scan_dir(&dest, &url);
+                        let protected = scan.is_protected();
+                        let RepoScan {
+                            collections,
+                            environments,
+                            ..
+                        } = scan;
                         let global_script = vcs::read_global_script(&dest);
                         Ok::<RepoAdd, String>(RepoAdd {
                             name,
                             path: dest,
                             remote_url: Some(url),
                             collections,
+                            environments,
+                            protected,
                             global_script,
                         })
                     })
@@ -83,7 +93,14 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
             return Task::perform(
                 async move {
                     tokio::task::spawn_blocking(move || {
-                        let collections = vcs::load_collections_from(&path)?;
+                        let key = path.to_string_lossy().into_owned();
+                        let scan = repo_import::scan_dir(&path, &key);
+                        let protected = scan.is_protected();
+                        let RepoScan {
+                            collections,
+                            environments,
+                            ..
+                        } = scan;
                         let remote_url = vcs::remote_url(&path);
                         let global_script = vcs::read_global_script(&path);
                         Ok::<RepoAdd, String>(RepoAdd {
@@ -91,6 +108,8 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
                             path,
                             remote_url,
                             collections,
+                            environments,
+                            protected,
                             global_script,
                         })
                     })
@@ -107,6 +126,8 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
                 path,
                 remote_url,
                 collections,
+                environments,
+                protected,
                 global_script,
             } = *payload;
             let count = collections.len();
@@ -118,6 +139,7 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
                 state.status_message = Some(format!("Some local drafts could not be saved: {e}"));
             }
             apply_global_script(state, global_script);
+            let env_err = super::import::apply_environments(state, environments).err();
             let id = uuid::Uuid::new_v4().to_string();
             state.git_repos.push(GitRepo {
                 id: id.clone(),
@@ -125,16 +147,23 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
                 path,
                 remote_url,
                 collection_ids: ids,
+                protected,
             });
             repos::save(&state.data_dir, &state.git_repos);
             state.git_active_repo = id;
             state.git_busy = false;
-            if count > 0 {
+            if let Some(e) = env_err {
+                state.status_message = Some(format!("Imported with an environment error: {e}"));
+            } else if count > 0 {
                 state.sidebar.panel = crate::message::SidebarPanel::Collections;
-                state.status_message = Some(format!("Imported {count} collection(s) from {name}"));
+                state.status_message = Some(if protected {
+                    format!("Imported {count} collection(s) from {name} (imported source — files left untouched)")
+                } else {
+                    format!("Imported {count} collection(s) from {name}")
+                });
             } else {
                 state.status_message =
-                    Some(format!("Added {name} — no rustman collections found in it"));
+                    Some(format!("Added {name} — no importable collections found in it"));
             }
             return refresh_task(state);
         }
@@ -161,6 +190,7 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
             }
             crate::app::request_ops::flush_modified_tabs(state);
             let repo_path = active_path(state);
+            let protected = active_repo_protected(state);
             let collections = collections_for_active(state);
             let global_pre_request_script = state.global_pre_request_editor.text();
             let global_test_script = state.global_test_editor.text();
@@ -177,12 +207,15 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
             state.git_commit_message.clear();
             state.git_busy = true;
             return blocking(move || {
-                vcs::write_working_tree(
-                    &repo_path,
-                    &collections,
-                    &global_pre_request_script,
-                    &global_test_script,
-                )?;
+                // An import-only repo keeps its own files: never rewrite them.
+                if !protected {
+                    vcs::write_working_tree(
+                        &repo_path,
+                        &collections,
+                        &global_pre_request_script,
+                        &global_test_script,
+                    )?;
+                }
                 vcs::commit(&repo_path, &identity, &message)?;
                 Ok(format!(
                     "Committed as {} <{}>",
@@ -235,9 +268,10 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
             state.git_busy = true;
             return sync_task(repo_id, move || {
                 let summary = vcs::pull(&repo_path)?;
-                let collections = vcs::load_collections_from(&repo_path)?;
+                let key = repo_path.to_string_lossy().into_owned();
+                let scan = repo_import::scan_dir(&repo_path, &key);
                 let global_script = vcs::read_global_script(&repo_path);
-                Ok((collections, global_script, format!("Pull: {summary}")))
+                Ok(SyncOutcome::new(scan, global_script, format!("Pull: {summary}")))
             });
         }
         GitMsg::SwitchBranch(name) => {
@@ -246,9 +280,14 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
             state.git_busy = true;
             return sync_task(repo_id, move || {
                 vcs::checkout_branch(&repo_path, &name)?;
-                let collections = vcs::load_collections_from(&repo_path)?;
+                let key = repo_path.to_string_lossy().into_owned();
+                let scan = repo_import::scan_dir(&repo_path, &key);
                 let global_script = vcs::read_global_script(&repo_path);
-                Ok((collections, global_script, format!("Switched to {name}")))
+                Ok(SyncOutcome::new(
+                    scan,
+                    global_script,
+                    format!("Switched to {name}"),
+                ))
             });
         }
         GitMsg::AskRestore(id) => {
@@ -264,9 +303,10 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
             let short: String = id.chars().take(7).collect();
             state.git_busy = true;
             return sync_task(repo_id, move || {
-                let collections = vcs::read_commit_collections(&repo_path, &id)?;
+                let key = repo_path.to_string_lossy().into_owned();
+                let scan = repo_import::scan_commit(&repo_path, &id, &key)?;
                 let global_script = vcs::read_commit_global_script(&repo_path, &id);
-                Ok((collections, global_script, format!("Restored {short}")))
+                Ok(SyncOutcome::new(scan, global_script, format!("Restored {short}")))
             });
         }
         GitMsg::ToggleDiff => {
@@ -299,6 +339,8 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
             let SyncPayload {
                 repo_id,
                 collections,
+                environments,
+                protected,
                 label,
                 global_script,
             } = *payload;
@@ -328,14 +370,17 @@ pub(super) fn handle(state: &mut AppState, msg: GitMsg) -> Task<Message> {
 
             let draft_err = apply_sync(state, collections).err();
             apply_global_script(state, global_script);
+            let env_err = super::import::apply_environments(state, environments).err();
             crate::app::drafts::refresh_open_tabs(state);
             if let Some(repo) = state.git_repos.iter_mut().find(|r| r.id == repo_id) {
                 repo.collection_ids = ids;
+                repo.protected = protected;
             }
             repos::save(&state.data_dir, &state.git_repos);
-            state.status_message = Some(match draft_err {
-                Some(e) => format!("{label} — some local drafts could not be saved: {e}"),
-                None => label,
+            state.status_message = Some(match (draft_err, env_err) {
+                (Some(e), _) => format!("{label} — some local drafts could not be saved: {e}"),
+                (None, Some(e)) => format!("{label} — environment error: {e}"),
+                (None, None) => label,
             });
             state.git_busy = false;
             return refresh_task(state);
@@ -358,6 +403,8 @@ struct RepoAdd {
     path: PathBuf,
     remote_url: Option<String>,
     collections: Vec<ImportedCollection>,
+    environments: Vec<AppEnvironment>,
+    protected: bool,
     global_script: Option<(String, String)>,
 }
 
@@ -368,6 +415,8 @@ fn repo_added(res: Result<RepoAdd, String>) -> Message {
             path: add.path,
             remote_url: add.remote_url,
             collections: add.collections,
+            environments: add.environments,
+            protected: add.protected,
             global_script: add.global_script,
         }))),
         Err(e) => Message::Git(GitMsg::Error(e)),
@@ -381,6 +430,16 @@ fn active_path(state: &AppState) -> PathBuf {
         .find(|r| r.id == state.git_active_repo)
         .map(|r| r.path.clone())
         .unwrap_or_else(|| state.data_dir.join("collections"))
+}
+
+/// The active repo is an import-only source whose working tree must not be
+/// rewritten (e.g. a cloned Postman export).
+fn active_repo_protected(state: &AppState) -> bool {
+    state
+        .git_repos
+        .iter()
+        .find(|r| r.id == state.git_active_repo)
+        .is_some_and(|r| r.protected)
 }
 
 fn collections_for_active(state: &AppState) -> Vec<ImportedCollection> {
@@ -453,7 +512,7 @@ fn load_view(
     let mut branches = Vec::new();
     let mut log = Vec::new();
     for repo in &repos {
-        if repo.id == active {
+        if repo.id == active && !repo.protected {
             let _ = vcs::write_working_tree(
                 &repo.path,
                 &active_collections,
@@ -511,11 +570,37 @@ where
     )
 }
 
-type SyncResult = (Vec<ImportedCollection>, Option<(String, String)>, String);
+/// The collections + environments a pull/switch/restore produced, plus the
+/// label shown when it lands.
+struct SyncOutcome {
+    collections: Vec<ImportedCollection>,
+    environments: Vec<AppEnvironment>,
+    global_script: Option<(String, String)>,
+    protected: bool,
+    label: String,
+}
+
+impl SyncOutcome {
+    fn new(scan: RepoScan, global_script: Option<(String, String)>, label: String) -> Self {
+        let protected = scan.is_protected();
+        let RepoScan {
+            collections,
+            environments,
+            ..
+        } = scan;
+        Self {
+            collections,
+            environments,
+            global_script,
+            protected,
+            label,
+        }
+    }
+}
 
 fn sync_task<F>(repo_id: String, op: F) -> Task<Message>
 where
-    F: FnOnce() -> Result<SyncResult, String> + Send + 'static,
+    F: FnOnce() -> Result<SyncOutcome, String> + Send + 'static,
 {
     Task::perform(
         async move {
@@ -525,14 +610,14 @@ where
                 .and_then(|r| r)
         },
         move |res| match res {
-            Ok((collections, global_script, label)) => {
-                Message::Git(GitMsg::Synced(Box::new(SyncPayload {
-                    repo_id: repo_id.clone(),
-                    collections,
-                    label,
-                    global_script,
-                })))
-            }
+            Ok(outcome) => Message::Git(GitMsg::Synced(Box::new(SyncPayload {
+                repo_id: repo_id.clone(),
+                collections: outcome.collections,
+                environments: outcome.environments,
+                protected: outcome.protected,
+                label: outcome.label,
+                global_script: outcome.global_script,
+            }))),
             Err(e) => Message::Git(GitMsg::Error(e)),
         },
     )
@@ -614,6 +699,7 @@ mod restore_tests {
             path: PathBuf::from("/tmp"),
             remote_url: None,
             collection_ids: cols.iter().map(|s| s.to_string()).collect(),
+            protected: false,
         }
     }
 
@@ -637,5 +723,29 @@ mod restore_tests {
             owned_ids(&repos, &all, repos::LOCAL_ID),
             vec!["local1", "local2"]
         );
+    }
+
+    #[test]
+    fn rescanning_a_repo_does_not_duplicate_its_collections() {
+        let dir = std::env::temp_dir().join(format!("rustman-git-{}", uuid::Uuid::new_v4()));
+        let repo = dir.join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        std::fs::write(
+            repo.join("A.postman_collection.json"),
+            r#"{"info":{"_postman_id":"id-a","name":"A"},"item":[]}"#,
+        )
+        .unwrap();
+
+        let (mut state, _) = crate::app::boot::init_at(dir.join("data"));
+        for scan in [
+            repo_import::scan_dir(&repo, "k"),
+            repo_import::scan_dir(&repo, "k"),
+        ] {
+            for imported in scan.collections {
+                crate::app::tree::insert_collection(&mut state, imported);
+            }
+        }
+        assert_eq!(state.collections.len(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

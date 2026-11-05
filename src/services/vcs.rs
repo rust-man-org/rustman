@@ -53,7 +53,7 @@ pub fn read_global_script(data_dir: &PathBuf) -> Option<(String, String)> {
 }
 
 /// Reads the global script pair as it existed at a specific past commit —
-/// the counterpart to `read_commit_collections`, used when restoring a
+/// the global-script counterpart to a restore, used when restoring a
 /// commit rather than reading the live working tree.
 pub fn read_commit_global_script(data_dir: &PathBuf, commit_id: &str) -> Option<(String, String)> {
     let repo = open_at(data_dir).ok()?;
@@ -65,28 +65,6 @@ pub fn read_commit_global_script(data_dir: &PathBuf, commit_id: &str) -> Option<
     let blob = object.as_blob()?;
     let file: GlobalScriptFile = serde_json::from_slice(blob.content()).ok()?;
     Some((file.pre_request_script, file.test_script))
-}
-
-pub fn load_collections(repo: &Repository) -> Result<Vec<ImportedCollection>, String> {
-    let workdir = repo.workdir().unwrap();
-    let mut results = Vec::new();
-
-    let entries = std::fs::read_dir(workdir).map_err(|e| e.to_string())?;
-    for entry in entries {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) == Some("json") {
-            let json = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-            if let Ok(cf) = serde_json::from_str::<CollectionFile>(&json) {
-                results.push(ImportedCollection {
-                    collection: cf.collection,
-                    requests: cf.requests,
-                    groups: cf.groups,
-                });
-            }
-        }
-    }
-    Ok(results)
 }
 
 #[derive(Debug, Clone)]
@@ -314,33 +292,6 @@ pub fn checkout_branch(data_dir: &PathBuf, name: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn read_commit_collections(
-    data_dir: &PathBuf,
-    commit_id: &str,
-) -> Result<Vec<ImportedCollection>, String> {
-    let repo = open_at(data_dir)?;
-    let oid = git2::Oid::from_str(commit_id).map_err(|e| e.to_string())?;
-    let commit = repo.find_commit(oid).map_err(|e| e.to_string())?;
-    let tree = commit.tree().map_err(|e| e.to_string())?;
-    let mut out = Vec::new();
-    for entry in tree.iter() {
-        if entry.name().map(|n| n.ends_with(".json")).unwrap_or(false) {
-            if let Ok(object) = entry.to_object(&repo) {
-                if let Some(blob) = object.as_blob() {
-                    if let Ok(file) = serde_json::from_slice::<CollectionFile>(blob.content()) {
-                        out.push(ImportedCollection {
-                            collection: file.collection,
-                            requests: file.requests,
-                            groups: file.groups,
-                        });
-                    }
-                }
-            }
-        }
-    }
-    Ok(out)
-}
-
 pub fn remote_url(data_dir: &PathBuf) -> Option<String> {
     let repo = open_at(data_dir).ok()?;
     repo.find_remote("origin")
@@ -435,12 +386,20 @@ pub fn write_working_tree(
             if path.file_name().and_then(|n| n.to_str()) == Some(GLOBAL_SCRIPT_FILE) {
                 continue;
             }
-            if path.extension().and_then(|e| e.to_str()) == Some("json") {
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    if !current.contains(stem) {
-                        let _ = std::fs::remove_file(&path);
-                    }
-                }
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            // Prune only files rustman itself wrote: never delete a foreign
+            // file (e.g. a Postman export cloned beside ours) that happens to
+            // be JSON.
+            let Ok(json) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            let Ok(file) = serde_json::from_str::<CollectionFile>(&json) else {
+                continue;
+            };
+            if !current.contains(&file.collection.id) {
+                let _ = std::fs::remove_file(&path);
             }
         }
     }
@@ -473,7 +432,31 @@ pub fn write_working_tree(
     Ok(())
 }
 
-pub fn load_collections_from(data_dir: &PathBuf) -> Result<Vec<ImportedCollection>, String> {
-    let repo = open_at(data_dir)?;
-    load_collections(&repo)
+#[cfg(test)]
+mod prune_tests {
+    use super::*;
+
+    #[test]
+    fn write_working_tree_prunes_only_rustman_files() {
+        let dir = std::env::temp_dir().join(format!("rustman-vcs-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let postman = dir.join("A.postman_collection.json");
+        std::fs::write(
+            &postman,
+            r#"{"info":{"_postman_id":"x","name":"A"},"item":[]}"#,
+        )
+        .unwrap();
+        let stale = dir.join("stale.json");
+        std::fs::write(
+            &stale,
+            r#"{"collection":{"id":"stale","name":"S","created_at":0},"requests":[]}"#,
+        )
+        .unwrap();
+
+        write_working_tree(&dir, &[], "", "").unwrap();
+
+        assert!(postman.exists(), "a foreign Postman file must survive");
+        assert!(!stale.exists(), "a stale rustman file is pruned");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

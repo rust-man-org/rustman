@@ -396,6 +396,7 @@ mod flow_tests {
             path: dir.join("repo"),
             remote_url: shared.then(|| "https://github.com/o/r.git".to_owned()),
             collection_ids: vec![COL.into()],
+            protected: false,
         });
         let base = find_base(&state.requests, REQ).unwrap().clone();
         state.tabs.open_request(&base);
@@ -414,6 +415,8 @@ mod flow_tests {
             Message::Git(GitMsg::Synced(Box::new(SyncPayload {
                 repo_id: REPO.into(),
                 collections: upstream,
+                environments: Vec::new(),
+                protected: false,
                 label: "Synced".into(),
                 global_script: None,
             }))),
@@ -742,6 +745,7 @@ mod tests {
             path: std::path::PathBuf::from("."),
             remote_url: remote.map(Into::into),
             collection_ids: cols.iter().map(|c| (*c).to_owned()).collect(),
+            protected: false,
         }
     }
 

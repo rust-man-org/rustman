@@ -419,6 +419,9 @@ pub struct RepoAddPayload {
     pub path: std::path::PathBuf,
     pub remote_url: Option<String>,
     pub collections: Vec<crate::domain::group::ImportedCollection>,
+    pub environments: Vec<crate::domain::environment::AppEnvironment>,
+    /// Import-only source: its working tree is never rewritten.
+    pub protected: bool,
     pub global_script: Option<(String, String)>,
 }
 
@@ -426,6 +429,9 @@ pub struct RepoAddPayload {
 pub struct SyncPayload {
     pub repo_id: String,
     pub collections: Vec<crate::domain::group::ImportedCollection>,
+    pub environments: Vec<crate::domain::environment::AppEnvironment>,
+    /// Import-only source: its working tree is never rewritten.
+    pub protected: bool,
     pub label: String,
     pub global_script: Option<(String, String)>,
 }

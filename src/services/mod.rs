@@ -5,6 +5,7 @@ pub mod github;
 pub mod http;
 pub mod import;
 pub mod keychain;
+pub mod repo_import;
 pub mod repo_layout;
 pub mod repos;
 pub mod search;
