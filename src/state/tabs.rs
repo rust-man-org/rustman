@@ -873,13 +873,30 @@ pub fn make_code_editor(content: &str, syntax: &str) -> CodeEditor {
 pub struct TabManager {
     pub tabs: Vec<RequestTabState>,
     pub active: usize,
+    /// Saved requests whose tab was closed this session, newest first
+    /// (tab list menu "Recently closed"). Unsaved tabs have nothing to
+    /// reopen, so they are not kept. Not persisted.
+    pub recently_closed: Vec<ClosedTab>,
 }
+
+/// A closed tab of a saved request, enough to list and reopen it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClosedTab {
+    pub collection_id: String,
+    pub request_id: String,
+    pub method: crate::domain::request::HttpMethod,
+    pub title: String,
+}
+
+/// How many closed tabs the tab list remembers.
+pub const RECENTLY_CLOSED_MAX: usize = 10;
 
 impl Default for TabManager {
     fn default() -> Self {
         Self {
             tabs: vec![RequestTabState::new()],
             active: 0,
+            recently_closed: Vec::new(),
         }
     }
 }
@@ -899,6 +916,19 @@ impl TabManager {
     }
 
     pub fn close_tab(&mut self, idx: usize) {
+        if let Some(tab) = self.tabs.get(idx)
+            && let Some((col, req)) = &tab.saved_as
+        {
+            let closed = ClosedTab {
+                collection_id: col.clone(),
+                request_id: req.clone(),
+                method: tab.method.clone(),
+                title: tab.title.clone(),
+            };
+            self.recently_closed.retain(|c| c.request_id != closed.request_id);
+            self.recently_closed.insert(0, closed);
+            self.recently_closed.truncate(RECENTLY_CLOSED_MAX);
+        }
         if self.tabs.len() == 1 {
             self.tabs[0] = RequestTabState::new();
             return;
@@ -1364,5 +1394,42 @@ mod session_round_trip_tests {
     fn crlf_body_survives_session_round_trip() {
         let raw = "{\r\n  \"a\": 1\r\n}";
         assert_eq!(restore(raw), raw);
+    }
+}
+
+#[cfg(test)]
+mod recently_closed_tests {
+    use super::*;
+
+    fn saved_tab(req: &str) -> RequestTabState {
+        let mut t = RequestTabState::new();
+        t.title = format!("Req {req}");
+        t.saved_as = Some(("col".into(), req.into()));
+        t
+    }
+
+    #[test]
+    fn closing_saved_tabs_keeps_newest_first_without_duplicates() {
+        let mut m = TabManager::default();
+        m.tabs = vec![saved_tab("a"), saved_tab("b"), RequestTabState::new()];
+        m.close_tab(2); // unsaved: nothing to reopen
+        assert!(m.recently_closed.is_empty());
+        m.close_tab(0);
+        m.tabs.push(saved_tab("a"));
+        m.close_tab(1);
+        m.close_tab(0);
+        let ids: Vec<_> = m.recently_closed.iter().map(|c| c.request_id.as_str()).collect();
+        assert_eq!(ids, vec!["b", "a"]);
+    }
+
+    #[test]
+    fn recently_closed_is_capped() {
+        let mut m = TabManager::default();
+        for i in 0..(RECENTLY_CLOSED_MAX + 3) {
+            m.tabs = vec![saved_tab(&i.to_string()), RequestTabState::new()];
+            m.close_tab(0);
+        }
+        assert_eq!(m.recently_closed.len(), RECENTLY_CLOSED_MAX);
+        assert_eq!(m.recently_closed[0].request_id, (RECENTLY_CLOSED_MAX + 2).to_string());
     }
 }

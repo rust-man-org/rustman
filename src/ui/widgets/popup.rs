@@ -46,20 +46,21 @@ pub fn popup_left<'a, Message: Clone + 'a, Theme: 'a, Renderer: renderer::Render
     })
 }
 
-/// Left-aligned open menu that holds its own input: messages matching
-/// `keep_open` (e.g. the filter text) leave it open; any other one runs
-/// and then closes it.
-pub fn popup_left_sticky<'a, Message: Clone + 'a, Theme: 'a, Renderer: renderer::Renderer + 'a>(
+/// Open menu that holds its own input: messages matching `keep_open`
+/// (e.g. the filter text) leave it open; any other one runs and then
+/// closes it. `align_left` pins its left edge to the anchor's.
+pub fn popup_sticky<'a, Message: Clone + 'a, Theme: 'a, Renderer: renderer::Renderer + 'a>(
     content: Element<'a, Message, Theme, Renderer>,
     menu: Element<'a, Message, Theme, Renderer>,
     close: Message,
     keep_open: fn(&Message) -> bool,
+    align_left: bool,
 ) -> Element<'a, Message, Theme, Renderer> {
     Element::new(Popup {
         content,
         menu,
         close,
-        align_left: true,
+        align_left,
         open: true,
         keep_open: Some(keep_open),
     })

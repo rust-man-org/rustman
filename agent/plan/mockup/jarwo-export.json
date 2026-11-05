@@ -179,9 +179,27 @@
       "w": 1280,
       "x": 1400.0,
       "y": 5880.0
+    },
+    {
+      "file": "mockups/rustman-requester-terminal-dark.html",
+      "h": 800,
+      "page": "pages/rustman-requester-terminal-dark.html",
+      "png": "png/21-rustman-requester-terminal-dark.png",
+      "w": 1280,
+      "x": 2800.0,
+      "y": 5880.0
+    },
+    {
+      "file": "mockups/rustman-requester-terminal.html",
+      "h": 800,
+      "page": "pages/rustman-requester-terminal.html",
+      "png": "png/22-rustman-requester-terminal.png",
+      "w": 1280,
+      "x": 0.0,
+      "y": 6860.0
     }
   ],
-  "exported": "2026-11-04_203121",
+  "exported": "2026-11-05_071431",
   "title": "postman-clone",
   "workspace": "postman-clone"
 }

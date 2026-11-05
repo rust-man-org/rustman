@@ -196,7 +196,20 @@ pub(super) fn multi_tab_bar(state: &AppState) -> Element<'_, Message> {
             .height(Length::Fill),
     )
     .padding([0, 6])
-    .height(Length::Fill);
+    .height(Length::Fill)
+    .width(Length::Fill);
+
+    // Postman's right end: open-tabs list, then the environment selector.
+    let strip = row![
+        strip,
+        super::tab_menus::tab_list(state),
+        hairline(true),
+        container(super::tab_menus::env_selector(state))
+            .padding([0, 8])
+            .center_y(Length::Fill),
+    ]
+    .height(Length::Fill)
+    .align_y(Alignment::Center);
 
     let bar = container(column![strip, hairline(false)])
         .height(BAR_H)

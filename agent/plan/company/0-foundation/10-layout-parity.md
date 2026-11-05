@@ -32,12 +32,12 @@ Behaviour does not change; only layout and styling.
 | 1 | App header: logo, workspace, branch pill, global search (opens palette), sync chip, settings | `ui/layout/header.rs` (new), `layout/mod.rs`, `tab_bar.rs` (search moved out) | [X] `a488b7f` | Avatar waits for 05; "Synced · 10s ago" timing waits for 04 |
 | 2 | Request header + URL row: breadcrumb, name, Save/Share; method + URL + Send in one box | `ui/request/url_bar.rs` (+ new `request/header.rs`) | [X] `1a494f2` | Save keeps Ctrl+S semantics until 08 |
 | 2b | Seams: no thick gaps between panels, 1px hairlines only | `ui/widgets/seam.rs` (new), both splitters, `layout/style.rs` | [X] `9846277` | Panels lost their four-sided borders |
-| 3 | Tab bar: request name as title, mockup tab style | `ui/layout/tab_bar.rs` | [ ] | Old behaviour showed the URL |
-| 4 | Request sub-tabs: underline style, labels (Docs, Params, Authorization, Headers, Body, Scripts, Cookies) | `ui/request/tabs.rs` | [ ] | "Diskusi" tab waits for 03 |
+| 3 | Tab bar: request name as title, mockup tab style | `ui/layout/tab_bar.rs` | [X] `3240387` `06ceccd` | 36px flat tabs, accent top edge; Postman tab list (⌄, Ctrl+Shift+A) and environment selector at the right end |
+| 4 | Request sub-tabs: underline style, labels (Docs, Params, Authorization, Headers, Body, Scripts, Cookies) | `ui/request/tabs.rs` | [~] branch `ws/10-layout/t4-request-subtabs` | "Diskusi" tab waits for 03 |
 | 5 | Sidebar, Postman-style: filter box, `+` menu (HTTP, WebSocket, request, folder, collection, environment), import, `⋯` (import/export), COLLECTIONS section, status icons, row actions on hover and in right-click menus | `ui/sidebar/collections.rs`, `sidebar/tree.rs` (new), components `search_input`, `menu`, `tree_row` | [X] `d382c1c` `dc731ca` | Updated mockup (2026-11-04) wins on visuals: counts, folder icons, accent-tinted selection, 28/26px rows, status marks (conflict = triangle); Postman-style hover `+` / `⋯` kept (`0976b17`). Try it with `scripts/ui.sh -x` (sample workspace, `a2cd79c`). History / Environments panels not restyled yet |
 | 6 | Response pane: status line, tabs, body toolbar | `ui/response/*` | [ ] | |
 | 7 | Fonts: Inter + IBM Plex Mono (OFL), replace Noto Sans / JetBrains Mono | `assets/fonts`, `ui/theme.rs` | [ ] | Check binary size |
-| 8 | Code snippet side panel (today a dialog) | `layout/dialogs.rs`, new panel | [ ] | Optional, after 1–7 |
+| 8 | Code snippet side panel (today a dialog) | `layout/dialogs.rs`, new panel | [X] `792d782` `53599a0` | Right panel, 10 languages, resizable, hide/show from the footer |
 | 9 | Migrate remaining ad-hoc `button::Style` blocks touched by 2–6 to components | per area | ongoing | |
 
 ## Out of scope

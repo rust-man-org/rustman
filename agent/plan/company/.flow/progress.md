@@ -95,6 +95,47 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
   sync → Git panel, Discard local changes when a draft exists); Share is an
   outlined link button. Resolved-URL line under the URL bar removed (not in
   the mockup, per user). Gates 263/255.
+- Done (`ui/command_palette.rs`): global search popup, near window wide (max
+  1280px, 40px gutter), anchored at the top, no dim; eases in (unroll, 160ms)
+  and out (110ms) via window frames only while animating. Type chips
+  Requests / Open tabs / History / Environments + Clear all; `>` or
+  Ctrl+Shift+P lists app commands with key caps; Ctrl+K and Ctrl+P open it;
+  rows show a method tile (DEL/OPT/PTCH short forms), bold name, muted URL,
+  detail line and relative time. Collections are not listed yet (no "open
+  collection" action); no "Find in workspace" row. Gates 269/261.
+- Original note (user request 2026-11-05, Postman reference): header search like
+  Postman's. The field reads "Search (Ctrl+K)" with the shortcut inside the
+  label and a hover state. Opening it shows a large popup anchored under the
+  top bar (about 1080px wide) with:
+  - a search input with a filter icon on the right;
+  - filter chips (Type, In, By, …) and "Clear all";
+  - command rows with key caps: "Show and run commands >" (Ctrl+Shift+P) and
+    "Find in workspace <NAME>" (Ctrl+Alt+K);
+  - a hairline, then a recently viewed list: a type icon (collection or
+    workspace), a bold name, a muted "workspace · owner" line and a relative
+    time on the right ("1m RECENTLY VIEWED", "12h", "3mo").
+  Rustman version: Ctrl+K opens it from the header field (keep Ctrl+P
+  working), with recent requests/collections/environments from local data.
+  Typing `>` switches to commands, reusing the command palette. Show only
+  filters Rustman can back (Type, In); no visibility/org filters.
+- Done (user request 2026-11-05, Postman reference): two controls at the
+  right end of the tab bar, after `+` (`ui/layout/tab_menus.rs`). Both menus
+  share `sidebar.menu_filter` and the sticky popup (typing keeps them open);
+  "Recently closed" lists saved requests closed this session (newest first,
+  max 10, not persisted) and reopens them; quick look opens the active
+  environment page. Gates 267/259.
+  - Tab list chevron (`⌄`): a popup (about 300px) with a "Search tabs" input
+    (hint Ctrl+Shift+A) and every open tab as a row: method in its colour, the
+    name ellipsized, and an orange dot when the tab is unsaved. Clicking a row
+    switches to that tab. A collapsible "Recently closed" section sits at the
+    bottom (needs a small closed-tabs history).
+  - Environment selector: a bg-2 pill with the active environment name and a
+    chevron, then an icon button for the environment quick look. The dropdown
+    (about 450px) has a "Search" input, "No Environment" (muted), the
+    environments with a tick on the active one (row bg-2), a hairline, and
+    "+ Create new environment".
+  Rustman version: reuse the existing environment state and tab state; keep
+  Ctrl+Shift+A for the tab search.
 - Committed on feat/endpoint-examples at the user's request (for a PR); not pushed.
 
 ## Verification checkpoint

@@ -545,13 +545,21 @@ pub(super) fn handle(state: &mut AppState, msg: SidebarMsg) -> Task<Message> {
             } else {
                 Some(id)
             };
-            if state.sidebar.context_menu.as_deref() == Some(crate::ui::layout::header::WORKSPACE_MENU)
+            // Menus with their own search box start empty and focused.
+            if let Some(input) = state
+                .sidebar
+                .context_menu
+                .as_deref()
+                .and_then(crate::ui::layout::menu_search_id)
             {
-                state.sidebar.workspace_filter.clear();
-                return iced::widget::operation::focus(crate::ui::layout::header::WORKSPACE_SEARCH_ID);
+                state.sidebar.menu_filter.clear();
+                return iced::widget::operation::focus(input);
             }
         }
-        SidebarMsg::WorkspaceFilterChanged(q) => state.sidebar.workspace_filter = q,
+        SidebarMsg::MenuFilterChanged(q) => state.sidebar.menu_filter = q,
+        SidebarMsg::RecentlyClosedToggled => {
+            state.sidebar.recently_closed_open = !state.sidebar.recently_closed_open;
+        }
         SidebarMsg::ContextMenuClosed => {
             state.sidebar.context_menu = None;
         }

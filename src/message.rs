@@ -138,8 +138,10 @@ pub enum SidebarMsg {
     ToggleCollapsed,
     /// Collection tree search box.
     FilterChanged(String),
-    /// Header workspace switcher search box.
-    WorkspaceFilterChanged(String),
+    /// Search box inside an open menu (workspaces, open tabs, environments).
+    MenuFilterChanged(String),
+    /// Tab list menu: expand/collapse "Recently closed".
+    RecentlyClosedToggled,
     SearchMove(isize),
     SearchConfirm,
     SearchPick(usize),
@@ -416,11 +418,39 @@ pub enum SaveDialogMsg {
 
 // ── Command palette ───────────────────────────────────────────────────────────
 
+/// Global search type filter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaletteKind {
+    Requests,
+    Tabs,
+    History,
+    Environments,
+}
+
+impl PaletteKind {
+    pub const ALL: [Self; 4] = [Self::Requests, Self::Tabs, Self::History, Self::Environments];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Requests => "Requests",
+            Self::Tabs => "Open tabs",
+            Self::History => "History",
+            Self::Environments => "Environments",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum PaletteMsg {
     Open,
+    /// Open straight into command mode (query `>`), Ctrl+Shift+P.
+    OpenCommands,
     Close,
     QueryChanged(String),
+    /// Type filter chip; `None` clears it ("Clear all").
+    KindChanged(Option<PaletteKind>),
+    /// Animation frame while the popup eases in or out.
+    Frame(std::time::Instant),
     MoveDown,
     MoveUp,
     Confirm,
