@@ -125,6 +125,8 @@ pub struct AppState {
     pub snippet_lang: crate::services::snippet::Lang,
     /// Layout direction: false = top/bottom, true = left/right.
     pub horizontal_layout: bool,
+    /// Headers tab lists the headers the client adds on send (view only).
+    pub show_auto_headers: bool,
     /// UI zoom level (0.7 – 2.0). Applied via iced scale_factor.
     pub ui_scale: f64,
     /// Auto-update progress for the banner + settings panel. Absent when the

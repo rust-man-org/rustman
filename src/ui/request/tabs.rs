@@ -1,6 +1,6 @@
 use iced::{
     Alignment, Background, Border, Color, Element, Length,
-    widget::{button, container, row, text},
+    widget::{button, column, container, row, text},
 };
 
 use crate::{
@@ -8,16 +8,17 @@ use crate::{
     state::tabs::RequestTabState,
     ui::{
         icons,
-        theme::{Palette, TEXT_SM, TEXT_XS},
+        theme::{MONO, Palette, UI_FONT, UI_FONT_MEDIUM},
     },
 };
 
+/// Mockup `.req-tabs`: flat 26px tabs on one row, a hairline underneath.
 pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
     let tabs = [
         (RequestTab::Params, "Params"),
+        (RequestTab::Auth, "Authorization"),
         (RequestTab::Headers, "Headers"),
         (RequestTab::Body, "Body"),
-        (RequestTab::Auth, "Auth"),
         (RequestTab::Scripts, "Scripts"),
     ];
 
@@ -25,165 +26,120 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
         .iter()
         .map(|(t, label)| {
             let active = &tab.active_request_tab == t;
-            let (badge, dot): (Option<usize>, Option<Color>) = match t {
-                RequestTab::Params => {
-                    let n = tab
-                        .params
-                        .iter()
-                        .filter(|p| p.enabled && !p.key.is_empty())
-                        .count();
-                    (if n > 0 { Some(n) } else { None }, None)
-                }
-                RequestTab::Headers => {
-                    let n = tab
-                        .headers
-                        .iter()
-                        .filter(|h| h.enabled && !h.key.is_empty())
-                        .count();
-                    (if n > 0 { Some(n) } else { None }, None)
-                }
-                RequestTab::Auth => {
-                    let has_auth = !tab.bearer_token.is_empty()
-                        || !tab.basic_user.is_empty()
-                        || !tab.basic_pass.is_empty()
-                        || !tab.api_key_name.is_empty()
-                        || !tab.api_key_value.is_empty()
-                        || !tab.cookie_string.is_empty()
-                        || !tab.jwt_secret.is_empty()
-                        || !tab.jwt_subject.is_empty();
-                    (
-                        None,
-                        if has_auth {
-                            Some(Palette::accent())
-                        } else {
-                            None
-                        },
-                    )
-                }
-                _ => (None, None),
+            let count = match t {
+                RequestTab::Params => tab
+                    .params
+                    .iter()
+                    .filter(|p| p.enabled && !p.key.is_empty())
+                    .count(),
+                RequestTab::Headers => tab
+                    .headers
+                    .iter()
+                    .filter(|h| h.enabled && !h.key.is_empty())
+                    .count(),
+                _ => 0,
             };
-            pill_tab(
+            let dot = (*t == RequestTab::Auth && has_auth(tab)).then(Palette::accent);
+            flat_tab(
                 label,
-                badge,
+                (count > 0).then_some(count),
                 dot,
                 active,
+                TabLook::Boxed,
                 Message::Request(RequestMsg::TabSelected(t.clone())),
             )
         })
         .collect();
 
-    // Segmented control on a recessed track.
-    container(container(row(btns).spacing(2).padding(3)).style(|_| {
-        iced::widget::container::Style {
-            background: Some(Background::Color(Palette::background())),
-            border: Border {
-                color: Palette::border_subtle(),
-                width: 1.0,
-                radius: 9.0.into(),
-            },
-            ..Default::default()
-        }
-    }))
-    .padding([8, 12])
-    .width(Length::Fill)
+    column![
+        container(row(btns).spacing(2).align_y(Alignment::Center))
+            .padding([6, 12])
+            .width(Length::Fill),
+        iced::widget::rule::horizontal(1.0).style(crate::ui::styles::divider),
+    ]
     .into()
 }
 
-pub fn pill_tab<'a>(
+fn has_auth(tab: &RequestTabState) -> bool {
+    !tab.bearer_token.is_empty()
+        || !tab.basic_user.is_empty()
+        || !tab.basic_pass.is_empty()
+        || !tab.api_key_name.is_empty()
+        || !tab.api_key_value.is_empty()
+        || !tab.cookie_string.is_empty()
+        || !tab.jwt_secret.is_empty()
+        || !tab.jwt_subject.is_empty()
+}
+
+/// How a [`flat_tab`] marks the active tab.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TabLook {
+    /// Request tabs (`.rtab`): 26px, raised `bg-2` box when active or hovered.
+    Boxed,
+    /// Response tabs (`.rsp-tab`): text only, the active one brighter.
+    Text,
+}
+
+/// One flat tab: label, optional mono count and status dot.
+pub fn flat_tab<'a>(
     label: &str,
-    badge: Option<usize>,
+    count: Option<usize>,
     dot: Option<Color>,
     active: bool,
+    look: TabLook,
     msg: Message,
 ) -> Element<'a, Message> {
-    let mut content = row![].align_y(Alignment::Center).spacing(6);
+    let mut content = row![].align_y(Alignment::Center).spacing(5);
     if let Some(color) = dot {
         content = content.push(icons::dot(color));
     }
-    content = content.push(
-        text(label.to_owned())
-            .size(TEXT_SM)
-            .color(if active {
-                Palette::text()
-            } else {
-                Palette::text_muted()
-            })
-            .font(if active {
-                crate::ui::theme::UI_FONT_MEDIUM
-            } else {
-                crate::ui::theme::UI_FONT
-            }),
-    );
-    if let Some(n) = badge {
+    content = content.push(text(label.to_owned()).size(12).font(if active {
+        UI_FONT_MEDIUM
+    } else {
+        UI_FONT
+    }));
+    if let Some(n) = count {
         content = content.push(
-            container(text(n.to_string()).size(TEXT_XS).color(if active {
-                Palette::accent()
-            } else {
-                Palette::text_subtle()
-            }))
-            .padding([1, 6])
-            .style(move |_| iced::widget::container::Style {
-                background: Some(Background::Color(if active {
-                    Palette::accent_soft()
-                } else {
-                    Palette::surface_high()
-                })),
-                border: Border {
-                    radius: 100.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }),
+            text(n.to_string())
+                .size(if look == TabLook::Boxed { 10 } else { 9 })
+                .font(iced::Font {
+                    weight: iced::font::Weight::Semibold,
+                    ..MONO
+                })
+                .color(Palette::text_subtle()),
         );
     }
 
-    button(content)
+    let pad = if look == TabLook::Boxed {
+        [0, 10]
+    } else {
+        [0, 2]
+    };
+    button(container(content).height(26).center_y(26))
         .on_press(msg)
-        .style(move |_, status| pill_tab_style(status, active))
-        .padding([6, 12])
+        .style(move |_, status| flat_tab_style(status, active, look))
+        .padding(pad)
         .into()
 }
 
-fn pill_tab_style(
+fn flat_tab_style(
     status: iced::widget::button::Status,
     active: bool,
+    look: TabLook,
 ) -> iced::widget::button::Style {
     let hovered = matches!(status, iced::widget::button::Status::Hovered);
+    let lit = active || hovered;
     iced::widget::button::Style {
-        background: if active {
-            Some(Background::Color(Palette::surface_raised()))
-        } else if hovered {
-            Some(Background::Color(Palette::hover()))
-        } else {
-            None
-        },
-        text_color: if active {
+        background: (look == TabLook::Boxed && lit)
+            .then(|| Background::Color(Palette::surface_high())),
+        text_color: if lit {
             Palette::text()
         } else {
             Palette::text_muted()
         },
         border: Border {
-            color: if active {
-                Palette::border()
-            } else {
-                Color::TRANSPARENT
-            },
-            width: if active { 1.0 } else { 0.0 },
-            radius: 7.0.into(),
-        },
-        shadow: if active {
-            iced::Shadow {
-                color: Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.0,
-                    a: 0.25,
-                },
-                offset: iced::Vector::new(0.0, 1.0),
-                blur_radius: 4.0,
-            }
-        } else {
-            iced::Shadow::default()
+            radius: 4.0.into(),
+            ..Default::default()
         },
         ..Default::default()
     }

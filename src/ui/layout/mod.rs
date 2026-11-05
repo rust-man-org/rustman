@@ -36,17 +36,15 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     // the menu over — the nested message is published last and wins.
     // The snippet panel belongs to the request view; the environment editor
     // and the example editor keep the full width.
-    let request_view =
-        state.sidebar.environment_page.is_none() && state.examples.editor.is_none();
+    let request_view = state.sidebar.environment_page.is_none() && state.examples.editor.is_none();
     let mut columns = row![left_panel(state), main_area(state)].height(Length::Fill);
     if request_view && state.snippet_open {
         columns = columns.push(crate::ui::snippet_panel::view(state));
     }
-    let shell: Element<Message> =
-        mouse_area(columns)
-            .on_press(Message::Sidebar(SidebarMsg::ContextMenuClosed))
-            .on_right_press(Message::Sidebar(SidebarMsg::ContextMenuClosed))
-            .into();
+    let shell: Element<Message> = mouse_area(columns)
+        .on_press(Message::Sidebar(SidebarMsg::ContextMenuClosed))
+        .on_right_press(Message::Sidebar(SidebarMsg::ContextMenuClosed))
+        .into();
     let mut workspace = column![header::view(state), shell].height(Length::Fill);
     if state.console_open {
         workspace = workspace
@@ -276,7 +274,11 @@ fn main_area(state: &AppState) -> Element<'_, Message> {
 
     let req_body: Element<Message> = match active_tab.active_request_tab {
         RequestTab::Params => request::params::view(active_tab, active_env),
-        RequestTab::Headers => request::headers::view(active_tab),
+        RequestTab::Headers => request::headers::view(
+            active_tab,
+            state.show_auto_headers,
+            state.sidebar.context_menu.as_deref(),
+        ),
         RequestTab::Body => request::body::view(active_tab),
         RequestTab::Auth => request::auth::view(active_tab),
         RequestTab::Scripts => request::scripts::view(active_tab),
@@ -293,12 +295,6 @@ fn main_area(state: &AppState) -> Element<'_, Message> {
         .style(surface_content_style)
         .width(Length::Fill);
 
-    let resp_status: Element<Message> = active_tab
-        .response
-        .as_ref()
-        .map(|r| response::status_bar::view(r))
-        .unwrap_or_else(|| Space::new().into());
-
     let resp_body: Element<Message> = match active_tab.active_response_tab {
         ResponseTab::Body => response::body::view(active_tab, state.spinner_frame),
         ResponseTab::Headers => response::headers::view(active_tab),
@@ -306,31 +302,10 @@ fn main_area(state: &AppState) -> Element<'_, Message> {
         ResponseTab::Tests => response::tests::view(active_tab),
     };
 
-    let save_example: Element<Message> = container(
-        crate::ui::components::atoms::Button::new("Save as example")
-            .on_press_maybe(
-                (active_tab.saved_as.is_some()
-                    && active_tab
-                        .response
-                        .as_ref()
-                        .is_some_and(|r| r.error.is_none() && !r.is_binary && !r.body_stored))
-                .then_some(Message::Example(
-                    crate::message::example::ExampleMsg::SaveResponse,
-                )),
-            )
-            .tooltip("Save a complete text response under this endpoint"),
-    )
-    .padding([4, 12])
-    .into();
     let response_panel = container(
-        column![
-            resp_status,
-            save_example,
-            response::tabs::view(active_tab),
-            resp_body
-        ]
-        .spacing(0)
-        .height(Length::Fill),
+        column![response::tabs::view(state), resp_body]
+            .spacing(0)
+            .height(Length::Fill),
     )
     .style(surface_style)
     .width(Length::Fill);

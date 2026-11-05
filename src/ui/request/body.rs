@@ -1,6 +1,6 @@
 use iced::{
     Background, Border, Color, Element, Length,
-    widget::{Space, button, column, container, row, scrollable, text},
+    widget::{Space, button, column, container, pick_list, row, scrollable, text},
 };
 
 use crate::{
@@ -11,33 +11,7 @@ use crate::{
 };
 
 pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
-    let type_tabs = container(
-        row![
-            body_type_btn("None", BodyType::None, &tab.body_type),
-            body_type_btn("JSON", BodyType::Json, &tab.body_type),
-            body_type_btn("Text", BodyType::Text, &tab.body_type),
-            body_type_btn("Form", BodyType::FormData, &tab.body_type),
-            body_type_btn("GraphQL", BodyType::GraphQL, &tab.body_type),
-        ]
-        .spacing(2)
-        .padding(3),
-    )
-    .style(|_| iced::widget::container::Style {
-        background: Some(Background::Color(Palette::background())),
-        border: Border {
-            color: Palette::border_subtle(),
-            width: 1.0,
-            radius: 9.0.into(),
-        },
-        ..Default::default()
-    });
-
-    let type_tabs_row = container(type_tabs).padding(iced::Padding {
-        top: 4.0,
-        right: 12.0,
-        bottom: 6.0,
-        left: 12.0,
-    });
+    let type_tabs_row = body_toolbar(tab);
 
     let body_panel: Element<Message> = match tab.body_type {
         BodyType::None => container(
@@ -55,87 +29,10 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
         .padding([24, 8])
         .into(),
 
-        BodyType::Json | BodyType::Text => {
-            let is_json = matches!(tab.body_type, BodyType::Json);
-            let indent_label = if tab.body_indent_tabs {
-                "Tabs"
-            } else {
-                "Spaces"
-            };
-            let toolbar = container(
-                row![
-                    text(if is_json { "JSON" } else { "Text" })
-                        .size(10)
-                        .color(if is_json {
-                            Palette::accent()
-                        } else {
-                            Palette::text_muted()
-                        }),
-                    Space::new().width(Length::Fill),
-                    button(
-                        text(format!("Indent: {indent_label}"))
-                            .size(10)
-                            .color(Palette::text_subtle()),
-                    )
-                    .on_press(Message::Request(RequestMsg::ToggleBodyIndentStyle))
-                    .style(iced::widget::button::text)
-                    .padding([2, 6]),
-                    if is_json {
-                        button(
-                            row![
-                                icons::braces().size(10).color(Palette::text_muted()),
-                                text("Format").size(10).color(Palette::text_muted()),
-                            ]
-                            .spacing(4)
-                            .align_y(iced::Alignment::Center),
-                        )
-                        .on_press(Message::Request(RequestMsg::FormatBody))
-                        .style(|_t, s| iced::widget::button::Style {
-                            background: if matches!(s, iced::widget::button::Status::Hovered) {
-                                Some(Background::Color(Palette::hover()))
-                            } else {
-                                Some(Background::Color(Palette::surface_high()))
-                            },
-                            text_color: Palette::text_muted(),
-                            border: Border {
-                                color: Palette::border_subtle(),
-                                width: 1.0,
-                                radius: 6.0.into(),
-                            },
-                            ..Default::default()
-                        })
-                        .padding([3, 8])
-                    } else {
-                        button(text("").size(10))
-                            .style(iced::widget::button::text)
-                            .padding([2, 0])
-                    },
-                ]
-                .spacing(8)
-                .align_y(iced::Alignment::Center)
-                .padding([3, 8]),
-            )
-            .style(|_| iced::widget::container::Style {
-                background: Some(Background::Color(Palette::background())),
-                border: Border {
-                    color: Palette::border_subtle(),
-                    width: 0.0,
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            })
-            .width(Length::Fill);
-
-            let editor: Element<Message> = tab
-                .body_editor
-                .view()
-                .map(|m| Message::Request(RequestMsg::BodyEdited(m)));
-
-            column![toolbar, editor]
-                .spacing(0)
-                .height(Length::Fill)
-                .into()
-        }
+        BodyType::Json | BodyType::Text => tab
+            .body_editor
+            .view()
+            .map(|m| Message::Request(RequestMsg::BodyEdited(m))),
 
         BodyType::FormData => form_data_view(tab),
 
@@ -299,19 +196,123 @@ fn field_index(tab: &RequestTabState, field: &FormField) -> usize {
         .unwrap_or(usize::MAX)
 }
 
-fn body_type_btn<'a>(
-    label: &'static str,
-    variant: BodyType,
-    current: &BodyType,
-) -> Element<'a, Message> {
-    let active = current == &variant;
-    button(text(label).size(11))
-        .on_press(Message::Request(RequestMsg::BodyTypeChanged(
-            variant.as_str().to_owned(),
-        )))
-        .style(move |t, s| type_btn_style(t, s, active))
-        .padding([5, 12])
-        .into()
+/// Body mode select (Postman's none / form-data / raw / GraphQL).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    None,
+    Form,
+    Raw,
+    GraphQl,
+}
+
+impl std::fmt::Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Mode::None => "none",
+            Mode::Form => "form-data",
+            Mode::Raw => "raw",
+            Mode::GraphQl => "GraphQL",
+        })
+    }
+}
+
+const MODES: &[Mode] = &[Mode::None, Mode::Form, Mode::Raw, Mode::GraphQl];
+
+fn mode_of(body: &BodyType) -> Mode {
+    match body {
+        BodyType::None => Mode::None,
+        BodyType::FormData => Mode::Form,
+        BodyType::Json | BodyType::Text => Mode::Raw,
+        BodyType::GraphQL => Mode::GraphQl,
+    }
+}
+
+/// The body type a mode switch lands on; raw keeps JSON/Text if already raw.
+fn body_for(mode: Mode, current: &BodyType) -> BodyType {
+    match mode {
+        Mode::None => BodyType::None,
+        Mode::Form => BodyType::FormData,
+        Mode::GraphQl => BodyType::GraphQL,
+        Mode::Raw if matches!(current, BodyType::Text) => BodyType::Text,
+        Mode::Raw => BodyType::Json,
+    }
+}
+
+/// Mockup body toolbar: `raw ▾`, `JSON ▾`, a hint, then Indent/Beautify.
+fn body_toolbar(tab: &RequestTabState) -> Element<'_, Message> {
+    let current = tab.body_type.clone();
+    let mode = mode_of(&current);
+    let mut left = row![
+        pick_list(MODES, Some(mode), move |m| {
+            Message::Request(RequestMsg::BodyTypeChanged(
+                body_for(m, &current).as_str().to_owned(),
+            ))
+        })
+        .text_size(12)
+        .font(crate::ui::theme::UI_FONT_MEDIUM)
+        .padding([6, 10])
+        .style(crate::ui::styles::boxed_pick_list)
+    ]
+    .spacing(8)
+    .align_y(iced::Alignment::Center);
+
+    let raw = mode == Mode::Raw;
+    let is_json = matches!(tab.body_type, BodyType::Json);
+    if raw {
+        left = left.push(
+            pick_list(
+                &["JSON", "Text"][..],
+                Some(if is_json { "JSON" } else { "Text" }),
+                |s| {
+                    Message::Request(RequestMsg::BodyTypeChanged(
+                        if s == "JSON" {
+                            BodyType::Json
+                        } else {
+                            BodyType::Text
+                        }
+                        .as_str()
+                        .to_owned(),
+                    ))
+                },
+            )
+            .text_size(12)
+            .font(crate::ui::theme::UI_FONT_MEDIUM)
+            .padding([6, 10])
+            .style(crate::ui::styles::boxed_pick_list),
+        );
+    }
+    let hint = match tab.body_type {
+        BodyType::None => "",
+        BodyType::Json => "raw body · Content-Type: application/json is added when not set",
+        BodyType::Text => "raw body · sent as typed",
+        BodyType::FormData => "multipart/form-data, or url-encoded when no file is attached",
+        BodyType::GraphQL => "query and variables are sent as JSON",
+    };
+    left = left.push(text(hint).size(11).color(Palette::text_subtle()));
+
+    let mut bar = row![left, Space::new().width(Length::Fill)]
+        .spacing(8)
+        .align_y(iced::Alignment::Center);
+    if raw {
+        let indent = if tab.body_indent_tabs {
+            "Indent: Tabs"
+        } else {
+            "Indent: Spaces"
+        };
+        bar = bar.push(crate::ui::widgets::mini::text_button(
+            None,
+            indent,
+            Some(Message::Request(RequestMsg::ToggleBodyIndentStyle)),
+        ));
+        if is_json {
+            bar = bar.push(crate::ui::widgets::mini::text_button(
+                Some(icons::braces()),
+                "Beautify",
+                Some(Message::Request(RequestMsg::FormatBody)),
+            ));
+        }
+    }
+    container(bar).padding([10, 16]).width(Length::Fill).into()
 }
 
 /// Section header above a split pane (GraphQL's Query / Variables).
@@ -456,50 +457,4 @@ fn form_data_view(tab: &RequestTabState) -> Element<'_, Message> {
         .width(Length::Fill),
     );
     scrollable(col).height(Length::Fill).into()
-}
-
-fn type_btn_style(
-    _theme: &iced::Theme,
-    status: iced::widget::button::Status,
-    active: bool,
-) -> iced::widget::button::Style {
-    let hovered = matches!(status, iced::widget::button::Status::Hovered);
-    iced::widget::button::Style {
-        background: if active {
-            Some(Background::Color(Palette::surface_raised()))
-        } else if hovered {
-            Some(Background::Color(Palette::hover()))
-        } else {
-            None
-        },
-        text_color: if active {
-            Palette::accent()
-        } else {
-            Palette::text_muted()
-        },
-        border: Border {
-            color: if active {
-                Palette::border()
-            } else {
-                Color::TRANSPARENT
-            },
-            width: if active { 1.0 } else { 0.0 },
-            radius: 7.0.into(),
-        },
-        shadow: if active {
-            iced::Shadow {
-                color: Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.0,
-                    a: 0.25,
-                },
-                offset: iced::Vector::new(0.0, 1.0),
-                blur_radius: 4.0,
-            }
-        } else {
-            iced::Shadow::default()
-        },
-        ..Default::default()
-    }
 }

@@ -20,13 +20,6 @@ pub const TEXT_LG: f32 = 15.0; // section/card headers
 
 static THEME_IDX: AtomicUsize = AtomicUsize::new(DEFAULT_THEME_IDX);
 
-pub const RESPONSE_BODY_PADDING: iced::Padding = iced::Padding {
-    top: 12.0,
-    right: 12.0,
-    bottom: 2.0,
-    left: 12.0
-};
-
 pub struct ThemeSpec {
     pub name: &'static str,
     pub dark: bool,
@@ -205,11 +198,11 @@ pub const THEMES: &[ThemeSpec] = &[
         surface_high: Color::from_rgb8(0xF2, 0xF2, 0xF2), // bg-2
         surface_raised: Color::from_rgb8(0xED, 0xED, 0xED),
         row_odd: Color::from_rgb8(0xFC, 0xFC, 0xFC),
-        border: Color::from_rgb8(0xE6, 0xE6, 0xE6),        // bd-2
+        border: Color::from_rgb8(0xE6, 0xE6, 0xE6), // bd-2
         border_subtle: Color::from_rgb8(0xED, 0xED, 0xED), // bd-1
-        text: Color::from_rgb8(0x21, 0x21, 0x21),          // tx-1
-        text_muted: Color::from_rgb8(0x6B, 0x6B, 0x6B),    // tx-2
-        text_subtle: Color::from_rgb8(0xA6, 0xA6, 0xA6),   // tx-3
+        text: Color::from_rgb8(0x21, 0x21, 0x21),   // tx-1
+        text_muted: Color::from_rgb8(0x6B, 0x6B, 0x6B), // tx-2
+        text_subtle: Color::from_rgb8(0xA6, 0xA6, 0xA6), // tx-3
         accent: Color::from_rgb8(0xFF, 0x6C, 0x37),
         hover: Color::from_rgb8(0xF2, 0xF2, 0xF2),
         chrome: Color::from_rgb8(0xED, 0xED, 0xED), // studio
@@ -223,11 +216,11 @@ pub const THEMES: &[ThemeSpec] = &[
         surface_high: Color::from_rgb8(0x2B, 0x2B, 0x2B), // bg-2
         surface_raised: Color::from_rgb8(0x30, 0x30, 0x30),
         row_odd: Color::from_rgb8(0x1E, 0x1E, 0x1E),
-        border: Color::from_rgb8(0x3B, 0x3B, 0x3B),        // bd-2
+        border: Color::from_rgb8(0x3B, 0x3B, 0x3B), // bd-2
         border_subtle: Color::from_rgb8(0x30, 0x30, 0x30), // bd-1
-        text: Color::from_rgb8(0xF2, 0xF2, 0xF2),          // tx-1
-        text_muted: Color::from_rgb8(0xA6, 0xA6, 0xA6),    // tx-2
-        text_subtle: Color::from_rgb8(0x6B, 0x6B, 0x6B),   // tx-3
+        text: Color::from_rgb8(0xF2, 0xF2, 0xF2),   // tx-1
+        text_muted: Color::from_rgb8(0xA6, 0xA6, 0xA6), // tx-2
+        text_subtle: Color::from_rgb8(0x6B, 0x6B, 0x6B), // tx-3
         accent: Color::from_rgb8(0xFF, 0x6C, 0x37),
         hover: Color::from_rgb8(0x2B, 0x2B, 0x2B),
         chrome: Color::from_rgb8(0x16, 0x16, 0x16), // studio
@@ -423,9 +416,6 @@ impl Palette {
     pub fn surface_raised() -> Color {
         Self::current().surface_raised
     }
-    pub fn row_even() -> Color {
-        Self::surface()
-    }
     pub fn row_odd() -> Color {
         Self::current().row_odd
     }
@@ -580,7 +570,14 @@ mod tests {
         // Sessions store the index. Reordering or inserting would silently
         // switch every existing user's theme.
         let legacy = [
-            "Violet", "Amber", "Midnight", "Nord", "Dracula", "Kanagawa", "Solarized", "Light",
+            "Violet",
+            "Amber",
+            "Midnight",
+            "Nord",
+            "Dracula",
+            "Kanagawa",
+            "Solarized",
+            "Light",
         ];
         for (i, name) in legacy.iter().enumerate() {
             assert_eq!(THEMES[i].name, *name, "theme index {i} moved");

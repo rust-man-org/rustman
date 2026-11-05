@@ -41,6 +41,10 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
     ) {
         return handle_url_variables(state, msg);
     }
+    if let RequestMsg::AutoHeadersToggled = msg {
+        state.show_auto_headers = !state.show_auto_headers;
+        return Task::none();
+    }
     let tab = state.tabs.active_tab_mut();
     record_undo(tab, &msg);
     match msg {
@@ -52,7 +56,8 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
         | RequestMsg::UrlVariableEnvironmentSelected(_)
         | RequestMsg::UrlVariableEnvironmentNameChanged(_)
         | RequestMsg::UrlVariableSave
-        | RequestMsg::UrlVariableDismissed => unreachable!("handled above"),
+        | RequestMsg::UrlVariableDismissed
+        | RequestMsg::AutoHeadersToggled => unreachable!("handled above"),
         RequestMsg::TitleChanged(value) => {
             if tab.title != value {
                 tab.title = value;
@@ -315,6 +320,14 @@ pub(super) fn handle(state: &mut AppState, msg: RequestMsg) -> Task<Message> {
         }
         RequestMsg::HeaderRemoved(i) => {
             tab.headers.remove(i);
+            tab.modified = true;
+        }
+        RequestMsg::HeaderPresetApplied(value) => {
+            apply_content_type_preset(&mut tab.headers, &value);
+            tab.modified = true;
+        }
+        RequestMsg::HeadersCleared => {
+            tab.headers.clear();
             tab.modified = true;
         }
         RequestMsg::HeaderToggled(i) => {
@@ -800,6 +813,25 @@ pub(super) fn url_action_edits_content(action: &iced::widget::text_editor::Actio
 
 /// Record an undo checkpoint of the request fields *before* a mutating message is
 /// applied, coalescing runs of keystrokes in one field into a single entry.
+/// Headers "Presets": set the Content-Type row (first one, enabling it),
+/// add one when missing; an empty value removes every Content-Type row.
+fn apply_content_type_preset(headers: &mut Vec<crate::domain::request::KeyValue>, value: &str) {
+    let is_ct = |k: &str| k.trim().eq_ignore_ascii_case("content-type");
+    if value.is_empty() {
+        headers.retain(|h| !is_ct(&h.key));
+        return;
+    }
+    if let Some(h) = headers.iter_mut().find(|h| is_ct(&h.key)) {
+        h.value = value.to_owned();
+        h.enabled = true;
+        return;
+    }
+    let mut row = crate::domain::request::KeyValue::new_empty();
+    row.key = "Content-Type".to_owned();
+    row.value = value.to_owned();
+    headers.push(row);
+}
+
 fn record_undo(tab: &mut RequestTabState, msg: &RequestMsg) {
     match edit_class(msg) {
         EditClass::Skip => {}
@@ -847,6 +879,8 @@ fn edit_class(msg: &RequestMsg) -> EditClass {
         | M::ParamRemoved(_)
         | M::ParamToggled(_)
         | M::HeadersBulkToggle
+        | M::HeaderPresetApplied(_)
+        | M::HeadersCleared
         | M::ParamsBulkToggle
         | M::MethodChanged(_)
         | M::AuthTypeChanged(_)

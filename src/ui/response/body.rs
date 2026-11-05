@@ -11,6 +11,7 @@ use crate::{
     ui::{
         icons,
         theme::{MONO, Palette, TEXT_LG, TEXT_SM, TEXT_XS},
+        widgets::mini,
     },
 };
 
@@ -109,53 +110,74 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
         Space::new().into()
     };
 
-    // Truncated bodies can't be saved accurately, so the action only appears
-    // while the full body is in memory.
-    let save_action: Element<Message> = if resp.body_stored {
-        Space::new().width(0).into()
-    } else {
-        save_text_button()
-    };
-
+    // Mockup `.rsp-tools`: format chip and line count on the left; wrap,
+    // search and copy icons on the right. Save lives in the head's ⋯ menu.
+    let format_chip = container(
+        text(if tab.viewer_full_is_json {
+            "JSON"
+        } else {
+            "Text"
+        })
+        .size(10)
+        .font(crate::ui::theme::UI_FONT_MEDIUM)
+        .color(Palette::text_muted()),
+    )
+    .height(24)
+    .center_y(24)
+    .padding([0, 9])
+    .style(|_| iced::widget::container::Style {
+        background: Some(Background::Color(Palette::background())),
+        border: Border {
+            color: Palette::border_subtle(),
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    });
+    let wrap_on = tab.response_editor.wrap_enabled();
     let toolbar = container(
         row![
+            format_chip,
             text(format!("{} lines", tab.response_viewer_lines))
-                .size(TEXT_XS)
+                .size(10)
                 .color(Palette::text_subtle()),
             size_note,
             Space::new().width(Length::Fill),
             page_nav,
-            save_action,
-            button(
-                row![
-                    icons::copy().size(11).color(Palette::text_muted()),
-                    text("Copy").size(TEXT_SM).color(Palette::text_muted()),
-                ]
-                .spacing(5)
-                .align_y(Alignment::Center),
-            )
-            .on_press(Message::Response(ResponseMsg::CopyBody))
-            .style(|_t, status| {
-                let hovered = matches!(status, iced::widget::button::Status::Hovered);
-                iced::widget::button::Style {
-                    background: if hovered {
-                        Some(Background::Color(Palette::hover()))
-                    } else {
-                        None
-                    },
-                    text_color: Palette::text_muted(),
-                    border: Border {
-                        radius: 6.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
-            })
-            .padding([4, 8]),
+            mini::icon_button(
+                icons::wrap_text(),
+                if wrap_on {
+                    "Unwrap lines"
+                } else {
+                    "Wrap lines"
+                },
+                Some(Message::Response(ResponseMsg::ViewerWrapToggled)),
+                wrap_on,
+            ),
+            mini::icon_button(
+                icons::search(),
+                "Search (Ctrl+F)",
+                Some(Message::Response(ResponseMsg::ViewerEdited(
+                    iced_code_editor::Message::OpenSearch,
+                ))),
+                false,
+            ),
+            mini::icon_button(
+                icons::copy(),
+                "Copy body",
+                Some(Message::Response(ResponseMsg::CopyBody)),
+                false,
+            ),
         ]
-        .align_y(Alignment::Center)
-        .padding([2, 12]),
+        .spacing(8)
+        .align_y(Alignment::Center),
     )
+    .padding(iced::Padding {
+        top: 8.0,
+        right: 16.0,
+        bottom: 4.0,
+        left: 16.0,
+    })
     .width(Length::Fill);
 
     let body: Element<Message> = if tab.viewer_processing {
@@ -171,7 +193,7 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
     };
 
     let body = container(body)
-        .padding([0,2])
+        .padding([0, 2])
         .width(Length::Fill)
         .height(Length::Fill);
 
@@ -351,8 +373,7 @@ fn error_view(err: &str) -> Element<'static, Message> {
 
 fn binary_view(resp: &HttpResponse) -> Element<'static, Message> {
     let is_pdf = resp.headers.iter().any(|(name, value)| {
-        name.eq_ignore_ascii_case("content-type")
-            && value.to_ascii_lowercase().contains("pdf")
+        name.eq_ignore_ascii_case("content-type") && value.to_ascii_lowercase().contains("pdf")
     });
     binary_view_with_note(
         resp,

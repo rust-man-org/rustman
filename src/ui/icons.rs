@@ -81,9 +81,6 @@ pub fn eye_closed() -> Text<'static> {
 pub fn zap() -> Text<'static> {
     glyph('\u{e1b4}')
 } // zap
-pub fn timer() -> Text<'static> {
-    glyph('\u{e1e0}')
-} // timer
 pub fn globe() -> Text<'static> {
     glyph('\u{e0e8}')
 } // globe
@@ -169,4 +166,16 @@ pub fn panel_right_close() -> Text<'static> {
 }
 pub fn panel_right_open() -> Text<'static> {
     glyph('\u{e434}')
+}
+pub fn wrap_text() -> Text<'static> {
+    glyph('\u{e248}')
+} // text-wrap
+pub fn external_link() -> Text<'static> {
+    glyph('\u{e0b9}')
+}
+pub fn file_down() -> Text<'static> {
+    glyph('\u{e318}')
+}
+pub fn eraser() -> Text<'static> {
+    glyph('\u{e28f}')
 }

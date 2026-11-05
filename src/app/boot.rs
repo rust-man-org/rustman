@@ -265,6 +265,7 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
         panel_split: 50,
         sidebar_width,
         horizontal_layout: false,
+        show_auto_headers: false,
         snippet_open,
         snippet_width,
         snippet: String::new(),

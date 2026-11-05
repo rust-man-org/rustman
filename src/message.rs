@@ -188,6 +188,13 @@ pub enum RequestMsg {
     HeaderRemoved(usize),
     HeadersBulkToggle,
     HeadersBulkEdited(iced::widget::text_editor::Action),
+    /// Set (or with "None" remove) the Content-Type header from the
+    /// Presets menu.
+    HeaderPresetApplied(String),
+    /// Remove every header row.
+    HeadersCleared,
+    /// Show or hide the headers the client adds on send (view state).
+    AutoHeadersToggled,
     // Params
     ParamToggled(usize),
     ParamKeyChanged(usize, String),
@@ -319,6 +326,8 @@ pub enum ResponseMsg {
     /// Step the response viewer one page (see `page_starts` in state/tabs).
     ViewerPagePrev,
     ViewerPageNext,
+    /// Toggle soft line wrap in the response viewer.
+    ViewerWrapToggled,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
@@ -436,7 +445,12 @@ pub enum PaletteKind {
 }
 
 impl PaletteKind {
-    pub const ALL: [Self; 4] = [Self::Requests, Self::Tabs, Self::History, Self::Environments];
+    pub const ALL: [Self; 4] = [
+        Self::Requests,
+        Self::Tabs,
+        Self::History,
+        Self::Environments,
+    ];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -478,8 +492,14 @@ pub enum ImportMsg {
     ChooseFolder,
     PathsSelected(Vec<std::path::PathBuf>),
     ResourcesParsed(Result<Vec<crate::services::import::resources::Resource>, String>),
-    PreviewScheduled { revision: u64, text: String },
-    PreviewReady { revision: u64, result: Result<Vec<crate::services::import::resources::Resource>, String> },
+    PreviewScheduled {
+        revision: u64,
+        text: String,
+    },
+    PreviewReady {
+        revision: u64,
+        result: Result<Vec<crate::services::import::resources::Resource>, String>,
+    },
     CollectionNameChanged(String),
     CreateEnvironmentChanged(bool),
     Clear,

@@ -72,7 +72,9 @@ pub(super) fn multi_tab_bar(state: &AppState) -> Element<'_, Message> {
     let tabs = state.tabs.tabs.iter().enumerate().map(|(i, tab)| {
         let active = i == state.tabs.active;
         let dragging = state.dragging_tab == Some(i);
-        let title = if tab.url.is_empty() {
+        // Saved requests show their name (like Postman); an unsaved tab shows
+        // its URL until it is named by saving.
+        let title = if tab.url.is_empty() || tab.saved_as.is_some() {
             tab.title.as_str()
         } else {
             &tab.url

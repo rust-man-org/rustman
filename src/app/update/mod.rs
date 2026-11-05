@@ -76,6 +76,7 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 | Message::Request(
                     crate::message::RequestMsg::TitleChanged(_)
                         | crate::message::RequestMsg::UrlHovered(_)
+                        | crate::message::RequestMsg::AutoHeadersToggled
                         | crate::message::RequestMsg::UrlCompletionMoved(_)
                         | crate::message::RequestMsg::UrlVariableValueChanged(_)
                         | crate::message::RequestMsg::UrlVariableEnvironmentSelected(_)
@@ -216,6 +217,7 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
                 | crate::message::RequestMsg::OpenImportDialog
                 | crate::message::RequestMsg::CloseImportDialog
                 | crate::message::RequestMsg::ImportFromClipboard
+                | crate::message::RequestMsg::AutoHeadersToggled
         )
         // Saving or opening a response body only writes a file and a
         // transient status line; nothing in the persisted session snapshot
@@ -225,6 +227,7 @@ pub(crate) fn marks_session_dirty(message: &Message) -> bool {
                 | crate::message::ResponseMsg::BodySaved(_)
                 | crate::message::ResponseMsg::OpenBodyInBrowser
                 | crate::message::ResponseMsg::BodyOpened(_)
+                | crate::message::ResponseMsg::ViewerWrapToggled
         )
     )
 }

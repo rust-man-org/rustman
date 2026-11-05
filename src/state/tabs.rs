@@ -398,8 +398,11 @@ impl RequestTabState {
         } else {
             "txt"
         };
+        // A new page or body keeps the wrap choice of the toolbar toggle.
+        let wrap = self.response_editor.wrap_enabled();
         self.response_editor = make_code_editor(&display, syntax);
         self.response_editor.set_show_whitespace(false);
+        self.response_editor.set_wrap_enabled(wrap);
     }
 
     /// Toggle the expanded editor for form field `index`. Expanding computes
@@ -946,7 +949,8 @@ impl TabManager {
                 method: tab.method.clone(),
                 title: tab.title.clone(),
             };
-            self.recently_closed.retain(|c| c.request_id != closed.request_id);
+            self.recently_closed
+                .retain(|c| c.request_id != closed.request_id);
             self.recently_closed.insert(0, closed);
             self.recently_closed.truncate(RECENTLY_CLOSED_MAX);
         }
@@ -1439,7 +1443,11 @@ mod recently_closed_tests {
         m.tabs.push(saved_tab("a"));
         m.close_tab(1);
         m.close_tab(0);
-        let ids: Vec<_> = m.recently_closed.iter().map(|c| c.request_id.as_str()).collect();
+        let ids: Vec<_> = m
+            .recently_closed
+            .iter()
+            .map(|c| c.request_id.as_str())
+            .collect();
         assert_eq!(ids, vec!["b", "a"]);
     }
 
@@ -1451,6 +1459,9 @@ mod recently_closed_tests {
             m.close_tab(0);
         }
         assert_eq!(m.recently_closed.len(), RECENTLY_CLOSED_MAX);
-        assert_eq!(m.recently_closed[0].request_id, (RECENTLY_CLOSED_MAX + 2).to_string());
+        assert_eq!(
+            m.recently_closed[0].request_id,
+            (RECENTLY_CLOSED_MAX + 2).to_string()
+        );
     }
 }
