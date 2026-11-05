@@ -3,7 +3,10 @@
 #
 #   scripts/ui.sh                 build (debug) + run with your normal data
 #   scripts/ui.sh -t              run tests and checks first; stop on failure
-#   scripts/ui.sh -r              release build (slower build, faster app)
+#   scripts/ui.sh -r              release build (slower build, faster app);
+#                                 output target/release/rustman(.exe)
+#   scripts/ui.sh -b              build only, do not start the app
+#                                 (release binary: scripts/ui.sh -r -b)
 #   scripts/ui.sh -d DIR          use DIR as the data folder instead of your
 #                                 real one (created if missing)
 #   scripts/ui.sh -s              sample mode: works on a copy of your data
@@ -26,19 +29,21 @@ cd "$(dirname "$0")/.."
 
 profile=debug
 run_tests=0
+build_only=0
 data_dir=""
 sample=0
 example=0
 
-while getopts "trd:sxh" opt; do
+while getopts "trbd:sxh" opt; do
     case "$opt" in
         t) run_tests=1 ;;
         r) profile=release ;;
+        b) build_only=1 ;;
         d) data_dir="$OPTARG" ;;
         s) sample=1 ;;
         x) example=1 ;;
         h | *)
-            sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
     esac
@@ -69,6 +74,12 @@ fi
 
 exe="target/$profile/rustman"
 [ -f "$exe.exe" ] && exe="$exe.exe"
+echo "==> built $exe ($(du -h "$exe" | cut -f1))"
+
+if [ "$build_only" = 1 ]; then
+    echo "==> build only (-b): not starting the app"
+    exit 0
+fi
 
 if [ "$sample" = 1 ]; then
     # Snapshot the real data once; later runs keep the sample's changes.

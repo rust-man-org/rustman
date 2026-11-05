@@ -205,6 +205,7 @@ Use Git Bash on Windows. Use a terminal with `sh` on macOS or Linux.
 |---|---|
 | `sh scripts/ui.sh` | Build and start the debug app with your normal data. |
 | `sh scripts/ui.sh -r` | Build and start the release app with your normal data. |
+| `sh scripts/ui.sh -r -b` | Build the release app only, without starting it. Output: `target/release/rustman` (`.exe` on Windows). |
 | `sh scripts/ui.sh -t -r` | Run both test configurations and the check. Then build and start the release app. |
 | `sh scripts/ui.sh -r -x` | Build and start the release app with the example workspace. |
 | `sh scripts/ui.sh -r -s` | Build and start the release app with a copy of your local data. |
