@@ -1,6 +1,9 @@
 pub mod auth;
 pub mod drafts;
+pub mod environment_cell;
+pub mod examples;
 pub mod meta;
+pub mod notifications;
 pub mod review;
 pub mod secrets;
 pub mod session;

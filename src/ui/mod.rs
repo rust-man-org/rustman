@@ -1,10 +1,14 @@
 pub mod auth;
 pub mod command_palette;
 pub mod components;
+pub mod environment_workspace;
+pub mod examples;
 pub mod icons;
 pub mod layout;
+pub mod notification;
 pub mod request;
 pub mod response;
+pub mod snippet_panel;
 pub mod sidebar;
 pub mod styles;
 pub mod theme;

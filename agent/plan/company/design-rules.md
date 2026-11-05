@@ -56,6 +56,21 @@ compose them and carry no styling of their own.
 | Molecules | `components/molecules/` | `Banner` (tone, mark, title, detail, actions, body), `DataTable` |
 | Organisms | feature files | e.g. `ui/request/draft_banner.rs`, `ui/sidebar/drafts.rs` |
 
+Environment workspace/footer additions: `table_input` and `footer_action` are
+generic atoms; `DataTable::ruled` and `footer_bar` are generic molecules.
+`ui/environment_workspace.rs` and `ui/layout/status_bar.rs` compose them and
+own feature messages. Shared surfaces use `ui/styles.rs` and theme tokens.
+Environment selection opens the main workspace and retains the sidebar;
+activation is separate. Keep the global footer below the entire app shell,
+including a sidebar toggle. Long/multiline values use the bounded editor.
+Spreadsheet fields stay transparent and borderless at idle/hover, with a
+square outline only on focus. Table dividers remain thin; no full-height
+outer frame. Footer slots center vertically with consistent label sizing.
+Collections occupies spare sidebar height while expanded, keeping Environments
+at the bottom even when its list is open. Only collapsing Collections moves
+Environments up. Use sidebar_sections for this layout and independent scrolling.
+Environment active/More actions are hover-only, including for the active row.
+
 Rules:
 
 - Components take a `Tone`, never a raw color; restyle by changing `Tone`.

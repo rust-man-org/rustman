@@ -91,6 +91,22 @@ pub fn braces() -> Text<'static> {
     glyph('\u{e36a}')
 } // braces
 
+/// Saved request/response example (Lucide file-code).
+pub fn example() -> Text<'static> {
+    glyph('\u{e0c3}')
+}
+
+pub fn check_circle() -> Text<'static> {
+    glyph('\u{e07c}')
+}
+
+pub fn panel_left_close() -> Text<'static> {
+    glyph('\u{e21c}')
+}
+pub fn panel_left_open() -> Text<'static> {
+    glyph('\u{e21d}')
+}
+
 // ── Tree / disclosure ─────────────────────────────────────────────────────────────
 pub fn chevron_down() -> Text<'static> {
     glyph('\u{e06d}')
@@ -123,4 +139,34 @@ pub fn dot<'a, M: 'a>(color: Color) -> Element<'a, M> {
             ..Default::default()
         })
         .into()
+}
+pub fn bookmark() -> Text<'static> {
+    glyph('\u{e060}')
+}
+pub fn check() -> Text<'static> {
+    glyph('\u{e06c}')
+}
+pub fn save() -> Text<'static> {
+    glyph('\u{e14d}')
+}
+pub fn link() -> Text<'static> {
+    glyph('\u{e102}')
+}
+pub fn rotate_ccw() -> Text<'static> {
+    glyph('\u{e148}')
+}
+pub fn arrow_up_to_line() -> Text<'static> {
+    glyph('\u{e45b}')
+}
+pub fn user() -> Text<'static> {
+    glyph('\u{e19f}')
+}
+pub fn layout_grid() -> Text<'static> {
+    glyph('\u{e0ff}')
+}
+pub fn panel_right_close() -> Text<'static> {
+    glyph('\u{e432}')
+}
+pub fn panel_right_open() -> Text<'static> {
+    glyph('\u{e434}')
 }

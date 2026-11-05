@@ -147,12 +147,38 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
         }
 
         ImportMsg::PostmanLoaded(data) => {
-            let count: usize = data.iter().map(|ic| ic.all_requests().len()).sum();
-            for imported in data {
-                crate::app::tree::insert_collection(state, imported);
+            state.notification = None;
+            if data.is_empty() {
+                return Task::none();
             }
+            let count: usize = data.iter().map(|ic| ic.all_requests().len()).sum();
+            let detail = if data.len() == 1 {
+                format!(
+                    "{} · Collection",
+                    crate::services::format::head_capped(&data[0].collection.name, 240)
+                )
+            } else {
+                format!("{} collections · {count} requests", data.len())
+            };
+            for imported in data {
+                let id = imported.collection.id.clone();
+                if let Err(error) = crate::app::tree::try_insert_collection(state, imported) {
+                    state.status_message = Some(format!("Import error: {error}"));
+                    return Task::none();
+                }
+                state.sidebar.expanded.insert(id);
+            }
+            state.sidebar.collections_collapsed = false;
+            state.sidebar.collapsed = false;
+            state.sidebar.panel = crate::message::SidebarPanel::Collections;
+            state.drafts.only_drafts = false;
             state.status_message = Some(format!("Imported {count} requests"));
-            Task::none()
+            crate::app::notifications::success(
+                state,
+                "Import complete",
+                Some(detail),
+                crate::state::notifications::ToastPlacement::BottomRight,
+            )
         }
 
         ImportMsg::ExportDone(path) => {
@@ -161,6 +187,7 @@ pub(super) fn handle(state: &mut AppState, msg: ImportMsg) -> Task<Message> {
         }
 
         ImportMsg::Error(e) => {
+            state.notification = None;
             state.status_message = Some(format!("Import error: {e}"));
             Task::none()
         }

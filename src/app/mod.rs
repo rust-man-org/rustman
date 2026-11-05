@@ -17,15 +17,21 @@ use crate::{
 
 mod boot;
 mod drafts;
+pub(crate) mod notifications;
 mod request_ops;
 mod sample;
 mod scripting;
 mod session;
+pub(crate) mod snippet;
 mod subscription;
 mod tree;
 mod update;
 
 pub struct AppState {
+    pub environment_cell: Option<crate::state::environment_cell::EnvironmentCellEditor>,
+    pub console_open: bool,
+    pub notification: Option<crate::state::notifications::Toast>,
+    pub examples: crate::state::examples::ExamplesState,
     pub tabs: TabManager,
     pub sidebar: SidebarState,
     pub collections: Vec<Collection>,
@@ -91,6 +97,14 @@ pub struct AppState {
     /// Sidebar content width in px (issue #53: the sidebar used to be a fixed
     /// 264px and could not be adjusted). Excludes the 48px icon rail.
     pub sidebar_width: f32,
+    /// Right "Code snippet" panel: shown, width in px (clamped on use).
+    pub snippet_open: bool,
+    pub snippet_width: f32,
+    /// The active tab as cURL, secrets masked; refreshed after edits while
+    /// the panel is open (see `app::snippet`), never rebuilt per frame.
+    pub snippet: String,
+    /// Language the snippet panel generates.
+    pub snippet_lang: crate::services::snippet::Lang,
     /// Layout direction: false = top/bottom, true = left/right.
     pub horizontal_layout: bool,
     /// UI zoom level (0.7 – 2.0). Applied via iced scale_factor.
@@ -156,6 +170,13 @@ pub enum UpdateState {
 }
 
 impl AppState {
+    pub(crate) fn close_environment_workspace(&mut self) {
+        self.sidebar.env_variable_hover = None;
+        self.sidebar.environment_page = None;
+        self.environment_cell = None;
+        self.sidebar.env_editing = None;
+        self.sidebar.env_edit_rows.clear();
+    }
     pub(crate) fn active_env(&self) -> Option<&AppEnvironment> {
         self.environments.iter().find(|e| e.is_active)
     }
@@ -203,6 +224,19 @@ impl AppState {
         // which the user can't even see right now.
         if self.global_scripts_modal_open {
             return true;
+        }
+        if self.sidebar.environment_page.is_some() {
+            return self
+                .environment_cell
+                .as_ref()
+                .is_some_and(|cell| cell.editor.editor().has_keyboard_focus());
+        }
+
+        if let Some(editor) = &self.examples.editor {
+            return (!editor.request_show_headers
+                && !editor.request_show_params
+                && editor.request_body.has_keyboard_focus())
+                || (!editor.response_show_headers && editor.response_body.has_keyboard_focus());
         }
 
         let tab = self.tabs.active_tab();

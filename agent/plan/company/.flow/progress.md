@@ -4,8 +4,8 @@ Updated: 2026-11-04 (Asia/Jakarta).
 
 ## Resume checkpoint
 
-- Current scope: local sidebar/RAM fixes on `fix/import-folders-sidebar-hover`; local development integration authorized.
-- Active task: sidebar visual follow-up pending; GPU-default launcher/docs verified.
+- Current scope: endpoint examples mockup on `feat/endpoint-examples`, branched from development (`a39ddd5`).
+- Active task: bottom-anchored Environments and hover-only active action; release verification.
 - Completed: Windows baseline/launch green (zip 9 fix); parallel rules and 09 plan written.
 - Wave 0 done: contracts frozen (C11 + D1–D3 in 00), scaffold + CI gate
   Local scaffold/CI commit: `65115de` on `ws/00-contracts/t-scaffold` (not pushed).
@@ -43,32 +43,64 @@ unverified. `—` means unclaimed; status is not a claim that code is absent.
 | [ ] | 06 | Secrets / scanner | — | Audit redaction, re-merge and write guards. |
 | [ ] | 07 | Self-update integrity | — | Audit existing verification and tests. |
 | [ ] | 08 | PR / company CI | — | Audit review flow and validator. |
-| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header (`a488b7f`), t2 request header + URL row (`1a494f2`), seams (`9846277`) and t5 sidebar (`d382c1c`, `dc731ca`, hover actions, then aligned to the updated mockup `0976b17`; sample workspace via `scripts/ui.sh -x`) done and merged. Sidebar is made as close to Postman as possible (user decision 2026-11-04): filter box, `+` menu incl. Folder, import, `⋯`, COLLECTIONS section; full suite 203/195. Next: t3 tab bar, t4 sub-tabs, t6 response pane. |
+| [~] | 10 | Layout parity | Claude, 2026-11-04 | Plan `../0-foundation/10-layout-parity.md`. Integration branch is local `development` (00+09+01 merged, master untouched at `14f2d73`). t1 header (`a488b7f`), t2 request header + URL row (`1a494f2`), seams (`9846277`) and t5 sidebar (`d382c1c`, `dc731ca`, hover actions, then aligned to the updated mockup `0976b17`; sample workspace via `scripts/ui.sh -x`) done and merged. Sidebar is made as close to Postman as possible (user decision 2026-11-04): filter box, `+` menu incl. Folder, import, `⋯`, COLLECTIONS section; full suite 203/195. Sidebar headers/environment rows/selected row and the URL preview line aligned to the updated mockup plus the URL row (method chevron, `{{var}}` highlight, split Send) on `feat/endpoint-examples` (252/244). Next: t3 tab bar, t4 sub-tabs, t6 response pane. |
 | [X] | 09 | Design tokens | — | `4289b76` on `ws/09-design-tokens/t1-tokens`: Rustman Light/Dark appended, fresh-install default, 5 tests. Fonts deferred; status colors kept global (36 call sites). |
 
 ## Active task details
 
-- Task: [~] sidebar fuzzy-search visual follow-up; Windows RAM optimization [X].
-- Owner: Codex, 2026-11-04 (Asia/Jakarta); branch fix/import-folders-sidebar-hover.
-- Integration: user authorized local commit and merge into development; no push.
-- Plans: ../0-foundation/{memory-optimization,sidebar-fuzzy-search}.md; readme.md now covers platform builds.
-- User correction: GPU is the default on all platforms. Use scripts/ui.sh for
-  build/run. Software rendering is opt-in through ICED_BACKEND; see readme.md.
-- Previous software release: 18.46 MiB private / 40.36 MiB total working set; CPU 0%;
-  9 requests, one restored JSON tab (39 bytes), five stable samples, no GPU modules.
-- Earlier controlled GPU/software baseline: ~162 / 12 MiB private; software JSON
-  editing reached 14 MiB. Final simultaneous GPU rerun exited before sampling;
-  use the earlier controlled baseline. Larger workloads remain unmeasured.
-- Evidence: target/memory-{backend-comparison,software-editor,optimized-release}.json;
-  target/memory-{tests,tests-no-default,check,release-build}.log.
-- Current launcher gate/build evidence: target/gpu-default-script.log; example data target/ui-example.
-- Remaining: sidebar light/dark/Playwright visual checks (earlier physical Escape
-  interruptions); Postman comparison under equivalent load. Global plans not Done.
+- Task: [~] bottom-anchored Environments and hover-only environment actions.
+- Owner: Codex, 2026-11-04; feat/endpoint-examples, existing HEAD 2b00b48.
+- Collections fills spare sidebar height; Environments stays below it even open.
+- Collapsing Collections moves Environments directly below its header.
+- Separate scroll areas; environment rows capped at192px; no shared outer scroll.
+- Atomic: generic sidebar_sections molecule; active/More actions hover-only.
+- Prior main editor/footer, environment menu/auto rows/hover delete preserved.
+- Gates: 251 default / 243 no-default passed; 3 network ignored each.
+- Iced layout test proves lower anchoring at300/700px; Playwright verifies
+  both disclosures,900px viewport,35-item scroll list and active hover visibility.
+- Gallery30/31/32 refreshed;33 shows bottom section. Release build in progress:
+  target/sidebar-anchor-release.log. Native action/typing QA previously stopped
+  by user's physical Escape; no claim of native typing verification.
+- Details: ../0-foundation/sidebar-environments.md; fuzzy-search visual checks
+  and equal-load Postman RAM comparison deferred. Global plans unfinished.
+- 2026-11-04 polish (Claude, user request): section headers share one padded
+  band (10px under the search box, 2px under each label); environment rows use
+  ROW_H with a 2px gap; header hover also covers press. The selected request
+  row is now the neutral square band (mockup 32/33) instead of the accent tint.
+  The URL bar's resolved-URL preview is a muted mono line aligned under the URL
+  text, with no orange chrome strip. Environment workspace tab left unchanged.
+- URL row follows mockup HTML `.url-row`: method column 115px bg-2 with a small
+  chevron (hover bd-2, accent ring when open), mono 13px URL with `{{var}}`
+  highlighted (Tone::Info), "→ Send" + 30px split chevron. The chevron menu
+  holds Import cURL… / Export as cURL, replacing the loose import icon.
+  Section headers: label centred in the 24px band, 10px text, 10px inset.
+  Unused accent `RowFill::Selected` removed. Gates 252/244.
+- Follow-up: method menu restyled per `.combo-menu` (bg-0, bd-2, 6px radius,
+  current item on bg-2, no iced cyan); open picker uses bg-0 without a ring.
+  Tab bar rebuilt per `.tabsbar`/`.tab`: 36px, flat tabs with hairlines,
+  active bg-0 + 2px accent top, plain mono method text, 16px close.
+- Deletion: collection delete is two layers (warning + Delete, then type
+  "delete"), enforced in the handler; request delete asks first (Enter/Esc).
+  Gates 254/246. Visual check of tab bar/menu still pending in the real app.
+- Code snippet panel (mockup rustman-requester-snippet .rightbar), right side:  language dropdown (cURL, HTTP, JS Fetch, Node Axios, Python requests, Go,  Java OkHttp, C# HttpClient, Ruby Net::HTTP, wget) from the same input as  Share; literal secrets masked, {{vars}} kept; Copy gives the full code.  Hide via header icon or footer toggle (closes flush, reopen from the footer
+  toggle only, per user); left edge drags  to resize (220-720px). Open/width/language persist in the session. Cached  in AppState::snippet, refreshed after edits, not per frame. Gates 262/254.
+- Top bar per mockup rustman-requester-workspace `.app-header`: workspace
+  switcher (bookmark icon, UPPERCASE name, chevron) opens a `.ws-menu` with a
+  search box, Create (Git panel), git repos as workspaces (tile, tick on the
+  current one) and View all workspaces; branch chip mono bg-2 pill; search
+  without the Ctrl+P hint; sync chip dot with tinted ring; avatar from the
+  git author initial; bottom hairline only. Popup gained a sticky mode so
+  typing in the menu does not close it.
+- Request header Save is a split button (Save + chevron: Save as…, Commit &
+  sync → Git panel, Discard local changes when a draft exists); Share is an
+  outlined link button. Resolved-URL line under the URL bar removed (not in
+  the mockup, per user). Gates 263/255.
+- Committed on feat/endpoint-examples at the user's request (for a PR); not pushed.
 
 ## Verification checkpoint
 
-- Latest Windows gate: 225 default / 217 no-default tests passed; 3 live-network
-  tests ignored each; locked no-default all-target check, release build/launch and 4 launcher tests pass.
+- Latest Windows gate: 251 default / 243 no-default tests passed; 3 live-network
+  tests ignored each; final no-default check/release evidence: target/environment-page-release.log.
 - Historical 2026-11-03 baseline: zip 9 Windows extraction fixed; build and launch
   passed, tests 139 default / 131 no-default; manual request/sync not exhaustive.
 - CI execution is not proven by local tests; wave 0 scaffold added the test gate.

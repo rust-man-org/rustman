@@ -9,4 +9,5 @@ pub mod params;
 pub mod scripts;
 pub mod tabs;
 pub mod url_bar;
+mod url_highlight;
 pub mod websocket;

@@ -12,6 +12,21 @@ pub fn tooltip<'a, M: 'a>(
     content: impl Into<Element<'a, M>>,
     tip: impl Into<String>,
 ) -> Element<'a, M> {
+    positioned_tooltip(content, tip, iced_tooltip::Position::Bottom)
+}
+
+pub fn tooltip_above<'a, M: 'a>(
+    content: impl Into<Element<'a, M>>,
+    tip: impl Into<String>,
+) -> Element<'a, M> {
+    positioned_tooltip(content, tip, iced_tooltip::Position::Top)
+}
+
+fn positioned_tooltip<'a, M: 'a>(
+    content: impl Into<Element<'a, M>>,
+    tip: impl Into<String>,
+    position: iced_tooltip::Position,
+) -> Element<'a, M> {
     iced_tooltip(
         content,
         container(text(tip.into()).size(TEXT_SM).color(Palette::text()))
@@ -25,7 +40,7 @@ pub fn tooltip<'a, M: 'a>(
                 },
                 ..Default::default()
             }),
-        iced_tooltip::Position::Bottom,
+        position,
     )
     .into()
 }

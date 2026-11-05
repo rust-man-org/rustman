@@ -2,6 +2,7 @@
 // its own file, owned by its workstream; this file is not edited again.
 pub mod auth;
 pub mod draft;
+pub mod example;
 pub mod meta;
 pub mod review;
 pub mod secrets;
@@ -12,6 +13,7 @@ use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    Example(example::ExampleMsg),
     Sidebar(SidebarMsg),
     Request(RequestMsg),
     Response(ResponseMsg),
@@ -93,8 +95,39 @@ pub enum SidebarMsg {
     CancelRename,
     HistoryEntryOpened(HistoryEntry),
     ClearHistory,
+    CollectionsSectionToggled,
+    CollectionDeleteTextChanged(String),
+    CollectionDeleteCancelled,
+    CollectionDeleteConfirmed,
+    /// Warning accepted: move to the type-`delete` step.
+    CollectionDeleteProceed,
+    /// Ask before deleting a request (sidebar menu).
+    RequestDeleteAsked {
+        id: String,
+        collection_id: String,
+    },
+    RequestDeleteCancelled,
+    RequestDeleteConfirmed,
+    EnvironmentsSectionToggled,
+    EnvironmentOpened(String),
+    EnvironmentPageClosed,
+    EnvironmentCellOpened {
+        environment_id: String,
+        row: usize,
+        value: bool,
+    },
+    EnvironmentCellEdited {
+        token: String,
+        message: iced_code_editor::Message,
+    },
+    EnvironmentCellPageChanged(bool),
+    EnvironmentCellClosed,
     EnvironmentSelected(String),
     EnvironmentCreated,
+    EnvironmentRenameStarted(String),
+    EnvironmentDuplicated(String),
+    EnvironmentExport(String),
+    EnvironmentVariableHover(String, usize, bool),
     EnvironmentDeleted(String),
     EnvironmentToggleEdit(String),
     EnvironmentNameChanged(String, String),
@@ -105,6 +138,8 @@ pub enum SidebarMsg {
     ToggleCollapsed,
     /// Collection tree search box.
     FilterChanged(String),
+    /// Header workspace switcher search box.
+    WorkspaceFilterChanged(String),
     SearchMove(isize),
     SearchConfirm,
     SearchPick(usize),
@@ -215,6 +250,9 @@ pub enum RequestMsg {
     Undo,
     Redo,
     SaveRequest,
+    /// Save menu "Save as…": the save dialog even for a saved request, so
+    /// the tab is stored as a new request.
+    SaveRequestAs,
     ImportCurl(String),
     ImportHttpie(String),
     /// A command parsed off the UI thread (clipboard/file import, or a large
@@ -408,16 +446,27 @@ pub enum ImportMsg {
 
 #[derive(Debug, Clone)]
 pub enum LayoutMsg {
+    ConsoleToggled,
     ZoomIn,
     ZoomOut,
     ZoomReset,
     PanelSplitChanged(u16),
     /// Drag on the sidebar/main-area splitter (issue #53): new sidebar width.
     SidebarWidthChanged(f32),
+    /// Show or hide the right "Code snippet" panel.
+    SnippetToggled,
+    /// Drag on the snippet panel's left edge: new panel width.
+    SnippetWidthChanged(f32),
+    /// Copy the full (unmasked) cURL of the active tab.
+    SnippetCopied,
+    /// Pick the snippet language (mockup `.rb-lang`).
+    SnippetLangChanged(crate::services::snippet::Lang),
 }
 
 #[derive(Debug, Clone)]
 pub enum AppMsg {
+    OpenTerminal,
+    ToastDismissed(String),
     HttpResponse {
         generation: u64,
         result: HttpResult,

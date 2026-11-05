@@ -9,6 +9,9 @@ pub struct Popup<'a, Message, Theme, Renderer> {
     close: Message,
     align_left: bool,
     open: bool,
+    /// Messages for which the menu stays open (typing in a search box
+    /// inside it). `None`: any message closes the menu first.
+    keep_open: Option<fn(&Message) -> bool>,
 }
 
 pub fn popup<'a, Message: Clone + 'a, Theme: 'a, Renderer: renderer::Renderer + 'a>(
@@ -22,6 +25,7 @@ pub fn popup<'a, Message: Clone + 'a, Theme: 'a, Renderer: renderer::Renderer + 
         close,
         align_left: false,
         open: true,
+        keep_open: None,
     })
 }
 
@@ -38,6 +42,26 @@ pub fn popup_left<'a, Message: Clone + 'a, Theme: 'a, Renderer: renderer::Render
         close,
         align_left: true,
         open,
+        keep_open: None,
+    })
+}
+
+/// Left-aligned open menu that holds its own input: messages matching
+/// `keep_open` (e.g. the filter text) leave it open; any other one runs
+/// and then closes it.
+pub fn popup_left_sticky<'a, Message: Clone + 'a, Theme: 'a, Renderer: renderer::Renderer + 'a>(
+    content: Element<'a, Message, Theme, Renderer>,
+    menu: Element<'a, Message, Theme, Renderer>,
+    close: Message,
+    keep_open: fn(&Message) -> bool,
+) -> Element<'a, Message, Theme, Renderer> {
+    Element::new(Popup {
+        content,
+        menu,
+        close,
+        align_left: true,
+        open: true,
+        keep_open: Some(keep_open),
     })
 }
 
@@ -170,6 +194,7 @@ where
             anchor,
             close: self.close.clone(),
             align_left: self.align_left,
+            keep_open: self.keep_open,
         })))
     }
 }
@@ -180,6 +205,7 @@ struct MenuOverlay<'a, 'b, Message, Theme, Renderer> {
     anchor: Rectangle,
     close: Message,
     align_left: bool,
+    keep_open: Option<fn(&Message) -> bool>,
 }
 
 fn menu_position(anchor: Rectangle, size: Size, bounds: Size) -> iced::Point {
@@ -271,10 +297,25 @@ impl<Message: Clone, Theme, Renderer: renderer::Renderer> overlay::Overlay<Messa
         );
         // Close before running the selected action: rename/new-child views must
         // not remain underneath their old menu. Preserve redraw/capture state.
-        if !menu_shell.is_empty() {
-            shell.publish(self.close.clone());
+        if let Some(keep_open) = self.keep_open {
+            // Sticky menu: run the action first, then close unless every
+            // message asked to keep it open (typing in its search box).
+            let closes = std::cell::Cell::new(false);
+            shell.merge(menu_shell, |m| {
+                if !keep_open(&m) {
+                    closes.set(true);
+                }
+                m
+            });
+            if closes.get() {
+                shell.publish(self.close.clone());
+            }
+        } else {
+            if !menu_shell.is_empty() {
+                shell.publish(self.close.clone());
+            }
+            shell.merge(menu_shell, |action| action);
         }
-        shell.merge(menu_shell, |action| action);
         // Menu padding must also block clicks from reaching the tree beneath it.
         if cursor.is_over(layout.bounds()) && matches!(event, Event::Mouse(_)) {
             shell.capture_event();
@@ -362,6 +403,7 @@ mod tests {
             anchor: Rectangle::with_size(Size::new(300.0, 28.0)),
             close: true,
             align_left: false,
+            keep_open: None,
         };
         let node = overlay.layout(&(), Size::new(400.0, 800.0));
         let event = Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left));
@@ -397,6 +439,7 @@ mod tests {
             anchor,
             close: true,
             align_left: true,
+            keep_open: None,
         };
         let node = overlay.layout(&(), Size::new(1280.0, 800.0));
         assert_eq!(node.bounds().x, 60.0);
@@ -429,6 +472,7 @@ mod tests {
             anchor: Rectangle::with_size(Size::new(300.0, 28.0)),
             close: "close",
             align_left: false,
+            keep_open: None,
         };
         let node = overlay.layout(&(), Size::new(400.0, 800.0));
         let mut messages = Vec::new();
@@ -447,5 +491,42 @@ mod tests {
             );
         }
         assert_eq!(messages, vec!["close", "action"]);
+    }
+
+    #[test]
+    fn sticky_menu_stays_open_for_kept_messages_only() {
+        use iced::advanced::overlay::Overlay;
+        for (action, expected) in [("type", vec!["type"]), ("pick", vec!["pick", "close"])] {
+            let mut menu: Element<'_, &str, iced::Theme, ()> =
+                iced::widget::button(Space::new().width(196).height(26))
+                    .on_press(action)
+                    .into();
+            let mut tree = Tree::new(&menu);
+            let mut overlay = MenuOverlay {
+                menu: &mut menu,
+                tree: &mut tree,
+                anchor: Rectangle::with_size(Size::new(300.0, 28.0)),
+                close: "close",
+                align_left: true,
+                keep_open: Some(|m: &&str| *m == "type"),
+            };
+            let node = overlay.layout(&(), Size::new(400.0, 800.0));
+            let mut messages = Vec::new();
+            let mut clipboard = iced::advanced::clipboard::Null;
+            for event in [
+                mouse::Event::ButtonPressed(mouse::Button::Left),
+                mouse::Event::ButtonReleased(mouse::Button::Left),
+            ] {
+                overlay.update(
+                    &Event::Mouse(event),
+                    Layout::new(&node),
+                    mouse::Cursor::Available(node.bounds().center()),
+                    &(),
+                    &mut clipboard,
+                    &mut Shell::new(&mut messages),
+                );
+            }
+            assert_eq!(messages, expected);
+        }
     }
 }

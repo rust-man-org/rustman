@@ -31,7 +31,6 @@ fn data_dir_from(env: Option<std::ffi::OsString>) -> PathBuf {
 /// Boot from an explicit data directory. `init` passes the user's data dir;
 /// tests pass a throwaway one so they never touch real data.
 pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
-
     let db = storage::open(&data_dir).ok();
 
     // `RUSTMAN_SAMPLE=1` (scripts/ui.sh -x): example collection for trying
@@ -91,6 +90,9 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
     let mut global_pre_request_script = String::new();
     let mut global_test_script = String::new();
     let mut sidebar_width = 200.0;
+    let mut snippet_open = true;
+    let mut snippet_width = crate::state::session::DEFAULT_SNIPPET_WIDTH;
+    let mut snippet_lang = crate::services::snippet::Lang::default();
     #[cfg(feature = "self-update")]
     let mut auto_check_updates = false;
     let mut tls_options = crate::services::http::TlsOptions::default();
@@ -100,6 +102,9 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
         global_pre_request_script = sess.global_pre_request_script.clone();
         global_test_script = sess.global_test_script.clone();
         sidebar_width = sess.sidebar_width;
+        snippet_open = sess.snippet_open;
+        snippet_width = sess.snippet_width;
+        snippet_lang = crate::services::snippet::Lang::from_key(&sess.snippet_lang);
         #[cfg(feature = "self-update")]
         {
             auto_check_updates = sess.auto_check_updates;
@@ -173,6 +178,27 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
     let git_identity = crate::services::vcs::resolve_identity(&data_dir.join("collections"));
 
     let state = AppState {
+        environment_cell: None,
+        console_open: false,
+        notification: None,
+        examples: {
+            let mut examples = crate::state::examples::ExamplesState::default();
+            if let Some(db) = &db {
+                match storage::examples::load(db) {
+                    Ok(items) => {
+                        for item in items {
+                            examples
+                                .items
+                                .entry(item.request_id.clone())
+                                .or_default()
+                                .push(item);
+                        }
+                    }
+                    Err(e) => eprintln!("Could not load examples: {e}"),
+                }
+            }
+            examples
+        },
         tabs,
         sidebar,
         collections,
@@ -227,6 +253,10 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
         panel_split: 50,
         sidebar_width,
         horizontal_layout: false,
+        snippet_open,
+        snippet_width,
+        snippet: String::new(),
+        snippet_lang,
         ui_scale: 1.0,
         #[cfg(feature = "self-update")]
         update: crate::app::UpdateState::Idle,
@@ -267,6 +297,8 @@ pub(crate) fn init_at(data_dir: PathBuf) -> (AppState, Task<Message>) {
     #[cfg(not(feature = "self-update"))]
     let boot_task = Task::none();
 
+    let mut state = state;
+    super::snippet::refresh(&mut state);
     (state, boot_task)
 }
 

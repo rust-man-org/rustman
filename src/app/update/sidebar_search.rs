@@ -98,6 +98,10 @@ pub(super) fn confirm(state: &mut AppState, index: usize) -> Task<Message> {
     else {
         return Task::none();
     };
+    if super::examples::protect(state) {
+        return Task::none();
+    }
+    state.examples.editor = None;
     let task = super::sidebar::handle(state, SidebarMsg::RequestOpened(request));
     if let Some(field) = hit.field {
         state.tabs.active_tab_mut().active_request_tab = match field {

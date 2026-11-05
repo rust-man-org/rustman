@@ -1,6 +1,9 @@
+//! Request tab strip, mockup `.tabsbar` / `.tab`: flat tabs separated by
+//! hairlines, the active one raised to bg-0 with a 2px accent top edge.
+
 use iced::{
     Alignment, Background, Border, Color, Element, Length,
-    widget::{Text, button, container, mouse_area, row, scrollable, text},
+    widget::{Space, button, column, container, mouse_area, row, scrollable, text},
 };
 
 use crate::{
@@ -8,117 +11,61 @@ use crate::{
     message::{Message, RequestMsg},
     ui::{
         icons,
-        theme::{MONO, Palette, TEXT_SM, TEXT_XS},
+        theme::{MONO, Palette, TEXT_SM},
     },
 };
 
-use super::style::{method_color, tab_bar_container};
+use super::style::method_color;
 
-fn tab_icon_btn(icon: Text<'static>, msg: Message, side: f32) -> Element<'static, Message> {
-    button(
-        container(icon)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill),
-    )
-    .on_press(msg)
-    .style(|_t, status| {
-        let hovered = matches!(status, iced::widget::button::Status::Hovered);
-        iced::widget::button::Style {
-            background: if hovered {
-                Some(Background::Color(Palette::hover()))
-            } else {
-                None
-            },
-            text_color: Palette::text_muted(),
+/// `.tabsbar`: 36px including its 1px bottom rule.
+const BAR_H: f32 = 36.0;
+
+/// 1px hairline in `bd-1`, vertical or horizontal.
+fn hairline(vertical: bool) -> Element<'static, Message> {
+    let (w, h) = if vertical {
+        (Length::Fixed(1.0), Length::Fill)
+    } else {
+        (Length::Fill, Length::Fixed(1.0))
+    };
+    container(Space::new())
+        .width(w)
+        .height(h)
+        .style(|_| iced::widget::container::Style {
+            background: Some(Background::Color(Palette::border_subtle())),
+            ..Default::default()
+        })
+        .into()
+}
+
+/// `.tab .x`: 16px, tx-3, bg-2 on hover.
+fn close_button(msg: Message) -> Element<'static, Message> {
+    button(container(icons::close().size(11).color(Palette::text_subtle())).center(Length::Fill))
+        .on_press(msg)
+        .width(16)
+        .height(16)
+        .padding(0)
+        .style(|_t, status| iced::widget::button::Style {
+            background: matches!(
+                status,
+                iced::widget::button::Status::Hovered | iced::widget::button::Status::Pressed
+            )
+            .then(|| Background::Color(Palette::surface_high())),
             border: Border {
-                radius: 6.0.into(),
+                radius: 4.0.into(),
                 ..Default::default()
             },
             ..Default::default()
-        }
-    })
-    .width(side)
-    .height(side)
-    .padding(0)
-    .into()
-}
-
-fn method_chip(method: &crate::domain::request::HttpMethod) -> Element<'static, Message> {
-    let color = method_color(method);
-    container(text(method.as_str()).size(9).color(color).font(MONO))
-        .padding([2, 5])
-        .style(move |_| iced::widget::container::Style {
-            background: Some(Background::Color(iced::Color { a: 0.15, ..color })),
-            border: Border {
-                color: iced::Color { a: 0.35, ..color },
-                width: 1.0,
-                radius: 5.0.into(),
-            },
-            ..Default::default()
         })
         .into()
 }
 
-/// Marks a tab as a WebSocket connection, in place of an HTTP method chip.
-fn ws_chip() -> Element<'static, Message> {
-    let color = Palette::accent();
-    container(text("WS").size(9).color(color).font(MONO))
-        .padding([2, 5])
-        .style(move |_| iced::widget::container::Style {
-            background: Some(Background::Color(iced::Color { a: 0.15, ..color })),
-            border: Border {
-                color: iced::Color { a: 0.35, ..color },
-                width: 1.0,
-                radius: 5.0.into(),
-            },
-            ..Default::default()
-        })
+/// `.tab .m`: the method as plain coloured mono text, no chip.
+fn method_label(label: &str, color: Color) -> Element<'static, Message> {
+    text(label.to_owned())
+        .size(10)
+        .font(MONO)
+        .color(color)
         .into()
-}
-
-/// The rounded "card" each tab lives in. Active tabs are raised with an accent
-/// top edge; inactive tabs are flat until hovered.
-fn tab_card(
-    active: bool,
-    dragging: bool,
-) -> impl Fn(&iced::Theme) -> iced::widget::container::Style {
-    move |_t| {
-        let accent = Palette::accent();
-        let (bg, border_color, border_width) = if dragging {
-            (
-                Some(Palette::accent_soft()),
-                Color { a: 0.7, ..accent },
-                1.0,
-            )
-        } else if active {
-            (Some(Palette::surface()), Palette::border_subtle(), 1.0)
-        } else {
-            (None, Color::TRANSPARENT, 0.0)
-        };
-        iced::widget::container::Style {
-            background: bg.map(Background::Color),
-            border: Border {
-                color: border_color,
-                width: border_width,
-                radius: 8.0.into(),
-            },
-            shadow: if active {
-                iced::Shadow {
-                    color: Color {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 0.35,
-                    },
-                    offset: iced::Vector::new(0.0, 2.0),
-                    blur_radius: 8.0,
-                }
-            } else {
-                iced::Shadow::default()
-            },
-            ..Default::default()
-        }
-    }
 }
 
 pub(super) fn multi_tab_bar(state: &AppState) -> Element<'_, Message> {
@@ -164,152 +111,100 @@ pub(super) fn multi_tab_bar(state: &AppState) -> Element<'_, Message> {
             None
         };
 
-        let close_color = if active {
-            Palette::text_muted()
-        } else {
-            Palette::text_subtle()
-        };
-        let close_btn = tab_icon_btn(
-            icons::close().size(TEXT_XS).color(close_color),
-            Message::Request(RequestMsg::CloseTab(i)),
-            20.0,
-        );
-
-        let title_color = if active {
-            Palette::text()
-        } else {
-            Palette::text_muted()
-        };
-
-        // Accent strip along the top of the active tab.
-        let accent_strip = container(iced::widget::Space::new().height(2).width(Length::Fill))
-            .style(move |_| iced::widget::container::Style {
-                background: Some(Background::Color(if active {
-                    Palette::accent()
-                } else {
-                    Color::TRANSPARENT
-                })),
-                border: Border {
-                    radius: iced::border::Radius::default().top_left(8.0).top_right(8.0),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .width(Length::Fill);
-
         // A ws:// or wss:// tab has no HTTP method — showing "GET" there is
         // simply wrong (the method is never sent, and the URL bar hides its
         // picker in this mode for the same reason).
-        let leading_chip = if tab.is_websocket() {
-            ws_chip()
+        let lead = if tab.is_websocket() {
+            method_label("WS", Palette::accent())
         } else {
-            method_chip(&tab.method)
+            method_label(tab.method.as_str(), method_color(&tab.method))
         };
-        let mut label_row = row![leading_chip].spacing(7).align_y(Alignment::Center);
+        let mut label_row = row![lead].spacing(7).align_y(Alignment::Center);
+        label_row = label_row.push(text(short_title).size(TEXT_SM).color(if active {
+            Palette::text()
+        } else {
+            Palette::text_muted()
+        }));
         if let Some(c) = modified_dot {
             label_row = label_row.push(icons::dot(c));
         }
-        label_row = label_row.push(text(short_title).size(TEXT_SM).color(title_color));
+        label_row = label_row.push(close_button(Message::Request(RequestMsg::CloseTab(i))));
 
-        let tab_content = container(
-            iced::widget::column![
-                accent_strip,
-                row![
-                    container(label_row).padding(iced::Padding {
-                        top: 6.0,
-                        right: 10.0,
-                        bottom: 7.0,
-                        left: 12.0
-                    }),
-                    container(close_btn).padding(iced::Padding {
-                        top: 0.0,
-                        right: 6.0,
-                        bottom: 1.0,
-                        left: 0.0
-                    }),
-                ]
-                .spacing(2)
-                .align_y(Alignment::Center),
-            ]
-            .spacing(0),
-        )
-        .style(tab_card(active, dragging));
+        // `.tab.active::after`: 2px accent along the top edge.
+        let strip = container(Space::new())
+            .width(Length::Fill)
+            .height(2)
+            .style(move |_| iced::widget::container::Style {
+                background: active.then(|| Background::Color(Palette::accent())),
+                ..Default::default()
+            });
 
-        let tab_btn = mouse_area(tab_content)
+        let card = container(column![
+            strip,
+            container(label_row).padding([0, 10]).center_y(Length::Fill),
+        ])
+        .height(Length::Fill)
+        .style(move |_| iced::widget::container::Style {
+            background: if dragging {
+                Some(Background::Color(Palette::accent_soft()))
+            } else if active {
+                Some(Background::Color(Palette::surface()))
+            } else {
+                None
+            },
+            ..Default::default()
+        });
+
+        let tab_btn = mouse_area(card)
             .on_press(Message::Request(RequestMsg::TabDragStart(i)))
             .on_release(Message::Request(RequestMsg::TabDragEnd))
-            .on_enter(Message::Request(RequestMsg::TabDragOver(i)));
+            .on_enter(Message::Request(RequestMsg::TabDragOver(i)))
+            .interaction(iced::mouse::Interaction::Pointer);
 
-        Element::from(tab_btn)
+        Element::from(row![tab_btn, hairline(true)].height(Length::Fill))
     });
 
     let mut tab_items: Vec<Element<Message>> = tabs.collect();
-    // Ghost "+" button for a new tab.
+    // `.tab.new`: a bare "+", tx-3 brightening to tx-1 on hover.
     tab_items.push(
-        container(
-            button(
-                container(icons::plus().size(11).color(Palette::text_muted()))
-                    .center_x(Length::Fill)
-                    .center_y(Length::Fill),
-            )
+        button(container(icons::plus().size(12)).center_y(Length::Fill))
             .on_press(Message::Request(RequestMsg::NewTab))
-            .style(|_t, status| {
-                let hovered = matches!(status, iced::widget::button::Status::Hovered);
-                iced::widget::button::Style {
-                    background: if hovered {
-                        Some(Background::Color(Palette::hover()))
-                    } else {
-                        None
-                    },
-                    text_color: if hovered {
-                        Palette::text()
-                    } else {
-                        Palette::text_muted()
-                    },
-                    border: Border {
-                        radius: 6.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
+            .height(Length::Fill)
+            .padding([0, 12])
+            .style(|_t, status| iced::widget::button::Style {
+                text_color: if matches!(status, iced::widget::button::Status::Hovered) {
+                    Palette::text()
+                } else {
+                    Palette::text_subtle()
+                },
+                ..Default::default()
             })
-            .width(24)
-            .height(24)
-            .padding(0),
-        )
-        .padding(iced::Padding {
-            top: 0.0,
-            right: 4.0,
-            bottom: 0.0,
-            left: 4.0,
-        })
-        .into(),
+            .into(),
     );
 
     // Global search moved to the app header (layout/header.rs).
-    let bar = container(
-        row![
-            scrollable(row(tab_items).spacing(2).width(Length::Shrink))
-                .direction(scrollable::Direction::Horizontal(
-                    scrollable::Scrollbar::new()
-                        .width(3)
-                        .scroller_width(3)
-                        .margin(0),
-                ))
-                .style(crate::ui::theme::tab_scrollbar)
-                .width(Length::Fill),
-        ]
-        .align_y(Alignment::Center)
-        .padding(iced::Padding {
-            top: 4.0,
-            right: 2.0,
-            bottom: 0.0,
-            left: 6.0,
-        })
-        .height(40),
+    let strip = container(
+        scrollable(row(tab_items).height(Length::Fill).width(Length::Shrink))
+            .direction(scrollable::Direction::Horizontal(
+                scrollable::Scrollbar::new()
+                    .width(3)
+                    .scroller_width(3)
+                    .margin(0),
+            ))
+            .style(crate::ui::theme::tab_scrollbar)
+            .width(Length::Fill)
+            .height(Length::Fill),
     )
-    .style(tab_bar_container)
-    .width(Length::Fill);
+    .padding([0, 6])
+    .height(Length::Fill);
+
+    let bar = container(column![strip, hairline(false)])
+        .height(BAR_H)
+        .width(Length::Fill)
+        .style(|_| iced::widget::container::Style {
+            background: Some(Background::Color(Palette::background())),
+            ..Default::default()
+        });
 
     mouse_area(bar)
         .on_release(Message::Request(RequestMsg::TabDragEnd))

@@ -51,8 +51,38 @@ pub fn compact_icon_button<'a, M: Clone + 'a>(
     msg: M,
     side: f32,
 ) -> Element<'a, M> {
+    compact_icon_button_color(icon, label, msg, side, Palette::text_muted())
+}
+
+/// Toggle-style row action: active remains visually distinct from hover.
+pub fn row_toggle<'a, M: Clone + 'a>(
+    icon: Text<'static>,
+    label: impl Into<String>,
+    msg: M,
+    active: bool,
+) -> Element<'a, M> {
+    compact_icon_button_color(
+        icon,
+        label,
+        msg,
+        22.0,
+        if active {
+            Palette::text()
+        } else {
+            Palette::text_subtle()
+        },
+    )
+}
+
+fn compact_icon_button_color<'a, M: Clone + 'a>(
+    icon: Text<'static>,
+    label: impl Into<String>,
+    msg: M,
+    side: f32,
+    color: iced::Color,
+) -> Element<'a, M> {
     let glyph = if side >= 26.0 { 14 } else { 13 };
-    let icon: Element<'a, M> = icon.size(glyph).color(Palette::text_muted()).into();
+    let icon: Element<'a, M> = icon.size(glyph).color(color).into();
     let btn = button(
         container(icon)
             .center_x(Length::Fill)

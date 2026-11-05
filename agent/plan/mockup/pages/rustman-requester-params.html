@@ -106,17 +106,49 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .rail-item.gap{margin-top:auto}
 
 .sidebar{flex:0 0 280px;background:var(--bg-1);border-right:1px solid var(--bd-1);display:flex;flex-direction:column;min-height:0}
-.side-top{padding:10px 10px 4px;display:flex;flex-direction:column;gap:8px}
+.side-top{padding:10px 10px 4px;display:flex;flex-direction:column;gap:8px;position:relative}
 .side-search-row{display:flex;align-items:center;gap:6px}
 .side-search{position:relative;flex:1;min-width:0}
 .side-search svg{position:absolute;left:9px;top:7px;color:var(--tx-3)}
 .side-search input{width:100%;height:28px;box-sizing:border-box;border:1px solid var(--bd-1);background:var(--bg-0);border-radius:4px;padding:0 8px 0 30px;font-size:12px;color:var(--tx-1)}
 .side-search input::placeholder{color:var(--tx-3)}
+.side-search input[value]{border-color:var(--accent);background:var(--bg-0)}
 .side-search input:focus{outline:none;border-color:var(--accent);background:var(--bg-0)}
 .side-icon{width:26px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);flex:0 0 auto}
 .side-icon:hover{background:var(--bg-2);color:var(--tx-1)}
 .side-section{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx-2)}
 .side-section svg{color:var(--tx-3)}
+.search-pop{position:absolute;left:0;top:calc(100% + 6px);z-index:35;width:452px;background:var(--bg-0);border:1px solid var(--bd-2);border-radius:8px;box-shadow:0 14px 36px rgba(0,0,0,.22);overflow:hidden}
+.sp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bd-1);background:var(--bg-1)}
+.sp-query{font-size:12px;color:var(--tx-2);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp-query b{color:var(--tx-1);font-weight:600}
+.sp-count{font:400 11px var(--font-code);color:var(--tx-3);white-space:nowrap}
+.sp-body{max-height:372px;overflow-y:auto;padding:6px}
+.sp-group + .sp-group{margin-top:6px;padding-top:6px;border-top:1px solid var(--bd-1)}
+.sp-glabel{display:flex;align-items:center;gap:6px;padding:4px 8px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx-3)}
+.sp-glabel .n{font:400 10px var(--font-code);color:var(--tx-3)}
+.sp-item{display:flex;align-items:flex-start;gap:10px;width:100%;padding:7px 8px;border-radius:5px;text-align:left}
+.sp-item:hover,.sp-item.active{background:var(--bg-2)}
+.sp-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.sp-title{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--tx-1);min-width:0}
+.sp-title .r-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-crumb{font-size:11px;color:var(--tx-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp-snippet{margin-top:2px;font:400 11px/16px var(--font-code);color:var(--tx-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--bg-1);border-radius:3px;padding:2px 6px}
+.sp-item.active .sp-snippet{background:var(--bg-0)}
+.sp-why{flex:0 0 auto;font-size:10px;color:var(--tx-3);border:1px solid var(--bd-1);border-radius:24px;padding:2px 7px;margin-top:1px}
+.sp-why.body{color:var(--info);border-color:transparent;background:var(--info-tint)}
+.sp-why.meta{color:var(--accent);border-color:transparent;background:var(--accent-tint)}
+.sp-method{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:4px;font:600 9px var(--font-code);letter-spacing:.02em;margin-top:2px;color:var(--tx-2);background:var(--bg-2)}
+.sp-method.post{background:var(--accent-tint);color:var(--accent)}
+.sp-method.get{background:var(--success-tint);color:var(--success)}
+.sp-method.put{background:var(--info-tint);color:var(--info)}
+.sp-method.del{background:var(--danger-tint);color:var(--danger)}
+.sp-method.folder{background:var(--bg-2);color:var(--tx-3)}
+.search-pop mark{background:var(--accent-tint);color:var(--tx-1);border-radius:2px;padding:0 1px}
+.sp-foot{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--bd-1);background:var(--bg-1);font-size:10px;color:var(--tx-3)}
+.sp-foot .sp-hint{display:flex;align-items:center;gap:5px}
+.sp-foot .right{margin-left:auto}
+.sp-kbd{font:600 9px var(--font-code);border:1px solid var(--bd-2);border-bottom-width:2px;border-radius:3px;padding:1px 4px;color:var(--tx-2);background:var(--bg-0)}
 .tree{flex:1;overflow-y:auto;padding:4px 6px 12px}
 .col-row{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border-radius:4px;font-size:12px;color:var(--tx-1);cursor:default}
 .col-row:hover{background:var(--bg-2)}
@@ -150,10 +182,20 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .rb-splitter::after{content:"";width:2px;height:28px;border-radius:2px;background:var(--bd-2);opacity:0;transition:opacity 120ms ease}
 .rb-splitter:hover{background:var(--accent-tint)}
 .rb-splitter:hover::after{opacity:1;background:var(--accent)}
-.rb-reopen{display:none;flex:0 0 26px;border-left:1px solid var(--bd-1);background:var(--bg-1);align-items:center;justify-content:center;color:var(--tx-3);cursor:pointer}
-.rb-reopen:hover{color:var(--tx-1);background:var(--bg-2)}
-#rbhide:checked ~ .rightbar{display:none}
-#rbhide:checked ~ .rb-reopen{display:flex}
+.statusbar{flex:0 0 25px;display:flex;align-items:center;gap:14px;padding:0 10px;border-top:1px solid var(--bd-1);background:var(--bg-1);font-size:11px;color:var(--tx-3)}
+.sb-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx-3);white-space:nowrap}
+.sb-item:hover{color:var(--tx-1)}
+.sb-item svg{color:var(--tx-3)}
+.sb-item:hover svg{color:var(--tx-1)}
+.sb-hint{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;color:var(--tx-3);font-size:11px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-hint svg{color:var(--accent);flex:0 0 auto}
+.sb-right{display:flex;align-items:center;gap:14px}
+.sb-icon{width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);flex:0 0 auto}
+.sb-icon:hover{background:var(--bg-2);color:var(--tx-1)}
+#sbhide:checked ~ .shell .sidebar{display:none}
+#sbhide:checked ~ .statusbar .sb-left{background:var(--accent-tint);color:var(--accent)}
+#rbhide:checked ~ .shell .rightbar{display:none}
+#rbhide:checked ~ .statusbar .sb-toggle{background:var(--accent-tint);color:var(--accent)}
 .rb-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px}
 .rb-title{font-size:13px;font-weight:600;letter-spacing:-.01em}
 .rb-actions{display:flex;gap:2px}
@@ -368,7 +410,7 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 .code-foot{display:flex;justify-content:space-between;gap:10px;padding:6px 0 0;font:400 11px var(--font-code);color:var(--tx-3)}
 .rsp-tools{display:flex;align-items:center;gap:8px;padding:8px 16px 0;flex:0 0 auto}
 .rsp-tools .spacer{flex:1}
-.sc-label{font-size:11px;color:var(--tx-3)}
+.rsp-tools .dd-mini summary{height:24px;padding:0 7px;font-size:10px;gap:5px}
 .dd-mini{position:relative}
 .dd-mini summary{list-style:none;display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:1px solid var(--bd-1);border-radius:4px;background:var(--bg-1);font-size:11px;color:var(--tx-2);cursor:pointer}
 .dd-mini summary::-webkit-details-marker{display:none}
@@ -376,7 +418,7 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 .dd-mini[open] summary{border-color:var(--accent);color:var(--tx-1);background:var(--bg-0)}
 .dd-mini .combo-menu{top:calc(100% + 4px);left:auto;right:0;min-width:178px}
 .lang-glyph{font:600 9px var(--font-code);color:var(--tx-3);width:18px;text-align:center;flex:0 0 auto}
-.preview-btn{height:26px;padding:0 9px;border:1px solid transparent;border-radius:4px;font-size:11px;color:var(--tx-2)}
+.preview-btn{height:24px;padding:0 7px;border:1px solid transparent;border-radius:4px;font-size:10px;color:var(--tx-2)}
 .preview-btn:hover{background:var(--bg-2);color:var(--tx-1)}
 .resp-icons{margin-left:auto;display:flex;gap:2px}
 .resp-icon{width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3)}
@@ -447,19 +489,20 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 .splitter::after{content:"";position:absolute;left:50%;top:1px;width:44px;margin-left:-22px;height:3px;border-radius:100%;background:var(--bd-2)}
 
 .response{flex:0 0 212px;display:flex;flex-direction:column;min-height:0}
-.resp-head{flex:0 0 36px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--bd-1)}
-.resp-title{font-size:13px;font-weight:600;letter-spacing:-.01em}
-.resp-history{display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:4px;font-size:11px;color:var(--tx-3)}
+.resp-head{flex:0 0 38px;display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid var(--bd-1);min-width:0}
+.resp-history{width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);flex:0 0 auto}
 .resp-history:hover{background:var(--bg-2);color:var(--tx-1)}
-.resp-status{display:flex;align-items:center;gap:7px;font:600 12px var(--font-code);color:var(--danger)}
-.resp-status .dot{width:8px;height:8px;border-radius:100%;background:var(--danger);box-shadow:0 0 0 3px var(--danger-tint)}
-.resp-meta{font:400 11px var(--font-code);color:var(--tx-3);font-variant-numeric:tabular-nums}
+.resp-right{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
+.resp-status{display:flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;background:var(--danger-tint);color:var(--danger);font:600 11px var(--font-code);white-space:nowrap;flex:0 0 auto}
+.resp-meta{font:400 11px var(--font-code);color:var(--tx-3);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .resp-meta b{color:var(--tx-2);font-weight:400}
-.resp-spacer{flex:1}
-.resp-tabsbar{flex:0 0 32px;display:flex;align-items:center;gap:2px;padding:0 12px;border-bottom:1px solid var(--bd-1)}
-.rsp-tab{display:flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:4px;font-size:12px;color:var(--tx-2);cursor:pointer}
-.rsp-tab:hover{color:var(--tx-1);background:var(--bg-2)}
-.rsp-tab .n{font:600 10px var(--font-code);color:var(--tx-3)}
+.resp-iconbtn{width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);flex:0 0 auto}
+.resp-iconbtn:hover{background:var(--bg-2);color:var(--tx-1)}
+.resp-action{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border-radius:4px;font-size:11px;color:var(--tx-2);white-space:nowrap;flex:0 0 auto}
+.resp-action:hover{background:var(--bg-2);color:var(--tx-1)}
+.rsp-tab{display:flex;align-items:center;gap:5px;height:26px;padding:0 2px;border-radius:0;font-size:12px;color:var(--tx-2);cursor:pointer;white-space:nowrap}
+.rsp-tab:hover{color:var(--tx-1)}
+.rsp-tab .n{font:600 9px var(--font-code);color:var(--tx-3)}
 .rsp-panel{display:none;flex:1;overflow:auto;min-height:0;font:400 12px/19px var(--font-code);color:var(--tx-1)}
 .rsp-panel.body-pad{padding:10px 16px;white-space:pre;background:var(--bg-1)}
 .rsp-panel .j-key{color:var(--tx-2)}
@@ -475,10 +518,10 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 .rsp-assert.fail .st{color:var(--danger)}
 .rsp-assert.pass .st{color:var(--success)}
 .rsp-assert .why{display:block;font:400 11px var(--font-code);color:var(--tx-3);margin-top:1px}
-#rr-body:checked ~ .resp-tabsbar [for="rr-body"],
-#rr-cookies:checked ~ .resp-tabsbar [for="rr-cookies"],
-#rr-headers:checked ~ .resp-tabsbar [for="rr-headers"],
-#rr-tests:checked ~ .resp-tabsbar [for="rr-tests"]{color:var(--tx-1);background:var(--bg-2);font-weight:500}
+#rr-body:checked ~ .resp-head [for="rr-body"],
+#rr-cookies:checked ~ .resp-head [for="rr-cookies"],
+#rr-headers:checked ~ .resp-head [for="rr-headers"],
+#rr-tests:checked ~ .resp-head [for="rr-tests"]{color:var(--tx-1);font-weight:500}
 #rr-body:checked ~ .rsp-panel[data-rsp="body"],
 #rr-cookies:checked ~ .rsp-panel[data-rsp="cookies"],
 #rr-headers:checked ~ .rsp-panel[data-rsp="headers"],
@@ -493,6 +536,8 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
 <body>
 
 <div class="app">
+  <input class="rb-toggle" type="checkbox" id="rbhide">
+  <input class="rb-toggle" type="checkbox" id="sbhide">
   <header class="app-header">
     <div class="hdr-left">
       <div class="logo">R</div>
@@ -580,7 +625,6 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
   </header>
 
   <div class="shell">
-    <input class="rb-toggle" type="checkbox" id="rbhide">
     <nav class="rail" aria-label="Navigasi">
       <button class="rail-item active" aria-label="Collections">
         <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 4.2c0-1 .8-1.7 1.7-1.7h2.6c.5 0 1 .2 1.3.6l.8.9h4.9c1 0 1.7.8 1.7 1.7v6.1c0 1-.8 1.7-1.7 1.7H3.2c-1 0-1.7-.8-1.7-1.7V4.2Z"/></svg>
@@ -596,9 +640,6 @@ button.chip.status:hover{color:var(--tx-1);background:var(--accent-tint)}
       </button>
       <button class="rail-item gap" aria-label="Console">
         <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.8" y="2.5" width="12.4" height="11" rx="1.4"/><path d="m4.5 6 2 2-2 2M8 10.5h3.5"/></svg>
-      </button>
-      <button class="rail-item" aria-label="Pengaturan">
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4"/></svg>
       </button>
     </nav>
 
@@ -1147,20 +1188,28 @@ pm.test('Response time di bawah 300ms', () =&gt; pm.expect(pm.response.responseT
           <input class="tab-radio" type="radio" name="rtabr" id="rr-headers">
           <input class="tab-radio" type="radio" name="rtabr" id="rr-tests">
           <div class="resp-head">
-            <span class="resp-title">Response</span>
-            <button class="resp-history">
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.8"/><path d="M8 5v3l2 1.3"/></svg>
-              History
-            </button>
-            <span class="resp-spacer"></span>
-            <span class="resp-status"><span class="dot"></span>401 Unauthorized</span>
-            <span class="resp-meta"><b>212 ms</b> · <b>1.2 KB</b> · env <b>staging</b></span>
-          </div>
-          <div class="resp-tabsbar">
             <label class="rsp-tab" for="rr-body">Body</label>
             <label class="rsp-tab" for="rr-cookies">Cookies</label>
             <label class="rsp-tab" for="rr-headers">Headers</label>
             <label class="rsp-tab" for="rr-tests">Test Results <span class="n">2</span></label>
+            <button class="resp-history" aria-label="Riwayat response">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.8"/><path d="M8 5v3l2 1.3"/></svg>
+            </button>
+            <span class="resp-right">
+              <span class="resp-status" title="401 Unauthorized">401</span>
+              <span class="resp-meta"><b>212 ms</b> · <b>1.2 KB</b></span>
+              <button class="resp-action">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 11.5h7a3 3 0 0 0 .4-6A4.2 4.2 0 0 0 4 6.2a2.7 2.7 0 0 0 .5 5.3Z"/></svg>
+                Load test
+              </button>
+              <button class="resp-action">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1.8 14 5 8 8.2 2 5l6-3.2Z" stroke-linejoin="round"/><path d="m2 8.2 6 3.2 6-3.2M2 11.2 8 14.4l6-3.2"/></svg>
+                Save
+              </button>
+              <button class="resp-iconbtn" aria-label="Lainnya">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.1"/><circle cx="8" cy="8" r="1.1"/><circle cx="12.5" cy="8" r="1.1"/></svg>
+              </button>
+            </span>
           </div>
           <div class="rsp-panel" data-rsp="body">
             <div class="rsp-tools">
@@ -1188,19 +1237,6 @@ pm.test('Response time di bawah 300ms', () =&gt; pm.expect(pm.response.responseT
                   <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3"/><path d="M10.5 5.5v-2a1.3 1.3 0 0 0-1.3-1.3H3.8A1.3 1.3 0 0 0 2.5 3.5v5.4a1.3 1.3 0 0 0 1.3 1.3h1.7"/></svg>
                 </button>
               </span>
-              <span class="spacer"></span>
-              <span class="sc-label">Status Code</span>
-              <details class="dd-mini">
-                <summary>401 Unauthorized
-                  <svg width="8" height="8" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m4 6 4 4 4-4"/></svg>
-                </summary>
-                <div class="combo-menu">
-                  <button class="combo-item">200 OK</button>
-                  <button class="combo-item">401 Unauthorized <span class="tick"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3.5 8.5 3 3 6-6.5"/></svg></span></button>
-                  <button class="combo-item">422 Unprocessable Entity</button>
-                  <button class="combo-item">500 Internal Server Error</button>
-                </div>
-              </details>
             </div>
             <div class="rsp-code">
               <div class="codeline"><span class="ln">1</span><span>{</span></div>
@@ -1252,9 +1288,6 @@ pm.test('Response time di bawah 300ms', () =&gt; pm.expect(pm.response.responseT
           <label class="rb-icon" for="rbhide" title="Sembunyikan panel" aria-label="Sembunyikan panel">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 4 4 4-4 4"/></svg>
           </label>
-          <button class="rb-icon" aria-label="Pengaturan snippet">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4"/></svg>
-          </button>
           <button class="rb-icon" aria-label="Salin snippet">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1.3"/><path d="M10.5 5.5v-2a1.3 1.3 0 0 0-1.3-1.3H3.8A1.3 1.3 0 0 0 2.5 3.5v5.4a1.3 1.3 0 0 0 1.3 1.3h1.7"/></svg>
           </button>
@@ -1294,15 +1327,31 @@ pm.test('Response time di bawah 300ms', () =&gt; pm.expect(pm.response.responseT
         <div class="rb-line"><span class="ln">8</span><span class="s">}'</span></div>
       </div>
     </aside>
-    <label class="rb-reopen" for="rbhide" aria-label="Tampilkan Code snippet" title="Tampilkan Code snippet">
-      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m5.5 5.5-2.7 2.7L5.5 11M10.5 5.5l2.7 2.7-2.7 2.7"/></svg>
+  </div>
+
+  <div class="statusbar">
+    <label class="sb-icon sb-left" for="sbhide" aria-label="Sembunyikan sidebar" title="Sembunyikan sidebar">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.8" width="12" height="10.4" rx="1.3"/><path d="M5.8 2.8v10.4"/></svg>
     </label>
+    <button class="sb-item">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.8 4.3c0-.9.7-1.5 1.5-1.5h2.4c.4 0 .8.2 1.1.5l.7.8h4.3c.9 0 1.5.7 1.5 1.5v5.8c0 .9-.7 1.5-1.5 1.5H3.3c-.9 0-1.5-.7-1.5-1.5V4.3Z"/></svg>
+      Open Folder
+    </button>
+    <button class="sb-item">Terminal</button>
+    <button class="sb-item">Console</button>
+    <span class="sb-hint">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5 9.4 6.2 13 7.5 9.4 8.8 8 12.5 6.6 8.8 3 7.5 6.6 6.2 8 2.5Z" stroke-linejoin="round"/></svg>
+      Need help with the next steps?
+    </span>
+    <span class="sb-right">
+      <button class="sb-item">Globals</button>
+      <button class="sb-item">Vault</button>
+      <button class="sb-item">Tools</button>
+      <label class="sb-icon sb-toggle" for="rbhide" aria-label="Tampilkan Code snippet" title="Tampilkan Code snippet">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.8" width="12" height="10.4" rx="1.3"/><path d="M10.2 2.8v10.4"/></svg>
+      </label>
+    </span>
   </div>
 </div>
 
-<button class="theme-toggle" onclick="const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'" aria-label="Ganti tema">
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.2 9.8A5.5 5.5 0 0 1 6.2 2.8a5.5 5.5 0 1 0 7 7Z" stroke-linejoin="round"/></svg>
-</button>
-
-</body>
-</html>
+<butto                                                                                                                                                                                                
