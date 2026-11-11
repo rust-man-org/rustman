@@ -1,27 +1,13 @@
-use iced::{Background, Border, Color, Shadow};
+use iced::{Background, Border};
 
-use crate::ui::theme::Palette;
+use crate::ui::theme::{Palette, RADIUS_SM};
 
-pub fn method_color(method: &crate::domain::request::HttpMethod) -> Color {
-    use crate::domain::request::HttpMethod as M;
-    match method {
-        M::Get => Palette::GET,
-        M::Post => Palette::POST,
-        M::Put => Palette::PUT,
-        M::Patch => Palette::PATCH,
-        M::Delete => Palette::DELETE,
-        M::Head | M::Options => Palette::HEAD,
-    }
-}
-
-pub fn icon_rail_style(_theme: &iced::Theme) -> iced::widget::container::Style {
+/// The whole window is one flat canvas: the rail, sidebar, tab strip, URL
+/// row, both panes and the status bar all use this, separated by hairlines
+/// rather than by darker bands.
+pub fn canvas_style(_theme: &iced::Theme) -> iced::widget::container::Style {
     iced::widget::container::Style {
-        background: Some(Background::Color(Palette::chrome())),
-        border: Border {
-            color: Palette::border_subtle(),
-            width: 1.0,
-            radius: 0.0.into(),
-        },
+        background: Some(Background::Color(Palette::tokens().canvas)),
         ..Default::default()
     }
 }
@@ -31,63 +17,19 @@ pub fn icon_btn_style(
     status: iced::widget::button::Status,
     active: bool,
 ) -> iced::widget::button::Style {
+    let t = Palette::tokens();
     iced::widget::button::Style {
         background: if active {
-            Some(Background::Color(Palette::accent_soft()))
+            Some(Background::Color(t.accent_soft))
         } else if matches!(status, iced::widget::button::Status::Hovered) {
-            Some(Background::Color(Palette::hover()))
+            Some(Background::Color(t.hover))
         } else {
             None
         },
-        text_color: Palette::text(),
+        text_color: t.text,
         border: Border {
-            color: if active {
-                Color {
-                    a: 0.30,
-                    ..Palette::accent()
-                }
-            } else {
-                Color::TRANSPARENT
-            },
-            width: if active { 1.0 } else { 0.0 },
-            radius: 10.0.into(),
-        },
-        ..Default::default()
-    }
-}
-
-pub fn sidebar_style(_theme: &iced::Theme) -> iced::widget::container::Style {
-    iced::widget::container::Style {
-        background: Some(Background::Color(Palette::surface())),
-        border: Border {
-            color: Palette::border(),
-            width: 1.0,
-            radius: 0.0.into(),
-        },
-        ..Default::default()
-    }
-}
-
-pub fn surface_style(_theme: &iced::Theme) -> iced::widget::container::Style {
-    iced::widget::container::Style {
-        background: Some(Background::Color(Palette::surface())),
-        border: Border {
-            color: Palette::border(),
-            width: 1.0,
-            radius: 0.0.into(),
-        },
-        shadow: Shadow::default(),
-        ..Default::default()
-    }
-}
-
-pub fn tab_bar_container(_theme: &iced::Theme) -> iced::widget::container::Style {
-    iced::widget::container::Style {
-        background: Some(Background::Color(Palette::chrome())),
-        border: Border {
-            color: Palette::border_subtle(),
-            width: 1.0,
-            radius: 0.0.into(),
+            radius: RADIUS_SM.into(),
+            ..Default::default()
         },
         ..Default::default()
     }

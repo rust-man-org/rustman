@@ -1,11 +1,17 @@
 use iced::Task;
+use rustman_core::script::run_tests;
+use rustman_core::store::HistoryStore;
 
 use crate::app::AppState;
-use crate::app::session::persist_session;
+use crate::app::scripting::{Engine, save_env_changes};
+use crate::app::session::{AUTOSAVE_PAUSE, persist_session, save_before_exit};
+use crate::domain::collection::SavedRequest;
 use crate::domain::history::HistoryEntry;
+use crate::domain::response::{BinaryPreviewKind, HttpResponse};
 use crate::jobs::JobKind;
 use crate::message::{AppMsg, FormatTarget, Message};
-use crate::services::storage;
+use crate::services::http::HttpResult;
+use crate::state::tabs::TestResult;
 
 /// Largest binary response, in bytes, we will try to render a rich preview for.
 ///
@@ -14,166 +20,128 @@ use crate::services::storage;
 /// the UI shows the plain "too large to preview" note instead.
 const PREVIEW_BYTE_LIMIT: usize = 32 * 1024 * 1024;
 
+/// What a response shows besides its raw body.
+enum Preview {
+    /// Text, laid out for the viewer off the UI thread.
+    Text,
+    /// A spreadsheet small enough to parse for a preview.
+    Spreadsheet,
+    /// Binary with no preview: an image, a PDF, an archive, or a spreadsheet
+    /// past [`PREVIEW_BYTE_LIMIT`].
+    Nothing,
+}
+
+impl Preview {
+    fn of(resp: &HttpResponse) -> Self {
+        if !resp.is_binary {
+            Preview::Text
+        } else if matches!(resp.binary_preview_kind(), BinaryPreviewKind::Spreadsheet) && resp.body_size <= PREVIEW_BYTE_LIMIT {
+            Preview::Spreadsheet
+        } else {
+            Preview::Nothing
+        }
+    }
+}
+
+/// Moves the keyboard focus into the active tab's URL bar. The operation
+/// runs on the next view, so it finds a tab opened in the same update.
+pub(super) fn focus_url_bar(state: &mut AppState) -> Task<Message> {
+    state.tabs.reveal_active();
+    // Code editors keep their own focus flag (they take no part in iced's
+    // focus operations) and only drop it on an outside click. Moving focus
+    // by keyboard must blur them explicitly, or the body editor keeps
+    // receiving keystrokes alongside the URL bar.
+    let tab = state.tabs.active_tab_mut();
+    tab.body_editor.lose_focus();
+    tab.graphql_variables_editor.lose_focus();
+    tab.pre_request_editor.lose_focus();
+    tab.test_editor.lose_focus();
+    tab.response_editor.lose_focus();
+    iced::widget::operation::focus(crate::ui::request::url_bar::URL_EDITOR_ID)
+}
+
+/// Whether the process may end at once once the session is saved: no git
+/// job is writing a working tree and no update is replacing the binary.
+fn nothing_left_to_write(state: &AppState) -> bool {
+    #[cfg(feature = "self-update")]
+    if matches!(state.update, crate::app::UpdateState::Installing) {
+        return false;
+    }
+    !state.git.jobs.is_busy()
+}
+
 pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
     match msg {
         AppMsg::HttpResponse { generation, result } => {
-            if let Some(tab) = state.tabs.tabs.iter_mut().find(|t| t.id == result.tab_id) {
-                if !tab.jobs.is_current(JobKind::Request, generation) {
+            let HttpResult { tab_id, env_id, request, response } = result;
+            let timeout_ms = u64::try_from(state.request_timeout().as_millis()).unwrap_or(u64::MAX);
+            let Some(tab) = state.tabs.get_mut(&tab_id) else {
+                return Task::none();
+            };
+            if !tab.jobs.is_current(JobKind::Request, generation) {
+                return Task::none();
+            }
+            tab.is_loading = false;
+            tab.viewer_processing = true;
+            let (status, duration_ms) = (response.status, response.duration_ms);
+            let preview = Preview::of(&response);
+            tab.set_response(response, timeout_ms);
+
+            let global_test_script = state.global_test_editor.text();
+            let env = state.environments.iter_mut().find(|e| Some(&e.id) == env_id.as_ref());
+            let Some(response) = state.tabs.tabs.iter().find(|t| t.id == tab_id).and_then(|t| t.response.as_ref()) else {
+                return Task::none();
+            };
+            let scripts = run_tests(&Engine, &global_test_script, &request, response, env);
+            save_env_changes(state, env_id.as_deref(), &scripts);
+
+            // What was sent, under an id of its own: the tab's id would make
+            // every entry from one tab reopen that tab.
+            let mut sent = SavedRequest::from(request);
+            sent.id = uuid::Uuid::new_v4().to_string();
+            let entry = HistoryEntry::new(sent, i32::from(status), i64::try_from(duration_ms).unwrap_or(i64::MAX));
+            state.history.insert(0, entry.summary());
+            if let Some(store) = &state.store {
+                store.write_with(move |store| store.append_history(entry), |e| Message::App(AppMsg::StoreFailed(e)));
+            }
+            if state.history.len() > 100 {
+                state.history.truncate(100);
+            }
+
+            let Some(t) = state.tabs.get_mut(&tab_id) else {
+                return Task::none();
+            };
+            t.test_results = scripts
+                .tests
+                .into_iter()
+                .map(|test| TestResult { name: test.name, passed: test.passed })
+                .collect();
+            t.script_error = scripts.error;
+            t.extend_script_logs(scripts.logs);
+
+            let body = match preview {
+                Preview::Text => t.response.as_ref().map(|r| r.body.clone()).unwrap_or_default(),
+                Preview::Nothing => {
+                    t.response_preview = crate::state::tabs::ResponsePreview::None;
+                    t.viewer_processing = false;
                     return Task::none();
                 }
-                tab.is_loading = false;
-                tab.parsed_json = None;
-                tab.viewer_processing = true;
-                tab.response = Some(result.response.clone());
-
-                let entry = HistoryEntry {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    timestamp: chrono::Utc::now().timestamp_millis(),
-                    method: tab.method.as_str().to_owned(),
-                    url: tab.url.clone(),
-                    status: result.response.status as i32,
-                    duration_ms: result.response.duration_ms as i64,
-                    request: crate::domain::collection::SavedRequest {
-                        id: tab.id.clone(),
-                        collection_id: String::new(),
-                        group_id: None, // history entries stand alone; group membership lives in the saved request
-                        sort_order: 0,
-                        name: tab.title.clone(),
-                        method: tab.method.clone(),
-                        url: tab.url.clone(),
-                        headers: tab.headers.clone(),
-                        params: tab.params.clone(),
-                        body: tab.body_editor.content(),
-                        body_type: tab.body_type.clone(),
-                        graphql_variables: tab.graphql_variables_editor.content(),
-                        auth_type: tab.auth_type.clone(),
-                        bearer_token: tab.bearer_token.clone(),
-                        basic_user: tab.basic_user.clone(),
-                        basic_pass: tab.basic_pass.clone(),
-                        api_key_name: tab.api_key_name.clone(),
-                        api_key_value: tab.api_key_value.clone(),
-                        api_key_location: tab.api_key_location.clone(),
-                        form_data_fields: tab.form_fields.clone(),
-                        cookie_string: tab.cookie_string.clone(),
-                        cookies: tab.cookies.clone(),
-                        jwt_secret: tab.jwt_secret.clone(),
-                        jwt_subject: tab.jwt_subject.clone(),
-                        jwt_algo: tab.jwt_algo.clone(),
-                        pre_request_script: tab.pre_request_editor.content(),
-                        test_script: tab.test_editor.content(),
-                    },
-                };
-
-                let body = result.response.body.clone();
-                let tab_id = tab.id.clone();
-                let body_hash = crate::services::cache::ParsedBodyCache::body_hash(&body);
-
-                if let Some(db) = &state.db {
-                    let _ = storage::add_history(db, &entry);
-                }
-                state.history.insert(0, entry);
-                if state.history.len() > 100 {
-                    state.history.truncate(100);
-                }
-                persist_session(state);
-
-                // Run the global test script, then this tab's own test
-                // script, against this response — results/logs from both
-                // accumulate; whichever phase fails (if any) reports its
-                // own error without discarding a phase that already passed.
-                let global_test_script = state.global_test_editor.text();
-                let request_test_script = state
-                    .tabs
-                    .tabs
-                    .iter()
-                    .find(|t| t.id == tab_id)
-                    .map(|t| t.test_editor.content())
-                    .unwrap_or_default();
-
-                let mut test_results = Vec::new();
-                let mut test_logs = Vec::new();
-                let mut test_error = None;
-
-                for (label, script) in [
-                    ("Global test script", &global_test_script),
-                    ("Test script", &request_test_script),
-                ] {
-                    if script.trim().is_empty() {
-                        continue;
-                    }
-                    let active_env = state.active_env().cloned();
-                    let host_input = state.tabs.tabs.iter().find(|t| t.id == tab_id).map(|t| {
-                        crate::app::scripting::test_host_input(
-                            t,
-                            active_env.as_ref(),
-                            &result.response,
-                        )
-                    });
-                    let Some(host_input) = host_input else {
-                        continue;
-                    };
-                    match crate::app::scripting::run_and_apply(state, script, host_input) {
-                        Ok(applied) => {
-                            test_results.extend(applied.test_results);
-                            test_logs.extend(applied.logs);
-                        }
-                        Err(err) => {
-                            test_error = Some(format!("{label} error: {err}"));
-                            break;
-                        }
-                    }
-                }
-
-                if let Some(t) = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id) {
-                    t.test_results = test_results;
-                    t.script_error = test_error;
-                    t.extend_script_logs(test_logs);
-                }
-
-                if result.response.is_binary {
-                    if let Some(t) = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id) {
-                        t.response_preview = crate::state::tabs::ResponsePreview::None;
-                        t.viewer_processing = false;
-                    }
-                    // Only spreadsheets have a rich preview now. Decide that
-                    // before cloning the raw bytes — an image, PDF or archive
-                    // download used to copy its whole payload here only to drop
-                    // it again.
-                    if !matches!(
-                        result.response.binary_preview_kind(),
-                        crate::domain::response::BinaryPreviewKind::Spreadsheet
-                    ) {
-                        return Task::none();
-                    }
-                    // Parsing a spreadsheet decodes the whole document, so do
-                    // not attempt it for payloads large enough to stall or
-                    // exhaust memory.
-                    if result.response.body_size > PREVIEW_BYTE_LIMIT {
-                        return Task::none();
-                    }
-                    let Some(bytes) = result.response.binary_data.clone() else {
+                Preview::Spreadsheet => {
+                    t.response_preview = crate::state::tabs::ResponsePreview::None;
+                    t.viewer_processing = false;
+                    let Some(bytes) = t.response.as_ref().and_then(|r| r.binary_data.clone()) else {
                         return Task::none();
                     };
-                    let (generation, cancel) = {
-                        let t = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id);
-                        match t {
-                            Some(t) => t.jobs.start(JobKind::Parse),
-                            None => return Task::none(),
-                        }
-                    };
+                    let (generation, cancel) = t.jobs.start(JobKind::Parse);
                     return Task::perform(
                         async move {
                             tokio::select! {
                                 biased;
-                                _ = cancel.cancelled() => AppMsg::Noop,
+                                () = cancel.cancelled() => AppMsg::Noop,
                                 parsed = tokio::task::spawn_blocking(move || {
                                     crate::services::spreadsheet::parse_first_sheet(&bytes)
                                 }) => match parsed {
-                                    Ok(result) => AppMsg::SpreadsheetPreviewReady {
-                                        generation,
-                                        tab_id,
-                                        result,
-                                    },
+                                    Ok(result) => AppMsg::SpreadsheetPreviewReady { generation, tab_id, result },
                                     Err(_) => AppMsg::Noop,
                                 },
                             }
@@ -181,91 +149,41 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
                         Message::App,
                     );
                 }
-
-                if state.parsed_cache.inner_get_by_hash(body_hash).is_some() {
-                    let cached_clone = state
-                        .parsed_cache
-                        .inner_get_by_hash(body_hash)
-                        .unwrap()
-                        .clone();
-                    let use_tabs = state
-                        .tabs
-                        .tabs
-                        .iter()
-                        .find(|t| t.id == tab_id)
-                        .map(|t| t.body_indent_tabs)
-                        .unwrap_or(false);
-                    let display = crate::services::format::pretty_value(&cached_clone, use_tabs)
-                        .unwrap_or_else(|| body.clone());
-                    if let Some(t) = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id) {
-                        t.parsed_json = Some(cached_clone);
-                        t.set_viewer_content(&display, true);
-                        t.html_fallback_text = t
-                            .response
-                            .as_ref()
-                            .and_then(crate::services::format::html_preview_text);
-                        t.viewer_processing = false;
-                        t.jobs.cancel(JobKind::Parse);
-                    }
-                    return Task::none();
-                }
-
-                let parse_generation;
-                let parse_cancel;
-                let use_tabs;
-                {
-                    let t = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id);
-                    if let Some(t) = t {
-                        let (generation, cancel) = t.jobs.start(JobKind::Parse);
-                        parse_generation = generation;
-                        parse_cancel = cancel;
-                        use_tabs = t.body_indent_tabs;
-                    } else {
-                        return Task::none();
-                    }
-                }
-                return Task::perform(
-                    async move {
-                        tokio::select! {
-                            biased;
-                            _ = parse_cancel.cancelled() => AppMsg::Noop,
-                            built = tokio::task::spawn_blocking(move || {
-                                let parsed = serde_json::from_str::<serde_json::Value>(&body).ok();
-                                let display = parsed.as_ref()
-                                    .and_then(|j| crate::services::format::pretty_value(j, use_tabs))
-                                    .unwrap_or(body);
-                                (display, parsed.map(Box::new))
-                            }) => match built {
-                                Ok((content_text, parsed_json)) => AppMsg::ViewerReady {
-                                    generation: parse_generation,
-                                    tab_id,
-                                    content_text,
-                                    parsed_json,
-                                },
-                                Err(_) => AppMsg::Noop,
+            };
+            let (parse_generation, parse_cancel) = t.jobs.start(JobKind::Parse);
+            let use_tabs = t.body_indent_tabs;
+            return Task::perform(
+                async move {
+                    tokio::select! {
+                        biased;
+                        () = parse_cancel.cancelled() => AppMsg::Noop,
+                        built = tokio::task::spawn_blocking(move || {
+                            match serde_json::from_str::<serde_json::Value>(&body) {
+                                Ok(json) => (rustman_core::text::pretty_value(&json, use_tabs), true),
+                                Err(_) => (body, false),
+                            }
+                        }) => match built {
+                            Ok((content_text, is_json)) => AppMsg::ViewerReady {
+                                generation: parse_generation,
+                                tab_id,
+                                content_text,
+                                is_json,
                             },
-                        }
-                    },
-                    Message::App,
-                );
-            }
+                            Err(_) => AppMsg::Noop,
+                        },
+                    }
+                },
+                Message::App,
+            );
         }
         AppMsg::ViewerReady {
             generation,
             tab_id,
             content_text,
-            parsed_json,
+            is_json,
         } => {
-            if let Some(tab) = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id) {
+            if let Some(tab) = state.tabs.get_mut(&tab_id) {
                 if tab.jobs.is_current(JobKind::Parse, generation) {
-                    let is_json = parsed_json.is_some();
-                    if let (Some(parsed), Some(raw_body)) = (
-                        parsed_json.as_deref(),
-                        tab.response.as_ref().map(|r| r.body.as_str()),
-                    ) {
-                        state.parsed_cache.insert(raw_body, parsed.clone());
-                    }
-                    tab.parsed_json = parsed_json.map(|b| *b);
                     tab.set_viewer_content(&content_text, is_json);
                     tab.html_fallback_text = tab
                         .response
@@ -280,7 +198,7 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
             tab_id,
             result,
         } => {
-            if let Some(tab) = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id)
+            if let Some(tab) = state.tabs.get_mut(&tab_id)
                 && tab.jobs.is_current(JobKind::Parse, generation)
             {
                 tab.response_preview = crate::state::tabs::ResponsePreview::Spreadsheet(result);
@@ -292,7 +210,7 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
             target,
             text,
         } => {
-            if let Some(tab) = state.tabs.tabs.iter_mut().find(|t| t.id == tab_id) {
+            if let Some(tab) = state.tabs.get_mut(&tab_id) {
                 if tab.jobs.is_current(JobKind::Format, generation) {
                     match target {
                         FormatTarget::RequestBody => {
@@ -306,26 +224,220 @@ pub(super) fn handle(state: &mut AppState, msg: AppMsg) -> Task<Message> {
             }
         }
         AppMsg::WindowCloseRequested(id) => {
-            persist_session(state);
+            save_before_exit(state);
+            // Everything is on disk. Shutting the runtime down would wait on
+            // any blocking task still running (pretty-printing a big body,
+            // say) while this process keeps the database locked.
+            if !cfg!(test) && nothing_left_to_write(state) {
+                std::process::exit(0);
+            }
             return iced::window::close(id);
         }
         AppMsg::OpenUrl(url) => {
             let _ = open::that(url);
         }
         AppMsg::AutoSaveSession => {
-            // Unconditional: this used to only run when a tab was dirty,
-            // which meant settings-only changes (global scripts, default
-            // timeout, theme) had no reliable save path if no tab happened
-            // to be modified at the same time. persist_session is a single
-            // cheap SQLite upsert, so there's no real cost to always doing it.
-            persist_session(state);
+            if state.session_changed_at.elapsed() >= AUTOSAVE_PAUSE {
+                persist_session(state);
+            }
+        }
+        AppMsg::StoreFailed(error) => {
+            state.storage_error = Some(format!("Couldn't save: {error}"));
+            // The failed write may have been the session's.
+            state.session_dirty = true;
+        }
+        AppMsg::RequestSaveFailed { tab_id, error } => {
+            if let Some(tab) = state.tabs.get_mut(&tab_id) {
+                tab.modified = true;
+            }
+            state.status_message = Some(format!("Couldn't save the request: {error}"));
         }
         AppMsg::SpinnerTick => {
             state.spinner_frame = state.spinner_frame.wrapping_add(1);
         }
-        AppMsg::FocusNextField => return crate::ui::widgets::focus_nav::focus_next(),
-        AppMsg::FocusPreviousField => return crate::ui::widgets::focus_nav::focus_previous(),
+        AppMsg::DismissStatus(shown) => {
+            if state.status_message.as_deref() == Some(shown.as_str()) {
+                state.status_message = None;
+            }
+        }
+        AppMsg::FocusUrlBar => return focus_url_bar(state),
+        AppMsg::CycleTab(step) => {
+            let count = state.tabs.tabs.len();
+            if count > 1 {
+                let next = (state.tabs.active as isize + step as isize).rem_euclid(count as isize);
+                return Task::done(Message::Request(crate::message::RequestMsg::SwitchTab(
+                    next as usize,
+                )));
+            }
+        }
+        AppMsg::MenuToggled(menu) => {
+            state.chrome.open_menu = (state.chrome.open_menu != Some(menu)).then_some(menu);
+        }
+        AppMsg::MenuDismissed => state.chrome.open_menu = None,
+        AppMsg::TabStripScrolled { offset, viewport, content } => {
+            state.chrome.strip = crate::app::StripScroll { offset, viewport, content };
+        }
+        AppMsg::FocusNextField => {
+            return if state.modal_open() {
+                crate::ui::widgets::focus_nav::focus_next_in(crate::ui::layout::MODAL_ID)
+            } else {
+                crate::ui::widgets::focus_nav::focus_next()
+            };
+        }
+        AppMsg::FocusPreviousField => {
+            return if state.modal_open() {
+                crate::ui::widgets::focus_nav::focus_previous_in(crate::ui::layout::MODAL_ID)
+            } else {
+                crate::ui::widgets::focus_nav::focus_previous()
+            };
+        }
         AppMsg::Noop => {}
     }
     Task::none()
+}
+
+#[cfg(test)]
+mod response_tests {
+    use super::*;
+    use crate::domain::environment::AppEnvironment;
+    use crate::state::tabs::make_code_editor;
+    use crate::test_support::TempDir;
+
+    fn env(id: &str, is_active: bool) -> AppEnvironment {
+        AppEnvironment {
+            id: id.into(),
+            name: id.into(),
+            variables: [("token".to_owned(), "old".to_owned())].into(),
+            is_active,
+        }
+    }
+
+    /// The tab's request as it is now, and the generation it was sent under.
+    fn send(state: &mut AppState) -> (u64, crate::domain::model::Request) {
+        let tab = state.tabs.active_tab_mut();
+        let (generation, _) = tab.jobs.start(JobKind::Request);
+        (generation, tab.to_request())
+    }
+
+    fn respond(state: &mut AppState, generation: u64, request: crate::domain::model::Request, env_id: Option<&str>) {
+        let result = HttpResult {
+            tab_id: state.tabs.active_tab().id.clone(),
+            env_id: env_id.map(str::to_owned),
+            request,
+            response: HttpResponse { status: 200, ..Default::default() },
+        };
+        let _ = handle(state, AppMsg::HttpResponse { generation, result });
+    }
+
+    /// Ctrl+Enter sends again while a request is out. When the new send's
+    /// pre-request script fails, that failure is the outcome, not the late
+    /// response of the send it replaced.
+    #[test]
+    fn a_resend_whose_script_fails_shows_the_failure_not_the_older_response() {
+        let dir = TempDir::new("response-resend-script");
+        let mut state = crate::app::scratch_state(dir.path().to_path_buf());
+        state.tabs.active_tab_mut().set_url("http://127.0.0.1:9/slow".to_owned());
+        let (generation, request) = send(&mut state);
+        state.tabs.active_tab_mut().is_loading = true;
+
+        state.tabs.active_tab_mut().pre_request_editor = make_code_editor("set_env(", "txt");
+        let _ = crate::app::update::update(&mut state, Message::Request(crate::message::RequestMsg::Send));
+        respond(&mut state, generation, request, None);
+
+        let tab = state.tabs.active_tab();
+        assert!(!tab.is_loading);
+        let shown = tab.response.as_ref().and_then(|r| r.error.as_deref()).unwrap_or_default();
+        assert!(shown.starts_with("Pre-request script error"), "{shown:?}");
+        let kind = tab.response_view.as_ref().and_then(|v| v.failure.as_ref()).map(|f| f.kind);
+        assert_eq!(kind, Some(crate::state::response_view::FailureKind::Script));
+    }
+
+    #[test]
+    fn test_scripts_write_to_the_environment_the_request_was_sent_with() {
+        let dir = TempDir::new("response-env");
+        let mut state = crate::app::scratch_state(dir.path().to_path_buf());
+        state.tabs.active_tab_mut().test_editor = make_code_editor("set_env(\"token\", \"new\")", "txt");
+        state.environments = vec![env("a", true), env("b", false)];
+        let (generation, request) = send(&mut state);
+        state.environments[0].is_active = false;
+        state.environments[1].is_active = true;
+        respond(&mut state, generation, request, Some("a"));
+        assert_eq!(state.environments[0].variables["token"], "new");
+        assert_eq!(state.environments[1].variables["token"], "old", "switched to after the send");
+    }
+
+    /// The test-script run on a response, which happens on the UI thread.
+    /// Run with `--ignored --nocapture`.
+    #[test]
+    #[ignore = "bench: test-script run per response"]
+    fn test_script_run_time() {
+        let mut tab = crate::state::tabs::RequestTabState::new();
+        tab.test_editor = make_code_editor("test(\"ok\", status() == 200)", "txt");
+        let request = tab.to_request();
+        let response = HttpResponse { status: 200, body: "{}".into(), ..Default::default() };
+        let runs = 20;
+        for (label, script) in [("no scripts", ""), ("one global test", "test(\"g\", true)")] {
+            let start = std::time::Instant::now();
+            for _ in 0..runs {
+                std::hint::black_box(run_tests(&Engine, script, &request, &response, None));
+            }
+            println!("{label}: {:?} per response", start.elapsed() / runs);
+        }
+    }
+
+    #[test]
+    fn a_timeout_too_short_to_use_is_reported_as_the_one_used() {
+        let dir = TempDir::new("response-timeout");
+        let mut state = crate::app::scratch_state(dir.path().to_path_buf());
+        for (typed, used) in [(0, 30_000), (500, 30_000), (4_500, 4_500)] {
+            state.default_timeout_ms = typed;
+            assert_eq!(state.request_timeout(), std::time::Duration::from_millis(used));
+            assert_eq!(state.timeout_overridden(), typed != used);
+        }
+        state.default_timeout_ms = 500;
+        let (generation, request) = send(&mut state);
+        let result = HttpResult {
+            tab_id: state.tabs.active_tab().id.clone(),
+            env_id: None,
+            request,
+            response: HttpResponse { error: Some("Request timed out: operation timed out".into()), ..Default::default() },
+        };
+        let _ = handle(&mut state, AppMsg::HttpResponse { generation, result });
+        let failure = state.tabs.active_tab().response_view.as_ref().and_then(|v| v.failure.clone()).unwrap();
+        assert_eq!(failure.title, "Timed out after 30 s");
+    }
+
+    #[test]
+    fn history_keeps_what_was_sent_under_an_id_of_its_own() {
+        let dir = TempDir::new("response-history");
+        let mut state = crate::app::scratch_state(dir.path().to_path_buf());
+        state.tabs.active_tab_mut().set_url("https://sent.example/a".to_owned());
+        for _ in 0..2 {
+            let (generation, request) = send(&mut state);
+            state.tabs.active_tab_mut().set_url("https://edited.example/b".to_owned());
+            respond(&mut state, generation, request, None);
+            state.tabs.active_tab_mut().set_url("https://sent.example/a".to_owned());
+        }
+        let [newer, older] = &state.history[..2] else { panic!("two entries") };
+        assert_eq!(newer.url, "https://sent.example/a");
+        assert_ne!(newer.id, older.id);
+        assert_ne!(newer.id, state.tabs.active_tab().id);
+    }
+}
+
+#[cfg(test)]
+mod exit_tests {
+    use super::*;
+    use crate::state::git::GitJob;
+    use crate::test_support::TempDir;
+
+    #[test]
+    fn the_process_ends_at_once_only_while_nothing_else_writes() {
+        let dir = TempDir::new("fast-exit");
+        let mut state = crate::app::boot::load(dir.path().to_path_buf());
+        assert!(nothing_left_to_write(&state));
+
+        state.git.jobs.push(GitJob::Refresh);
+        assert!(!nothing_left_to_write(&state), "a git job may be writing the working tree");
+    }
 }

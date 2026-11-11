@@ -1,0 +1,150 @@
+{
+  "tabs": [
+    {
+      "id": "tab-full",
+      "title": "Update product*",
+      "method": "Patch",
+      "url": "{{base_url}}/products/42?expand=variants&trace=on",
+      "headers": [
+        {
+          "id": "h-ct",
+          "key": "Content-Type",
+          "value": "application/json",
+          "enabled": true
+        },
+        {
+          "id": "h-debug",
+          "key": "X-Debug",
+          "value": "1",
+          "enabled": false
+        }
+      ],
+      "params": [
+        {
+          "id": "p-expand",
+          "key": "expand",
+          "value": "variants",
+          "enabled": true
+        },
+        {
+          "id": "p-trace",
+          "key": "trace",
+          "value": "on",
+          "enabled": true
+        },
+        {
+          "id": "p-draft",
+          "key": "draft",
+          "value": "true",
+          "enabled": false
+        }
+      ],
+      "body_type": "GraphQL",
+      "body": "query Product($id: ID!) { product(id: $id) { id name } }",
+      "graphql_variables": "{\n  \"id\": \"42\"\n}",
+      "form_fields": [
+        {
+          "id": "ff-text",
+          "key": "caption",
+          "value": "Front view",
+          "field_type": "Text",
+          "enabled": true,
+          "file_name": null,
+          "file_data": null,
+          "mime_type": null
+        },
+        {
+          "id": "ff-file",
+          "key": "image",
+          "value": "",
+          "field_type": "File",
+          "enabled": false,
+          "file_name": "front.png",
+          "file_data": "aGVsbG8gd29ybGQ=",
+          "mime_type": "image/png"
+        }
+      ],
+      "auth_type": "JwtUser",
+      "bearer_token": "bearer-token-123",
+      "basic_user": "alice",
+      "basic_pass": "s3cret: with spaces",
+      "api_key_name": "X-Api-Key",
+      "api_key_value": "key-456",
+      "api_key_location": "Query",
+      "cookie_string": "session=abc; theme=dark",
+      "cookies": [
+        {
+          "id": "c-session",
+          "key": "session",
+          "value": "abc",
+          "enabled": true
+        },
+        {
+          "id": "c-theme",
+          "key": "theme",
+          "value": "dark",
+          "enabled": false
+        }
+      ],
+      "jwt_secret": "jwt-signing-secret",
+      "jwt_subject": "user-42",
+      "jwt_algo": "HS256",
+      "pre_request_script": "env.set(\"started\", now())\n",
+      "test_script": "test(\"ok\", status == 200)\n",
+      "saved_as": [
+        "col-storefront",
+        "req-full"
+      ],
+      "active_request_tab": "Scripts",
+      "active_response_tab": "Tests"
+    },
+    {
+      "id": "tab-scratch",
+      "title": "New Request",
+      "method": "Post",
+      "url": "https://httpbin.org/anything",
+      "headers": [],
+      "params": [],
+      "body_type": "Text",
+      "body": "draft",
+      "graphql_variables": "",
+      "form_fields": [],
+      "auth_type": "None",
+      "bearer_token": "",
+      "basic_user": "",
+      "basic_pass": "",
+      "api_key_name": "",
+      "api_key_value": "",
+      "api_key_location": "Header",
+      "cookie_string": "",
+      "cookies": [],
+      "jwt_secret": "",
+      "jwt_subject": "",
+      "jwt_algo": "HS256",
+      "pre_request_script": "",
+      "test_script": "",
+      "saved_as": null,
+      "active_request_tab": "Params",
+      "active_response_tab": "Body"
+    }
+  ],
+  "active_tab": 1,
+  "active_env_id": "env-prod",
+  "sidebar_panel": "History",
+  "sidebar_width": 312.5,
+  "sidebar_collapsed": true,
+  "theme_idx": 3,
+  "horizontal_layout": true,
+  "panel_split": 35,
+  "ui_scale": 1.25,
+  "default_timeout_ms": 45000,
+  "global_pre_request_script": "env.set(\"run_id\", uuid())\n",
+  "global_test_script": "test(\"fast\", duration < 2000)\n",
+  "git_user_name": "Ada Lovelace",
+  "git_user_email": "ada@example.invalid",
+  "tls_accept_invalid_certs": true,
+  "tls_http1_only": true,
+  "tls_force_tls12": true,
+  "tls_force_tls13": true,
+  "auto_check_updates": true
+}

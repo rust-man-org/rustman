@@ -9,6 +9,11 @@ mod services;
 mod state;
 mod ui;
 
+#[cfg(test)]
+mod golden_tests;
+#[cfg(test)]
+mod test_support;
+
 fn main() -> iced::Result {
     prefer_integrated_gpu_on_linux();
     app::run()

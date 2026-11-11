@@ -1,0 +1,25 @@
+[package]
+name = "rustman-store"
+description = "Rustman's SQLite persistence"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustman-core.workspace = true
+
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+
+[dev-dependencies]
+rusqlite = { workspace = true, features = ["hooks"] }
+rustman-testkit.workspace = true
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

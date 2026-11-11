@@ -1,0 +1,37 @@
+{
+  "id": "5b1f3c2e-0d4a-4f7e-9a51-2c8e7d6b9a10",
+  "collection_id": "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b",
+  "name": "Get profile",
+  "method": "Get",
+  "url": "https://api.example.com/users/me",
+  "headers": [],
+  "params": [],
+  "body": "{\n  \"fields\": [\"name\", \"email\"]\n}",
+  "body_type": "Json",
+  "auth_type": "None",
+  "bearer_token": "",
+  "basic_user": "",
+  "basic_pass": "",
+  "api_key_name": "",
+  "api_key_value": "",
+  "api_key_location": "Header",
+  "form_data_fields": [
+    {
+      "id": "c3d2e1f0-1111-4222-8333-444455556666",
+      "key": "avatar",
+      "value": "",
+      "field_type": "File",
+      "enabled": true,
+      "file_name": null,
+      "file_data": null,
+      "mime_type": null
+    }
+  ],
+  "cookie_string": "",
+  "cookies": [],
+  "jwt_secret": "",
+  "jwt_subject": "",
+  "jwt_algo": "HS256",
+  "pre_request_script": "",
+  "test_script": "test(\"ok\", status == 200)"
+}

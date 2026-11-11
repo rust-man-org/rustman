@@ -30,11 +30,14 @@ impl JobManager {
         self.slots[kind.index()].generation == generation
     }
 
-    /// Cancel the running job of `kind` without bumping the generation (e.g. Abort).
+    /// Cancels the running job of `kind`. Its generation goes stale too, so
+    /// a result already on its way is dropped rather than applied.
     pub fn cancel(&mut self, kind: JobKind) {
-        if let Some(token) = self.slots[kind.index()].token.take() {
+        let slot = &mut self.slots[kind.index()];
+        if let Some(token) = slot.token.take() {
             token.cancel();
         }
+        slot.generation = slot.generation.wrapping_add(1);
     }
 
     pub fn cancel_all(&mut self) {
@@ -49,5 +52,20 @@ impl JobManager {
 impl Drop for JobManager {
     fn drop(&mut self) {
         self.cancel_all();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_cancelled_job_is_no_longer_current() {
+        let mut jobs = JobManager::default();
+        let (generation, token) = jobs.start(JobKind::Request);
+        assert!(jobs.is_current(JobKind::Request, generation));
+        jobs.cancel(JobKind::Request);
+        assert!(token.is_cancelled());
+        assert!(!jobs.is_current(JobKind::Request, generation), "a response already queued is dropped");
     }
 }

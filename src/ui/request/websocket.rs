@@ -1,22 +1,26 @@
 use iced::{
     Alignment, Background, Border, Color, Element, Length,
-    widget::{Space, button, column, container, row, scrollable, text, text_input},
+    widget::{Space, button, column, container, row, text, text_input},
 };
 
 use crate::{
     message::{Message, RequestMsg},
-    state::tabs::RequestTabState,
+    state::tabs::{RequestTabState, WsFrame, WsMessage},
     ui::{
         icons,
-        theme::{MONO, Palette, TEXT_SM, TEXT_XS},
+        theme::{MONO, Palette, TEXT_SM, TEXT_CAPTION},
     },
 };
+
+/// Messages the feed draws, newest last: a widget each, every frame, so
+/// the rest of the kept history waits off screen.
+const FEED_SHOWN: usize = 200;
 
 pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
     let ws = &tab.ws;
 
     let status_color = if ws.connected {
-        Palette::SUCCESS
+        Palette::success()
     } else {
         Palette::text_muted()
     };
@@ -28,7 +32,7 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
             } else {
                 "Disconnected"
             })
-            .size(TEXT_XS)
+            .size(TEXT_CAPTION)
             .color(status_color),
             Space::new().width(Length::Fill),
         ]
@@ -38,8 +42,12 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
     .padding([4, 12]);
 
     let mut feed = column![].spacing(4).padding([8, 10]);
-    for msg in &ws.messages {
-        feed = feed.push(message_bubble(&msg.text, msg.is_outgoing));
+    let hidden = ws.messages.len().saturating_sub(FEED_SHOWN);
+    if hidden > 0 {
+        feed = feed.push(text(format!("{hidden} earlier messages not shown")).size(TEXT_CAPTION).color(Palette::text_subtle()));
+    }
+    for msg in ws.messages.newest(FEED_SHOWN) {
+        feed = feed.push(message_bubble(msg));
     }
     if ws.messages.is_empty() {
         feed = feed.push(
@@ -84,9 +92,7 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
 
     column![
         status_bar,
-        scrollable(feed)
-            .height(Length::Fill)
-            .style(crate::ui::theme::thin_scrollbar),
+        crate::ui::components::scroll::vertical(crate::ui::theme::Palette::tokens(), feed).height(Length::Fill),
         container(send_row).style(|_| container::Style {
             background: Some(Background::Color(Palette::background())),
             border: Border {
@@ -102,8 +108,8 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
 }
 
 /// Chat-style bubble: outgoing on the right in accent, incoming on the left.
-fn message_bubble(text_str: &str, outgoing: bool) -> Element<'static, Message> {
-    let (bg, border_color, label, label_color) = if outgoing {
+fn message_bubble(msg: &WsMessage) -> Element<'_, Message> {
+    let (bg, border_color, label, label_color) = if msg.frame == WsFrame::Sent {
         (
             Palette::accent_soft(),
             Color {
@@ -118,16 +124,16 @@ fn message_bubble(text_str: &str, outgoing: bool) -> Element<'static, Message> {
             Palette::surface_high(),
             Palette::border_subtle(),
             "← recv",
-            Palette::SUCCESS,
+            Palette::success(),
         )
     };
 
     let bubble = container(
         column![
-            text(label).size(9).color(label_color),
-            text(text_str.to_owned())
+            text(label).size(crate::ui::theme::TEXT_CAPTION).color(label_color),
+            text(msg.text.as_str())
                 .size(12)
-                .color(Palette::text())
+                .color(if msg.frame == WsFrame::Binary { Palette::text_muted() } else { Palette::text() })
                 .font(MONO),
         ]
         .spacing(2),
@@ -144,7 +150,7 @@ fn message_bubble(text_str: &str, outgoing: bool) -> Element<'static, Message> {
     })
     .max_width(560);
 
-    let aligned: Element<Message> = if outgoing {
+    let aligned: Element<Message> = if msg.frame == WsFrame::Sent {
         row![Space::new().width(Length::Fill), bubble].into()
     } else {
         row![bubble, Space::new().width(Length::Fill)].into()

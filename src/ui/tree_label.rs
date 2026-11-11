@@ -1,283 +1,208 @@
-//! Single-line tree labels with overflow-gated hover tooltips, shared by
-//! the collections tree and the history list.
+//! Single-line labels that never wrap.
 //!
-//! iced's `Text` can refuse to wrap but has no ellipsis mode, and views
-//! cannot measure laid-out text — so overflow is *predicted*: the bundled
-//! Noto Sans Regular (the app's default font) is parsed for real per-glyph
-//! advances and each label is measured at its size. Kerning, ligatures and
-//! fallback fonts are ignored, so the result is an estimate: the tooltip
-//! gate additionally demands a clear margin before popping up, erring toward
-//! *fewer* popups (a missed one just means widening the sidebar).
-//!
-//! Two details matter for this to work at all:
-//! - the label text is `Length::Fill`: a `Shrink` text sizes itself to its
-//!   content, so no wrapping mode could ever constrain it and long names
-//!   would push the row out sideways instead of clipping.
-//! - overflowing labels render pre-truncated with a "…" (measured to fit the
-//!   same budget), so the cut looks deliberate rather than sliced mid-glyph.
-//!
-//! A third keeps huge names cheap: measuring is per-glyph font lookups every
-//! frame, so names past `LABEL_RENDER_LIMIT` render truncated without ever
-//! being measured, and hover text is capped at `HOVER_TIP_BYTES` — tooltips
-//! shape their whole content, and megabytes there would freeze on hover.
+//! iced can neither ellipsize nor report laid-out text widths to a view, so
+//! overflow is predicted from the bundled fonts' glyph advances. Kerning and
+//! fallback fonts are ignored; the tooltip gate keeps a margin
+//! ([`OVERFLOW_SLACK_PX`]) so the estimate errs toward fewer popups.
 
-use iced::{Element, Length, widget::text};
+use iced::widget::{text, tooltip::Position};
+use iced::{Color, Element, Font, Length};
 
 use crate::consts::{HOVER_TIP_BYTES, LABEL_RENDER_LIMIT, OVERFLOW_SLACK_PX};
-use crate::message::Message;
 use crate::services::format::head_capped;
-use crate::ui::theme::Palette;
+use crate::ui::components::tooltip::tooltip_at;
+use crate::ui::theme::{MONO, Tokens, UI_FONT, UI_FONT_MEDIUM};
 
-/// Fallback advance for glyphs missing from the font, ~the measured mean.
+const ELLIPSIS: char = '…';
+/// JetBrains Mono advances every glyph by exactly this many em.
+const MONO_ADVANCE_EM: f32 = 0.6;
+/// Advance used for glyphs the font lacks, about the Noto Sans mean.
 const FALLBACK_ADVANCE_EM: f32 = 0.55;
 
-/// The app's default font, parsed once. `include_bytes!` is `'static`, which
-/// is exactly what `Face` wants to borrow.
-fn face() -> Option<&'static ttf_parser::Face<'static>> {
-    static FACE: std::sync::OnceLock<Option<ttf_parser::Face<'static>>> =
-        std::sync::OnceLock::new();
-    FACE.get_or_init(|| {
-        let data: &'static [u8] = include_bytes!("../../assets/fonts/NotoSans-Regular.ttf");
-        ttf_parser::Face::parse(data, 0).ok()
-    })
-    .as_ref()
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Face {
+    Regular,
+    Medium,
+    Mono,
 }
 
-/// Advance of one char at `size_px`, in px.
-fn char_advance(face: Option<&ttf_parser::Face>, c: char, size_px: f32) -> f32 {
-    match face {
-        Some(f) => {
-            let scale = size_px / f32::from(f.units_per_em());
-            f.glyph_index(c)
-                .and_then(|gid| f.glyph_hor_advance(gid))
-                .map(|adv| f32::from(adv) * scale)
-                .unwrap_or(size_px * FALLBACK_ADVANCE_EM)
+type ParsedFace = Option<ttf_parser::Face<'static>>;
+
+impl Face {
+    pub fn font(self) -> Font {
+        match self {
+            Face::Regular => UI_FONT,
+            Face::Medium => UI_FONT_MEDIUM,
+            Face::Mono => MONO,
         }
-        None => size_px * FALLBACK_ADVANCE_EM,
     }
-}
 
-/// Per-char advances for `name`. Monospace labels (JetBrains Mono, measured
-/// at exactly 0.6 em) skip font parsing — every glyph is identical.
-fn glyph_widths(name: &str, size_px: f32, mono: bool) -> Vec<f32> {
-    if mono {
-        return name.chars().map(|_| size_px * 0.6).collect();
-    }
-    let f = face();
-    name.chars().map(|c| char_advance(f, c, size_px)).collect()
-}
-
-/// Predicted pixel width of `name` rendered at `size_px` in the default font.
-#[cfg(test)]
-fn est_text_width(name: &str, size_px: f32) -> f32 {
-    glyph_widths(name, size_px, false).iter().sum()
-}
-
-/// `name` cut to fit `budget_px` at `size_px`, with a trailing "…" when
-/// anything was cut. Always whole chars (never splits UTF-8). A budget that
-/// fits nothing still yields "…" rather than an empty label.
-///
-/// Huge names skip the fits-check below (which scans the whole name):
-/// past `LABEL_RENDER_LIMIT` nothing fits a sidebar budget, and the cutter
-/// itself exits early once over budget, so unbounded input stays bounded.
-pub(crate) fn truncate_to_fit(name: &str, size_px: f32, budget_px: f32, mono: bool) -> String {
-    if name.len() > LABEL_RENDER_LIMIT {
-        return cut_to_budget(name, size_px, budget_px, mono);
-    }
-    if glyph_widths(name, size_px, mono).iter().sum::<f32>() <= budget_px {
-        return name.to_owned();
-    }
-    cut_to_budget(name, size_px, budget_px, mono)
-}
-
-/// Cut `name` to `budget_px`, streaming advances so the scan stops as soon
-/// as the budget is exceeded — a megabyte name costs a row's worth of
-/// lookups, not megabytes.
-fn cut_to_budget(name: &str, size_px: f32, budget_px: f32, mono: bool) -> String {
-    let f = face();
-    let ell_adv = if mono {
-        size_px * 0.6
-    } else {
-        char_advance(f, '…', size_px)
-    };
-    if budget_px <= 0.0 {
-        return "…".to_owned();
-    }
-    let mut used = 0.0;
-    let mut end = 0;
-    for (i, c) in name.char_indices() {
-        let adv = if mono {
-            size_px * 0.6
-        } else {
-            char_advance(f, c, size_px)
+    fn parsed(self) -> Option<&'static ttf_parser::Face<'static>> {
+        static REGULAR: std::sync::OnceLock<ParsedFace> = std::sync::OnceLock::new();
+        static MEDIUM: std::sync::OnceLock<ParsedFace> = std::sync::OnceLock::new();
+        let (cell, data): (&std::sync::OnceLock<ParsedFace>, &'static [u8]) = match self {
+            Face::Regular => (&REGULAR, include_bytes!("../../assets/fonts/NotoSans-Regular.ttf")),
+            Face::Medium => (&MEDIUM, include_bytes!("../../assets/fonts/NotoSans-Medium.ttf")),
+            Face::Mono => return None,
         };
-        if used + adv + ell_adv > budget_px {
-            break;
+        cell.get_or_init(|| ttf_parser::Face::parse(data, 0).ok()).as_ref()
+    }
+
+    /// Advance of `c` at `size` px.
+    pub fn advance(self, c: char, size: f32) -> f32 {
+        if self == Face::Mono {
+            return size * MONO_ADVANCE_EM;
         }
-        used += adv;
-        end = i + c.len_utf8();
+        let Some(face) = self.parsed() else {
+            return size * FALLBACK_ADVANCE_EM;
+        };
+        let scale = size / f32::from(face.units_per_em());
+        face.glyph_index(c)
+            .and_then(|glyph| face.glyph_hor_advance(glyph))
+            .map_or(size * FALLBACK_ADVANCE_EM, |adv| f32::from(adv) * scale)
     }
-    if end >= name.len() {
-        return name.to_owned();
-    }
-    let mut out = name[..end].to_owned();
-    out.push('…');
-    out
 }
 
-/// Hover text for a label: capped, since tooltips render their whole
-/// content and an uncapped megabyte name would freeze shaping on hover.
-fn tip_text(name: &str) -> String {
-    let head = head_capped(name, HOVER_TIP_BYTES);
-    if head.len() >= name.len() {
-        return name.to_owned();
-    }
-    let mut out = head.to_owned();
-    out.push('…');
-    out
-}
-
-/// One label that never wraps: overlong names render truncated with "…" and
-/// the full text shows on hover — but only on clear overflow. `avail_px` is
-/// the row's label budget: content width minus that row's chrome (indent,
-/// icons, buttons, padding), estimated at the call site.
-///
-/// Takes an owned `String` so callers can pass locals as well as state
-/// borrows (commit messages, pretty file names); the per-frame clone of a
-/// short label is negligible next to what `view` already allocates.
-pub fn tree_label(name: String, size: f32, avail_px: f32) -> Element<'static, Message> {
-    tree_label_styled(name, size, avail_px, None, Palette::text())
-}
-
-/// Like [`tree_label`], but rendered in `font`/`color` (e.g. mono branch
-/// names). Pass `Some` font only for monospace faces — width prediction
-/// switches to the exact 0.6 em advance instead of parsing the UI font.
-pub fn tree_label_styled(
-    name: String,
+/// A label with its glyph edges measured once, so fitting it to a width
+/// is a binary search with no font lookups.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Measured {
+    text: String,
     size: f32,
-    avail_px: f32,
-    font: Option<iced::Font>,
-    color: iced::Color,
-) -> Element<'static, Message> {
-    let mono = font.is_some();
-    // Labels are measured on every frame: names past the render limit skip
-    // measuring and go straight to truncation, so a pathological name can
-    // never cost megabytes of font lookups per frame.
-    let huge = name.len() > LABEL_RENDER_LIMIT;
-    if !huge && glyph_widths(&name, size, mono).iter().sum::<f32>() <= avail_px + OVERFLOW_SLACK_PX
-    {
-        let mut label = text(name)
-            .size(size)
+    face: Face,
+    /// `(byte end, x end)` per char; names past [`LABEL_RENDER_LIMIT`] bytes
+    /// are measured only that far.
+    edges: Vec<(usize, f32)>,
+}
+
+impl Measured {
+    pub fn new(text: impl Into<String>, size: f32, face: Face) -> Self {
+        let text = text.into();
+        let mut x = 0.0;
+        let edges = text
+            .char_indices()
+            .take_while(|&(i, _)| i < LABEL_RENDER_LIMIT)
+            .map(|(i, c)| {
+                x += face.advance(c, size);
+                (i + c.len_utf8(), x)
+            })
+            .collect();
+        Measured { text, size, face, edges }
+    }
+
+    pub fn into_text(self) -> String {
+        self.text
+    }
+
+    pub fn width(&self) -> f32 {
+        self.edges.last().map_or(0.0, |&(_, x)| x)
+    }
+
+    fn fits(&self, budget: f32) -> bool {
+        let measured_all = self.edges.last().map_or(0, |&(end, _)| end) == self.text.len();
+        measured_all && self.width() <= budget + OVERFLOW_SLACK_PX
+    }
+
+    /// `None` when the whole text fits `budget`, else the longest prefix
+    /// that fits together with a trailing "…".
+    pub fn fitted(&self, budget: f32) -> Option<String> {
+        if self.fits(budget) {
+            return None;
+        }
+        let room = budget - self.face.advance(ELLIPSIS, self.size);
+        let kept = self.edges.partition_point(|&(_, x)| x <= room);
+        let end = kept.checked_sub(1).map_or(0, |i| self.edges[i].0);
+        let mut cut = String::with_capacity(end + ELLIPSIS.len_utf8());
+        cut.push_str(&self.text[..end]);
+        cut.push(ELLIPSIS);
+        Some(cut)
+    }
+
+    /// The label as a single line filling its row. `fitted` is what
+    /// [`Measured::fitted`] returned; a cut label shows the full text in a
+    /// tooltip.
+    pub fn view<'a, M: 'a>(&self, fitted: Option<&str>, color: Color, t: &'a Tokens) -> Element<'a, M> {
+        let label = text(fitted.unwrap_or(&self.text).to_owned())
+            .size(self.size)
+            .font(self.face.font())
             .color(color)
             .width(Length::Fill)
             .wrapping(iced_core::text::Wrapping::None);
-        if let Some(font) = font {
-            label = label.font(font);
+        if fitted.is_some() {
+            tooltip_at(t, label, tip_text(&self.text), None, Position::FollowCursor)
+        } else {
+            label.into()
         }
-        return label.into();
     }
-    let short = truncate_to_fit(&name, size, avail_px, mono);
-    let mut tip = text(short)
-        .size(size)
-        .color(color)
-        .width(Length::Fill)
-        .wrapping(iced_core::text::Wrapping::None);
-    if let Some(font) = font {
-        tip = tip.font(font);
+}
+
+/// Tooltip text, capped: tooltips shape their whole content.
+fn tip_text(s: &str) -> String {
+    let head = head_capped(s, HOVER_TIP_BYTES);
+    if head.len() == s.len() {
+        s.to_owned()
+    } else {
+        format!("{head}{ELLIPSIS}")
     }
-    let tip_text = tip_text(&name);
-    iced::widget::tooltip(
-        tip,
-        text(tip_text).size(12).color(Palette::text()),
-        iced::widget::tooltip::Position::FollowCursor,
-    )
-    .into()
 }
 
 #[cfg(test)]
-mod width_tests {
+mod tests {
     use super::*;
 
+    fn width_of(s: &str, size: f32, face: Face) -> f32 {
+        Measured::new(s, size, face).width()
+    }
+
     #[test]
-    fn measures_narrow_and_wide_runs_differently() {
-        let narrow = est_text_width("iiiiii", 12.0);
-        let wide = est_text_width("mmmmmm", 12.0);
+    fn wide_glyphs_measure_wider_than_narrow_ones() {
+        let narrow = width_of("iiiiii", 12.0, Face::Regular);
+        let wide = width_of("mmmmmm", 12.0, Face::Regular);
         assert!(wide > narrow * 1.5, "m-run {wide} vs i-run {narrow}");
+        assert!(width_of("Get user", 13.0, Face::Medium) >= width_of("Get user", 13.0, Face::Regular));
     }
 
     #[test]
-    fn empty_name_measures_zero() {
-        assert_eq!(est_text_width("", 12.0), 0.0);
+    fn fitting_text_is_kept_whole() {
+        let label = Measured::new("Get user", 12.0, Face::Regular);
+        assert_eq!(label.fitted(label.width()), None);
     }
 
     #[test]
-    fn twelve_px_sample_is_sane() {
-        // "Get user" ≈ 8 glyphs; must land well clear of both 0 and 8×12.
-        let w = est_text_width("Get user", 12.0);
-        assert!(w > 20.0 && w < 96.0, "unexpected width {w}");
+    fn overflowing_text_is_cut_with_an_ellipsis_within_budget() {
+        let label = Measured::new("a-quite-long-endpoint-name-for-testing", 12.0, Face::Regular);
+        let cut = label.fitted(100.0).expect("too long for 100 px");
+        assert!(cut.ends_with(ELLIPSIS), "expected ellipsis, got {cut:?}");
+        assert!(width_of(&cut, 12.0, Face::Regular) <= 100.0 + 0.5);
     }
 
     #[test]
-    fn fitting_text_is_returned_untouched() {
-        let name = "Get user";
-        let budget = est_text_width(name, 12.0) + 1.0;
-        assert_eq!(truncate_to_fit(name, 12.0, budget, false), name);
+    fn a_budget_that_fits_nothing_still_shows_the_ellipsis() {
+        assert_eq!(Measured::new("Health check", 12.0, Face::Regular).fitted(0.0).as_deref(), Some("…"));
     }
 
     #[test]
-    fn overflowing_text_is_cut_with_ellipsis_within_budget() {
-        let name = "a-quite-long-endpoint-name-for-testing";
-        let budget = 100.0;
-        let cut = truncate_to_fit(name, 12.0, budget, false);
-        assert!(cut.ends_with('…'), "expected ellipsis, got {cut:?}");
-        assert!(cut.len() < name.len());
-        // The rendered result (cut incl. "…") must fit the budget, with a
-        // small tolerance for the estimate itself being approximate.
-        let w = est_text_width(&cut, 12.0);
-        assert!(w <= budget + 1.0, "cut width {w} exceeds budget {budget}");
-    }
-
-    #[test]
-    fn truncation_never_splits_utf8() {
-        // Slicing by byte index panics on multi-byte chars, and this crate
-        // builds with `panic = "abort"` — a render-path panic is fatal.
+    fn cuts_never_split_a_char() {
         for name in [
             "héllo-wörld-énough-chars-to-overflow-the-budget".to_owned(),
             "🎉".repeat(60),
             "日本語のコミットメッセージ".repeat(8),
-            "🚀 fix: ünïcödé commit with emoji 🎉 and more text to overflow".to_owned(),
         ] {
-            let cut = truncate_to_fit(&name, 12.0, 60.0, false);
-            assert!(cut.ends_with('…'), "expected ellipsis for {name:?}");
+            assert!(Measured::new(name, 12.0, Face::Regular).fitted(60.0).is_some_and(|c| c.ends_with(ELLIPSIS)));
         }
     }
 
     #[test]
-    fn mono_labels_use_exact_advance() {
-        // JetBrains Mono is exactly 0.6 em: 6 chars at 10px = 36px.
-        let name = "iiiiii";
-        assert_eq!(truncate_to_fit(name, 10.0, 40.0, true), name);
-        let cut = truncate_to_fit(name, 10.0, 30.0, true);
-        assert!(cut.ends_with('…'), "expected ellipsis, got {cut:?}");
+    fn mono_advances_are_exact() {
+        assert!((width_of("OPTIONS", 10.0, Face::Mono) - 42.0).abs() < 1e-3);
     }
 
     #[test]
-    fn megabyte_names_render_bounded() {
-        // The pathological case behind the label/tooltip freeze: measuring
-        // and shaping must never see the whole name.
+    fn huge_names_are_measured_and_tipped_in_bounded_time() {
         let name = "x".repeat(5_000_000);
-        let cut = truncate_to_fit(&name, 12.0, 200.0, false);
-        assert!(
-            cut.len() < 1000,
-            "label must be budget-cut, got {}",
-            cut.len()
-        );
-        assert!(cut.ends_with('…'));
-        let tip = tip_text(&name);
-        assert!(
-            tip.len() <= HOVER_TIP_BYTES + 4,
-            "tip must be capped, got {}",
-            tip.len()
-        );
+        let label = Measured::new(name.clone(), 12.0, Face::Regular);
+        assert!(label.edges.len() <= LABEL_RENDER_LIMIT);
+        assert!(label.fitted(f32::MAX / 2.0).is_some(), "an unmeasured tail is never claimed to fit");
+        assert!(tip_text(&name).len() <= HOVER_TIP_BYTES + ELLIPSIS.len_utf8());
     }
 }

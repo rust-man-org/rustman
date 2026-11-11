@@ -1,0 +1,335 @@
+[
+  {
+    "collection": {
+      "id": "col-storefront",
+      "name": "Storefront API",
+      "created_at": 1785000000000
+    },
+    "requests": [
+      {
+        "id": "req-get",
+        "collection_id": "col-storefront",
+        "group_id": null,
+        "sort_order": 0,
+        "name": "List products",
+        "method": "Get",
+        "url": "{{base_url}}/products?page=1",
+        "headers": [],
+        "params": [
+          {
+            "id": "p-page",
+            "key": "page",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "body": "",
+        "body_type": "None",
+        "graphql_variables": "",
+        "auth_type": "None",
+        "bearer_token": "",
+        "basic_user": "",
+        "basic_pass": "",
+        "api_key_name": "",
+        "api_key_value": "",
+        "api_key_location": "Header",
+        "form_data_fields": [],
+        "cookie_string": "",
+        "cookies": [],
+        "jwt_secret": "",
+        "jwt_subject": "",
+        "jwt_algo": "HS256",
+        "pre_request_script": "",
+        "test_script": ""
+      },
+      {
+        "id": "req-put",
+        "collection_id": "col-storefront",
+        "group_id": null,
+        "sort_order": 1,
+        "name": "Replace description",
+        "method": "Put",
+        "url": "{{base_url}}/products/1/description",
+        "headers": [],
+        "params": [],
+        "body": "Plain text, with \"quotes\" and a\nnewline.",
+        "body_type": "Text",
+        "graphql_variables": "",
+        "auth_type": "Bearer",
+        "bearer_token": "{{token}}",
+        "basic_user": "",
+        "basic_pass": "",
+        "api_key_name": "",
+        "api_key_value": "",
+        "api_key_location": "Header",
+        "form_data_fields": [],
+        "cookie_string": "",
+        "cookies": [],
+        "jwt_secret": "",
+        "jwt_subject": "",
+        "jwt_algo": "HS256",
+        "pre_request_script": "",
+        "test_script": ""
+      }
+    ],
+    "groups": [
+      {
+        "id": "grp-catalog",
+        "parent_id": "col-storefront",
+        "parent_is_collection": true,
+        "name": "Catalog",
+        "sort_order": 0,
+        "requests": [
+          {
+            "id": "req-post",
+            "collection_id": "col-storefront",
+            "group_id": "grp-catalog",
+            "sort_order": 0,
+            "name": "Create product",
+            "method": "Post",
+            "url": "{{base_url}}/products",
+            "headers": [
+              {
+                "id": "h-ct",
+                "key": "Content-Type",
+                "value": "application/json",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": "{\n  \"name\": \"Lamp\",\n  \"price\": 12.5\n}",
+            "body_type": "Json",
+            "graphql_variables": "",
+            "auth_type": "Basic",
+            "bearer_token": "",
+            "basic_user": "admin",
+            "basic_pass": "hunter2",
+            "api_key_name": "",
+            "api_key_value": "",
+            "api_key_location": "Header",
+            "form_data_fields": [],
+            "cookie_string": "",
+            "cookies": [],
+            "jwt_secret": "",
+            "jwt_subject": "",
+            "jwt_algo": "HS256",
+            "pre_request_script": "",
+            "test_script": ""
+          }
+        ],
+        "groups": [
+          {
+            "id": "grp-products",
+            "parent_id": "grp-catalog",
+            "parent_is_collection": false,
+            "name": "Products",
+            "sort_order": 0,
+            "requests": [
+              {
+                "id": "req-full",
+                "collection_id": "col-storefront",
+                "group_id": "grp-products",
+                "sort_order": 0,
+                "name": "Update product (every field)",
+                "method": "Patch",
+                "url": "{{base_url}}/products/42?expand=variants&trace=on",
+                "headers": [
+                  {
+                    "id": "h-ct",
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "enabled": true
+                  },
+                  {
+                    "id": "h-debug",
+                    "key": "X-Debug",
+                    "value": "1",
+                    "enabled": false
+                  }
+                ],
+                "params": [
+                  {
+                    "id": "p-expand",
+                    "key": "expand",
+                    "value": "variants",
+                    "enabled": true
+                  },
+                  {
+                    "id": "p-trace",
+                    "key": "trace",
+                    "value": "on",
+                    "enabled": true
+                  },
+                  {
+                    "id": "p-draft",
+                    "key": "draft",
+                    "value": "true",
+                    "enabled": false
+                  }
+                ],
+                "body": "query Product($id: ID!) { product(id: $id) { id name } }",
+                "body_type": "GraphQL",
+                "graphql_variables": "{\n  \"id\": \"42\"\n}",
+                "auth_type": "JwtUser",
+                "bearer_token": "bearer-token-123",
+                "basic_user": "alice",
+                "basic_pass": "s3cret: with spaces",
+                "api_key_name": "X-Api-Key",
+                "api_key_value": "key-456",
+                "api_key_location": "Query",
+                "form_data_fields": [
+                  {
+                    "id": "ff-text",
+                    "key": "caption",
+                    "value": "Front view",
+                    "field_type": "Text",
+                    "enabled": true,
+                    "file_name": null,
+                    "file_data": null,
+                    "mime_type": null
+                  },
+                  {
+                    "id": "ff-file",
+                    "key": "image",
+                    "value": "",
+                    "field_type": "File",
+                    "enabled": false,
+                    "file_name": "front.png",
+                    "file_data": "aGVsbG8gd29ybGQ=",
+                    "mime_type": "image/png"
+                  }
+                ],
+                "cookie_string": "session=abc; theme=dark",
+                "cookies": [
+                  {
+                    "id": "c-session",
+                    "key": "session",
+                    "value": "abc",
+                    "enabled": true
+                  },
+                  {
+                    "id": "c-theme",
+                    "key": "theme",
+                    "value": "dark",
+                    "enabled": false
+                  }
+                ],
+                "jwt_secret": "jwt-signing-secret",
+                "jwt_subject": "user-42",
+                "jwt_algo": "HS256",
+                "pre_request_script": "env.set(\"started\", now())\n",
+                "test_script": "test(\"ok\", status == 200)\n"
+              },
+              {
+                "id": "req-patch",
+                "collection_id": "col-storefront",
+                "group_id": "grp-products",
+                "sort_order": 1,
+                "name": "Upload image",
+                "method": "Patch",
+                "url": "{{base_url}}/products/1/image",
+                "headers": [],
+                "params": [],
+                "body": "",
+                "body_type": "FormData",
+                "graphql_variables": "",
+                "auth_type": "ApiKey",
+                "bearer_token": "",
+                "basic_user": "",
+                "basic_pass": "",
+                "api_key_name": "X-Api-Key",
+                "api_key_value": "abc123",
+                "api_key_location": "Header",
+                "form_data_fields": [
+                  {
+                    "id": "ff-text",
+                    "key": "caption",
+                    "value": "Front view",
+                    "field_type": "Text",
+                    "enabled": true,
+                    "file_name": null,
+                    "file_data": null,
+                    "mime_type": null
+                  },
+                  {
+                    "id": "ff-file",
+                    "key": "image",
+                    "value": "",
+                    "field_type": "File",
+                    "enabled": false,
+                    "file_name": "front.png",
+                    "file_data": "aGVsbG8gd29ybGQ=",
+                    "mime_type": "image/png"
+                  }
+                ],
+                "cookie_string": "",
+                "cookies": [],
+                "jwt_secret": "",
+                "jwt_subject": "",
+                "jwt_algo": "HS256",
+                "pre_request_script": "",
+                "test_script": ""
+              }
+            ],
+            "groups": []
+          }
+        ]
+      },
+      {
+        "id": "grp-empty",
+        "parent_id": "col-storefront",
+        "parent_is_collection": true,
+        "name": "Empty folder",
+        "sort_order": 1,
+        "requests": [],
+        "groups": []
+      }
+    ]
+  },
+  {
+    "collection": {
+      "id": "col-auth",
+      "name": "Auth service",
+      "created_at": 1785000100000
+    },
+    "requests": [
+      {
+        "id": "req-head",
+        "collection_id": "col-auth",
+        "group_id": null,
+        "sort_order": 5,
+        "name": "Check session",
+        "method": "Head",
+        "url": "{{base_url}}/session",
+        "headers": [],
+        "params": [],
+        "body": "",
+        "body_type": "None",
+        "graphql_variables": "",
+        "auth_type": "Cookie",
+        "bearer_token": "",
+        "basic_user": "",
+        "basic_pass": "",
+        "api_key_name": "",
+        "api_key_value": "",
+        "api_key_location": "Header",
+        "form_data_fields": [],
+        "cookie_string": "sid=xyz",
+        "cookies": [
+          {
+            "id": "c-sid",
+            "key": "sid",
+            "value": "xyz",
+            "enabled": true
+          }
+        ],
+        "jwt_secret": "",
+        "jwt_subject": "",
+        "jwt_algo": "HS256",
+        "pre_request_script": "",
+        "test_script": ""
+      }
+    ],
+    "groups": []
+  }
+]

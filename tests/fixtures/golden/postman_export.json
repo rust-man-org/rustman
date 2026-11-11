@@ -1,0 +1,244 @@
+{
+  "info": {
+    "_postman_id": "col-storefront",
+    "name": "Storefront API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Catalog",
+      "item": [
+        {
+          "name": "Products",
+          "item": [
+            {
+              "name": "Update product (every field)",
+              "request": {
+                "auth": {
+                  "type": "jwt",
+                  "jwt": [
+                    {
+                      "key": "algorithm",
+                      "value": "HS256",
+                      "type": "string"
+                    },
+                    {
+                      "key": "secret",
+                      "value": "jwt-signing-secret",
+                      "type": "string"
+                    },
+                    {
+                      "key": "isSecretBase64Encoded",
+                      "value": false,
+                      "type": "boolean"
+                    },
+                    {
+                      "key": "payload",
+                      "value": "{\"sub\":\"user-42\"}",
+                      "type": "string"
+                    },
+                    {
+                      "key": "addTokenTo",
+                      "value": "header",
+                      "type": "string"
+                    },
+                    {
+                      "key": "headerPrefix",
+                      "value": "Bearer",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "disabled": false
+                  },
+                  {
+                    "key": "X-Debug",
+                    "value": "1",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/products/42?expand=variants&trace=on",
+                  "query": [
+                    {
+                      "key": "expand",
+                      "value": "variants",
+                      "disabled": false
+                    },
+                    {
+                      "key": "trace",
+                      "value": "on",
+                      "disabled": false
+                    },
+                    {
+                      "key": "draft",
+                      "value": "true",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query Product($id: ID!) { product(id: $id) { id name } }",
+                    "variables": "{\n  \"id\": \"42\"\n}"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Upload image",
+              "request": {
+                "auth": {
+                  "type": "apikey",
+                  "apikey": [
+                    {
+                      "key": "key",
+                      "value": "X-Api-Key",
+                      "type": "string"
+                    },
+                    {
+                      "key": "value",
+                      "value": "abc123",
+                      "type": "string"
+                    },
+                    {
+                      "key": "in",
+                      "value": "header",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/products/1/image"
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "caption",
+                      "value": "Front view",
+                      "type": "text",
+                      "disabled": false
+                    },
+                    {
+                      "key": "image",
+                      "value": "",
+                      "type": "file",
+                      "disabled": true,
+                      "src": "front.png",
+                      "contentType": "image/png"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create product",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "hunter2",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lamp\",\n  \"price\": 12.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Empty folder",
+      "item": []
+    },
+    {
+      "name": "List products",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products?page=1",
+          "query": [
+            {
+              "key": "page",
+              "value": "1",
+              "disabled": false
+            }
+          ]
+        },
+        "body": {
+          "mode": "none"
+        }
+      }
+    },
+    {
+      "name": "Replace description",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/1/description"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "Plain text, with \"quotes\" and a\nnewline.",
+          "options": {
+            "raw": {
+              "language": "text"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

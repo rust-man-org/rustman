@@ -1,121 +1,160 @@
+//! The request/response splitter: an overlay across the whole pane area
+//! that takes no layout space. The hairline itself is part of the layout;
+//! this grabs presses within `GRAB` px of it, shows the resize cursor,
+//! draws an accent line while hovered or dragged, and reports the request
+//! pane's new size in px.
+
 use iced::advanced::widget::{self, Tree, Widget};
 use iced::advanced::{Clipboard, Layout, Shell, layout, mouse, renderer};
-use iced::{Element, Event, Length, Rectangle, Size};
+use iced::{Background, Color, Element, Event, Length, Point, Rectangle, Size};
+
+use crate::ui::theme::{HAIRLINE, MIN_PANE, TAB_INDICATOR, Tokens};
+
+/// How far from the hairline, either side, a press still grabs it.
+const GRAB: f32 = 3.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Orientation {
-    Horizontal,
-    Vertical,
+    /// Request on the left, response on the right.
+    SideBySide,
+    /// Request above, response below.
+    Stacked,
 }
 
-#[derive(Clone)]
+/// The request pane's extent along the split, including its hairline:
+/// the saved size (or `default`), kept so both panes stay usable in `total`.
+pub fn pane_extent(saved: Option<f32>, default: f32, total: f32) -> f32 {
+    let max = (total - MIN_PANE).max(MIN_PANE);
+    saved.unwrap_or(default).clamp(MIN_PANE, max)
+}
+
+pub fn panel_splitter<'a, M: Clone + 'a>(
+    t: &'a Tokens,
+    extent: f32,
+    orientation: Orientation,
+    on_resize: fn(f32) -> M,
+) -> Element<'a, M> {
+    Element::new(PanelSplitter {
+        tokens: t,
+        extent,
+        orientation,
+        on_resize,
+    })
+}
+
+struct PanelSplitter<'a, M> {
+    tokens: &'a Tokens,
+    extent: f32,
+    orientation: Orientation,
+    on_resize: fn(f32) -> M,
+}
+
+#[derive(Default)]
 struct State {
     dragging: bool,
     hovered: bool,
-    /// Snapshotted origin (content_top for H, content_left for V) at drag start.
-    drag_origin: f32,
-    /// Snapshotted available space (excluding splitter) at drag start.
-    drag_total: f32,
 }
 
-/// A draggable splitter bar. In `Horizontal` mode (top/bottom panels) it's
-/// a horizontal bar resizing rows; in `Vertical` mode (left/right panels) it's
-/// a vertical bar resizing columns. The split ratio is calculated directly from
-/// the cursor position each frame, making drag feel smooth with no jitter.
-pub fn panel_splitter<'a, Message, Theme, Renderer>(
-    panel_split: u16,
-    orientation: Orientation,
-    on_resize: impl Fn(u16) -> Message + 'a,
-) -> PanelSplitter<'a, Message, Theme, Renderer> {
-    PanelSplitter {
-        panel_split,
-        orientation,
-        on_resize: Box::new(on_resize),
-        _phantom: std::marker::PhantomData,
+impl<M> PanelSplitter<'_, M> {
+    /// Distance of `point` from the area's origin along the split.
+    fn along(&self, area: Rectangle, point: Point) -> f32 {
+        match self.orientation {
+            Orientation::SideBySide => point.x - area.x,
+            Orientation::Stacked => point.y - area.y,
+        }
+    }
+
+    fn total(&self, area: Rectangle) -> f32 {
+        match self.orientation {
+            Orientation::SideBySide => area.width,
+            Orientation::Stacked => area.height,
+        }
+    }
+
+    fn near_line(&self, area: Rectangle, cursor: mouse::Cursor) -> bool {
+        cursor.position_over(area).is_some_and(|p| {
+            let line = self.extent - HAIRLINE;
+            (self.along(area, p) - line).abs() <= GRAB
+        })
+    }
+
+    /// The accent line drawn over the hairline while active.
+    fn indicator(&self, area: Rectangle) -> Rectangle {
+        let start = self.extent - HAIRLINE - (TAB_INDICATOR - HAIRLINE) / 2.0;
+        match self.orientation {
+            Orientation::SideBySide => Rectangle {
+                x: (area.x + start).round(),
+                width: TAB_INDICATOR,
+                ..area
+            },
+            Orientation::Stacked => Rectangle {
+                y: (area.y + start).round(),
+                height: TAB_INDICATOR,
+                ..area
+            },
+        }
     }
 }
 
-pub struct PanelSplitter<'a, Message, Theme, Renderer> {
-    panel_split: u16,
-    orientation: Orientation,
-    on_resize: Box<dyn Fn(u16) -> Message + 'a>,
-    _phantom: std::marker::PhantomData<(Theme, Renderer)>,
-}
-
-impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
-    for PanelSplitter<'_, Message, Theme, Renderer>
-where
-    Renderer: renderer::Renderer,
-    Message: Clone + 'static,
-{
+impl<M: Clone, Theme, Renderer: renderer::Renderer> Widget<M, Theme, Renderer> for PanelSplitter<'_, M> {
     fn tag(&self) -> widget::tree::Tag {
         widget::tree::Tag::of::<State>()
     }
 
     fn state(&self) -> widget::tree::State {
-        widget::tree::State::new(State {
-            dragging: false,
-            hovered: false,
-            drag_origin: 0.0,
-            drag_total: 0.0,
-        })
+        widget::tree::State::new(State::default())
     }
-
-    fn children(&self) -> Vec<Tree> {
-        vec![]
-    }
-
-    fn diff(&self, _tree: &mut Tree) {}
 
     fn size(&self) -> Size<Length> {
-        match self.orientation {
-            Orientation::Horizontal => Size::new(Length::Fill, Length::Fixed(8.0)),
-            Orientation::Vertical => Size::new(Length::Fixed(8.0), Length::Fill),
-        }
+        Size::new(Length::Fill, Length::Fill)
     }
 
-    fn layout(
-        &mut self,
-        _tree: &mut Tree,
-        _renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        let (w, h) = match self.orientation {
-            Orientation::Horizontal => (Length::Fill, Length::Fixed(8.0)),
-            Orientation::Vertical => (Length::Fixed(8.0), Length::Fill),
-        };
-        layout::Node::new(limits.resolve(w, h, Size::ZERO))
+    fn layout(&mut self, _tree: &mut Tree, _renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+        layout::atomic(limits, Length::Fill, Length::Fill)
     }
 
     fn draw(
         &self,
-        _tree: &Tree,
-        _renderer: &mut Renderer,
+        tree: &Tree,
+        renderer: &mut Renderer,
         _theme: &Theme,
         _style: &renderer::Style,
-        _layout: Layout<'_>,
+        layout: Layout<'_>,
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        // No visible handle: panels carry their own borders, and a drawn
-        // bar always looked bolted-on across themes. The area stays
-        // draggable (mouse_interaction below) — just invisible.
+        let state = tree.state.downcast_ref::<State>();
+        if !(state.hovered || state.dragging) {
+            return;
+        }
+        let alpha = if state.dragging { 0.9 } else { 0.6 };
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds: self.indicator(layout.bounds()),
+                ..Default::default()
+            },
+            Background::Color(Color {
+                a: alpha,
+                ..self.tokens.accent
+            }),
+        );
     }
+
     fn mouse_interaction(
         &self,
-        _tree: &Tree,
+        tree: &Tree,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         _viewport: &Rectangle,
         _renderer: &Renderer,
     ) -> mouse::Interaction {
-        if cursor.is_over(layout.bounds()) {
-            match self.orientation {
-                Orientation::Horizontal => mouse::Interaction::ResizingRow,
-                Orientation::Vertical => mouse::Interaction::ResizingColumn,
-            }
-        } else {
-            mouse::Interaction::Idle
+        let state = tree.state.downcast_ref::<State>();
+        if !(state.dragging || self.near_line(layout.bounds(), cursor)) {
+            return mouse::Interaction::None;
+        }
+        match self.orientation {
+            Orientation::SideBySide => mouse::Interaction::ResizingColumn,
+            Orientation::Stacked => mouse::Interaction::ResizingRow,
         }
     }
 
@@ -127,73 +166,54 @@ where
         cursor: mouse::Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
+        shell: &mut Shell<'_, M>,
+        _viewport: &Rectangle,
     ) {
         let state = tree.state.downcast_mut::<State>();
-        let bounds = layout.bounds();
-
+        let area = layout.bounds();
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(button))
-                if *button == mouse::Button::Left && cursor.is_over(bounds) =>
-            {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) if self.near_line(area, cursor) => {
                 state.dragging = true;
-                // Snapshot the available area boundaries at drag start.
-                match self.orientation {
-                    Orientation::Horizontal => {
-                        let p = self.panel_split as f32 / 100.0;
-                        let fixed_bot = 29.0;
-                        state.drag_origin =
-                            (bounds.y - p * (viewport.height - fixed_bot - 8.0)) / (1.0 - p);
-                        state.drag_total =
-                            (viewport.height - state.drag_origin - fixed_bot - 8.0).max(1.0);
-                    }
-                    Orientation::Vertical => {
-                        let p = self.panel_split as f32 / 100.0;
-                        state.drag_origin = (bounds.x - p * (viewport.width - 8.0)) / (1.0 - p);
-                        state.drag_total = (viewport.width - state.drag_origin - 8.0).max(1.0);
-                    }
-                }
                 shell.capture_event();
             }
             Event::Mouse(mouse::Event::CursorMoved { position }) if state.dragging => {
-                let new_split = match self.orientation {
-                    Orientation::Horizontal => {
-                        let ratio =
-                            ((position.y - state.drag_origin) / state.drag_total).clamp(0.0, 1.0);
-                        (ratio * 100.0).round().clamp(1.0, 99.0) as u16
-                    }
-                    Orientation::Vertical => {
-                        let ratio =
-                            ((position.x - state.drag_origin) / state.drag_total).clamp(0.0, 1.0);
-                        (ratio * 100.0).round().clamp(1.0, 99.0) as u16
-                    }
-                };
-                if new_split != self.panel_split {
-                    shell.publish((self.on_resize)(new_split));
-                    self.panel_split = new_split;
+                let extent = pane_extent(Some(self.along(area, *position) + HAIRLINE), 0.0, self.total(area));
+                if (extent - self.extent).abs() >= 1.0 {
+                    self.extent = extent;
+                    shell.publish((self.on_resize)(extent));
                 }
             }
-            Event::Mouse(mouse::Event::ButtonReleased(button))
-                if *button == mouse::Button::Left && state.dragging =>
-            {
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) if state.dragging => {
                 state.dragging = false;
+                shell.request_redraw();
             }
             _ => {}
         }
-
-        state.hovered = cursor.is_over(bounds);
+        let hovered = self.near_line(area, cursor);
+        if hovered != state.hovered {
+            state.hovered = hovered;
+            shell.request_redraw();
+        }
     }
 }
 
-impl<'a, Message, Theme, Renderer> From<PanelSplitter<'a, Message, Theme, Renderer>>
-    for Element<'a, Message, Theme, Renderer>
-where
-    Message: Clone + 'static + 'a,
-    Theme: 'a,
-    Renderer: renderer::Renderer + 'a,
-{
-    fn from(splitter: PanelSplitter<'a, Message, Theme, Renderer>) -> Self {
-        Element::new(splitter)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_default_extent_is_used_until_the_user_drags() {
+        assert!((pane_extent(None, 520.0, 1136.0) - 520.0).abs() < f32::EPSILON);
+        assert!((pane_extent(Some(600.0), 520.0, 1136.0) - 600.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn both_panes_keep_their_minimum() {
+        assert!((pane_extent(Some(10.0), 520.0, 1136.0) - MIN_PANE).abs() < f32::EPSILON);
+        assert!((pane_extent(Some(5000.0), 520.0, 1136.0) - (1136.0 - MIN_PANE)).abs() < f32::EPSILON);
+        assert!(
+            (pane_extent(Some(400.0), 520.0, 200.0) - MIN_PANE).abs() < f32::EPSILON,
+            "a tiny window still shows the request"
+        );
     }
 }

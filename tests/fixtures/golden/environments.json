@@ -1,0 +1,23 @@
+{
+  "environments": [
+    {
+      "id": "env-dev",
+      "name": "Development",
+      "variables": {
+        "token": "dev-token",
+        "base_url": "http://localhost:8080"
+      },
+      "is_active": 0
+    },
+    {
+      "id": "env-prod",
+      "name": "Production",
+      "variables": {
+        "base_url": "https://api.example.com",
+        "empty": "",
+        "token": "{{vault_token}}"
+      },
+      "is_active": 1
+    }
+  ]
+}

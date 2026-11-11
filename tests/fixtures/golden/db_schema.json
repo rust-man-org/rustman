@@ -1,0 +1,203 @@
+{
+  "collections": [
+    {
+      "name": "id",
+      "type": "TEXT",
+      "not_null": false,
+      "default": null,
+      "primary_key": true
+    },
+    {
+      "name": "name",
+      "type": "TEXT",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "created_at",
+      "type": "INTEGER",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    }
+  ],
+  "environments": [
+    {
+      "name": "id",
+      "type": "TEXT",
+      "not_null": false,
+      "default": null,
+      "primary_key": true
+    },
+    {
+      "name": "name",
+      "type": "TEXT",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "variables",
+      "type": "TEXT",
+      "not_null": true,
+      "default": "'{}'",
+      "primary_key": false
+    },
+    {
+      "name": "is_active",
+      "type": "INTEGER",
+      "not_null": true,
+      "default": "0",
+      "primary_key": false
+    }
+  ],
+  "groups": [
+    {
+      "name": "id",
+      "type": "TEXT",
+      "not_null": false,
+      "default": null,
+      "primary_key": true
+    },
+    {
+      "name": "parent_id",
+      "type": "TEXT",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "parent_is_collection",
+      "type": "INTEGER",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "name",
+      "type": "TEXT",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "sort_order",
+      "type": "INTEGER",
+      "not_null": true,
+      "default": "0",
+      "primary_key": false
+    }
+  ],
+  "history": [
+    {
+      "name": "id",
+      "type": "TEXT",
+      "not_null": false,
+      "default": null,
+      "primary_key": true
+    },
+    {
+      "name": "timestamp",
+      "type": "INTEGER",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "method",
+      "type": "TEXT",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "url",
+      "type": "TEXT",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "status",
+      "type": "INTEGER",
+      "not_null": true,
+      "default": "0",
+      "primary_key": false
+    },
+    {
+      "name": "duration",
+      "type": "INTEGER",
+      "not_null": true,
+      "default": "0",
+      "primary_key": false
+    },
+    {
+      "name": "request_json",
+      "type": "TEXT",
+      "not_null": true,
+      "default": "'{}'",
+      "primary_key": false
+    }
+  ],
+  "requests": [
+    {
+      "name": "id",
+      "type": "TEXT",
+      "not_null": false,
+      "default": null,
+      "primary_key": true
+    },
+    {
+      "name": "collection_id",
+      "type": "TEXT",
+      "not_null": true,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "data",
+      "type": "TEXT",
+      "not_null": true,
+      "default": "'{}'",
+      "primary_key": false
+    },
+    {
+      "name": "group_id",
+      "type": "TEXT",
+      "not_null": false,
+      "default": null,
+      "primary_key": false
+    },
+    {
+      "name": "sort_order",
+      "type": "INTEGER",
+      "not_null": true,
+      "default": "0",
+      "primary_key": false
+    }
+  ],
+  "session": [
+    {
+      "name": "key",
+      "type": "TEXT",
+      "not_null": false,
+      "default": "'current'",
+      "primary_key": true
+    },
+    {
+      "name": "data",
+      "type": "TEXT",
+      "not_null": true,
+      "default": "'{}'",
+      "primary_key": false
+    },
+    {
+      "name": "saved_at",
+      "type": "INTEGER",
+      "not_null": true,
+      "default": "0",
+      "primary_key": false
+    }
+  ]
+}

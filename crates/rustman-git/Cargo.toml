@@ -1,0 +1,22 @@
+[package]
+name = "rustman-git"
+description = "Rustman's git-backed collection store and repository registry"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustman-core.workspace = true
+
+git2.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+rustman-testkit.workspace = true
+
+[lints]
+workspace = true

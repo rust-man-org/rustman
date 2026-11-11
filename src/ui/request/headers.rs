@@ -1,18 +1,17 @@
-use iced::{
-    Background, Element, Length,
-    widget::{button, checkbox, column, container, pick_list, row, scrollable, text},
-};
+//! The Headers tab: a key-value table, with value suggestions on a
+//! Content-Type row.
 
-use crate::{
-    domain::request::KeyValue,
-    message::{Message, RequestMsg},
-    state::tabs::RequestTabState,
-    ui::{
-        icons, styles,
-        theme::{Palette, TEXT_SM, TEXT_XS},
-        widgets::kv_table,
-    },
-};
+use iced::Element;
+
+use crate::message::{AppMsg, MenuId, Message, RequestMsg};
+use crate::state::tabs::RequestTabState;
+use crate::ui::components::icon_button::{IconSize, icon_button_toggled};
+use crate::ui::components::kv_table::{Actions, Row, kv_table};
+use crate::ui::components::menu::{self, Align, Entry, Item};
+use crate::ui::components::scroll;
+use crate::ui::icons;
+use crate::ui::theme::{TEXT_SM, Tokens};
+use crate::ui::widgets::kv_table as bulk;
 
 const CONTENT_TYPE_SUGGESTIONS: &[&str] = &[
     "application/json",
@@ -46,157 +45,53 @@ const CONTENT_TYPE_SUGGESTIONS: &[&str] = &[
     "application/x-ndjson",
 ];
 
-fn is_content_type_key(key: &str) -> bool {
-    key.eq_ignore_ascii_case("content-type")
-}
+const HELP: &str = "No custom headers. Content-Type comes from the body type, and auth headers from the Auth tab.";
+/// Width of the suggestions menu.
+const MENU_WIDTH: f32 = 320.0;
 
-pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
-    match &tab.headers_bulk {
-        Some(content) => kv_table::bulk_panel(
+const ACTIONS: Actions<Message> = Actions {
+    toggle: |i| Message::Request(RequestMsg::HeaderToggled(i)),
+    key: |i, s| Message::Request(RequestMsg::HeaderKeyChanged(i, s)),
+    value: |i, s| Message::Request(RequestMsg::HeaderValueChanged(i, s)),
+    remove: |i| Message::Request(RequestMsg::HeaderRemoved(i)),
+    append: |field, s| Message::Request(RequestMsg::HeaderAppended(field, s)),
+};
+
+pub fn view<'a>(tab: &'a RequestTabState, open_menu: Option<MenuId>, t: &'a Tokens) -> Element<'a, Message> {
+    if let Some(content) = &tab.headers_bulk {
+        return bulk::bulk_panel(
             content,
             |a| Message::Request(RequestMsg::HeadersBulkEdited(a)),
             Message::Request(RequestMsg::HeadersBulkToggle),
-        ),
-        None => header_table(&tab.headers),
+        );
     }
+    let rows = tab
+        .headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| Row {
+            id: h.id.as_str(),
+            enabled: h.enabled,
+            key: h.key.as_str(),
+            value: h.value.as_str(),
+            suffix: h
+                .key
+                .eq_ignore_ascii_case("content-type")
+                .then(|| suggestions(i, &h.id, open_menu == Some(MenuId::HeaderSuggestions(i)), t)),
+        })
+        .collect();
+    scroll::vertical(t, kv_table(t, rows, ACTIONS, "Add header", Some(HELP))).into()
 }
 
-fn header_table(items: &[KeyValue]) -> Element<'_, Message> {
-    let header = row![
-        container(text("").size(1)).width(24),
-        container(text("").size(1)).width(24),
-        text("Key")
-            .size(TEXT_SM)
-            .color(Palette::text_muted())
-            .width(Length::Fill),
-        text("Value")
-            .size(TEXT_SM)
-            .color(Palette::text_muted())
-            .width(Length::Fill),
-        container(text("").size(1)).width(28),
-    ]
-    .spacing(6)
-    .padding(iced::Padding {
-        top: 6.0,
-        right: 10.0,
-        bottom: 6.0,
-        left: 10.0,
+fn suggestions<'a>(row: usize, id: &str, open: bool, t: &'a Tokens) -> Element<'a, Message> {
+    let trigger = icon_button_toggled(t, icons::chevron_down().size(TEXT_SM), IconSize::Small, open)
+        .on_press(Message::App(AppMsg::MenuToggled(MenuId::HeaderSuggestions(row))));
+    let panel = open.then(|| {
+        let entries: Vec<Entry<'_, Message>> = CONTENT_TYPE_SUGGESTIONS
+            .iter()
+            .map(|s| Item::new(*s, Message::Request(RequestMsg::HeaderValueChanged(id.to_owned(), (*s).to_owned()))).into())
+            .collect();
+        menu::panel(t, entries, MENU_WIDTH)
     });
-
-    let header = container(header)
-        .style(crate::ui::styles::section_header)
-        .width(Length::Fill);
-
-    let footer = || {
-        kv_table::table_footer(
-            Message::Request(RequestMsg::HeaderAdded),
-            "Add header",
-            Message::Request(RequestMsg::HeadersBulkToggle),
-        )
-    };
-
-    if items.is_empty() {
-        return column![header, footer()].spacing(0).into();
-    }
-
-    let mut col = column![header].spacing(0);
-
-    for (i, item) in items.iter().enumerate() {
-        let is_even = i % 2 == 0;
-        let bg = if is_even {
-            Palette::row_even()
-        } else {
-            Palette::row_odd()
-        };
-        let is_ct = is_content_type_key(&item.key);
-
-        let value_widget: Element<Message> = if is_ct {
-            let selected = CONTENT_TYPE_SUGGESTIONS
-                .iter()
-                .find(|s| **s == item.value)
-                .copied();
-            let suggestions: Vec<&str> = CONTENT_TYPE_SUGGESTIONS
-                .iter()
-                .filter(|s| item.value.is_empty() || s.starts_with(&item.value))
-                .copied()
-                .collect();
-            if suggestions.is_empty() {
-                super::cell::text_cell(
-                    "value",
-                    &item.value,
-                    TEXT_SM,
-                    [5, 6],
-                    Length::Fill,
-                    move |s| Message::Request(RequestMsg::HeaderValueChanged(i, s)),
-                )
-            } else {
-                let current = selected.unwrap_or("");
-                pick_list(suggestions, Some(current), move |s| {
-                    Message::Request(RequestMsg::HeaderValueChanged(i, s.to_owned()))
-                })
-                .text_size(TEXT_SM)
-                .padding([5, 6])
-                .width(Length::Fill)
-                .style(styles::pick_list)
-                .into()
-            }
-        } else {
-            super::cell::text_cell(
-                "value",
-                &item.value,
-                TEXT_SM,
-                [5, 6],
-                Length::Fill,
-                move |s| Message::Request(RequestMsg::HeaderValueChanged(i, s)),
-            )
-        };
-
-        let row_el = container(
-            row![
-                checkbox(item.enabled)
-                    .on_toggle(move |_| Message::Request(RequestMsg::HeaderToggled(i)))
-                    .size(12)
-                    .spacing(0)
-                    .style(styles::checkbox),
-                text(format!("{}", i + 1))
-                    .size(TEXT_XS)
-                    .color(Palette::text_subtle())
-                    .font(crate::ui::theme::MONO)
-                    .width(20),
-                super::cell::text_cell("key", &item.key, TEXT_SM, [5, 6], Length::Fill, move |s| {
-                    Message::Request(RequestMsg::HeaderKeyChanged(i, s))
-                },),
-                value_widget,
-                button(icons::close().size(TEXT_XS).color(Palette::text_subtle()))
-                    .on_press(Message::Request(RequestMsg::HeaderRemoved(i)))
-                    .style(iced::widget::button::text)
-                    .padding([2, 6]),
-            ]
-            .spacing(4)
-            .padding(iced::Padding {
-                top: 4.0,
-                right: 8.0,
-                bottom: 4.0,
-                left: 10.0,
-            })
-            .align_y(iced::Alignment::Center),
-        )
-        .style(move |_| iced::widget::container::Style {
-            background: Some(Background::Color(bg)),
-            ..Default::default()
-        })
-        .width(Length::Fill);
-
-        col = col.push(row_el);
-    }
-
-    col = col.push(footer());
-
-    scrollable(col)
-        .height(Length::Fill)
-        .direction(iced::widget::scrollable::Direction::Vertical(
-            crate::ui::theme::grabbable_scrollbar(),
-        ))
-        .style(crate::ui::theme::thin_scrollbar)
-        .into()
+    menu::popover(trigger, panel, Align::End, Message::App(AppMsg::MenuDismissed))
 }

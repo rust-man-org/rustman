@@ -235,11 +235,13 @@
 <div class="docs-shell">
   <aside class="toc">
     <div class="toc-label">On this page</div>
-    <a href="#global">Global scripts</a>
-    <a href="#where">Where scripts run</a>
+    <a href="#when">When scripts run</a>
+    <a href="#where">What a script can see</a>
+    <a href="#errors">When a script fails</a>
     <a href="#syntax">Syntax</a>
     <a href="#response">The response object</a>
     <a href="#builtins">Built-in functions</a>
+    <a href="#limits">Limits</a>
     <a href="#examples">Worked examples</a>
     <a href="#missing">What's not here</a>
     <a href="#ai">Prompt for an LLM</a>
@@ -251,57 +253,97 @@
     <h1>Rustman scripting language</h1>
     <p class="docs-lede">
       Pre-request and test scripts run on <strong>rustman-engine</strong>, a small interpreted
-      language written from scratch in Rust, not JavaScript. There is no <code>pm.*</code> API,
-      no Node builtins, no <code>require</code>/<code>import</code>. It's deliberately tiny: the
-      target audience for actually typing this syntax is an AI generating a script from a
-      plain-English request, not a person memorizing a grammar. This page is a complete
-      reference: every construct that exists is listed below, and nothing else exists at
-      runtime.
+      language written in Rust for Rustman. It is not JavaScript: there is no <code>pm.*</code> API,
+      no Node builtins and no <code>require</code>/<code>import</code>. The language is small so an
+      LLM can write a correct script from a plain-English request. This page lists everything it
+      has; anything not listed here does not exist.
     </p>
 
-    <h2 id="global">Global scripts</h2>
+    <h2 id="when">When scripts run</h2>
     <p>
-      The Settings panel has a <strong>Global Scripts</strong> section: a pre-request/test
-      script pair that runs for <em>every</em> request, so common setup (an auth header every
-      request needs, environment bootstrapping) doesn't need copy-pasting into each request's
-      own Scripts tab.
+      Every HTTP request has a pre-request script and a test script in its <strong>Scripts</strong>
+      tab. <strong>Settings → General → Global scripts</strong> holds one more pair that runs for
+      every request. Scripts don't run for WebSocket connections. One send goes like this:
+    </p>
+    <ul>
+      <li>The global pre-request script runs, then the request's own.</li>
+      <li>The request's <code>{{variables}}</code> are filled in, so a value <code>set_env</code> just wrote is the one that is sent.</li>
+      <li>The response arrives. The global test script runs, then the request's own.</li>
+    </ul>
+    <p>
+      A blank script is skipped. The request's own script sees what the global one did: environment
+      changes through <code>env()</code>, and the headers and body it set through
+      <code>header()</code>, <code>headers()</code> and <code>body()</code>. Test results and
+      <code>print</code> output from both land in the response's <strong>Tests</strong> tab, in
+      order; the output goes to its <strong>Console</strong>.
     </p>
     <p>
-      The global script always runs first, then the request's own script runs second and can see
-      (and override) anything the global script already did; its <code>set_header</code>/<code>set_body</code>
-      effects are folded into what <code>header()</code>/<code>body()</code> return inside the
-      per-request script. Test results and <code>print(...)</code> logs from both accumulate in
-      that order. If either script fails, that phase's error is labeled so it's clear which one
-      broke; a pre-request failure stops the request from sending at all.
+      Test scripts also run when no response came back, after a timeout or a refused connection.
+      <code>response.status</code> is then <code>0</code> and the body is empty.
+    </p>
+    <p>
+      If you sync collections with Git, the global scripts are committed with them. Read secrets
+      with <code>env()</code> rather than typing them into a global script.
+    </p>
+    <p>
+      <code>rustman-cli run</code> runs the same scripts, plus the app's global scripts when the
+      collection is one saved in the app. What one request's scripts write with
+      <code>set_env</code>, the next request reads; the CLI doesn't save it. <code>--no-scripts</code>
+      turns scripts off.
     </p>
 
-    <h2 id="where">Where a script runs and what it can see</h2>
+    <h2 id="where">What a script can see</h2>
     <div class="docs-table-wrap">
       <table class="docs-table">
         <tr><th></th><th>Pre-request script</th><th>Test script</th></tr>
-        <tr><td>Runs</td><td>Before the request is sent</td><td>After the response is received</td></tr>
-        <tr><td>env(...)</td><td colspan="2">Active environment's variables</td></tr>
-        <tr><td>header(...)</td><td>The request's own headers</td><td>The <strong>response's</strong> headers</td></tr>
-        <tr><td>cookie(...)</td><td colspan="2">The request's cookie jar</td></tr>
-        <tr><td>response</td><td>Not available (doesn't exist yet)</td><td>Available: status + body</td></tr>
-        <tr><td>body(), url()</td><td>The request's own body/URL</td><td>Same: what was actually sent (not the response)</td></tr>
-        <tr><td>headers()</td><td>All of the request's own headers</td><td>All of the <strong>response's</strong> headers</td></tr>
-        <tr><td>Effects that matter</td><td><code>set_header</code>, <code>set_body</code>, <code>set_env</code></td><td><code>test</code>, <code>set_env</code></td></tr>
+        <tr><td>env(name)</td><td colspan="2">The active environment, including changes from scripts that already ran</td></tr>
+        <tr><td>header(name), headers()</td><td>The request's enabled header rows, plus headers the global script set. Not the Auth tab's header.</td><td>The <strong>response's</strong> headers</td></tr>
+        <tr><td>cookie(name)</td><td colspan="2">The Cookie string in the request's Auth tab</td></tr>
+        <tr><td>body()</td><td>The body as written, or as the global script set it</td><td>The body that was sent, including <code>set_body</code> changes</td></tr>
+        <tr><td>url()</td><td colspan="2">The URL as typed in the URL bar</td></tr>
+        <tr><td>response</td><td><code>null</code></td><td>Status and body</td></tr>
+        <tr><td>Effects</td><td><code>set_header</code>, <code>set_body</code>, <code>set_env</code>, <code>print</code></td><td><code>test</code>, <code>set_env</code>, <code>print</code></td></tr>
       </table>
     </div>
     <p>
-      A pre-request script's <code>set_header</code> calls are merged into the outgoing
-      request's headers, and a <code>set_body</code> call replaces the outgoing body.
-      Neither touches what's saved in the request editor; only the one outgoing
-      request is affected. A test script's <code>test</code> calls populate the response's
-      <strong>Tests</strong> tab. <code>set_env</code> works in either script and writes to the
-      active environment, persisted immediately, the same as editing it by hand.
+      <code>body()</code> and <code>url()</code> return the text as written, so a
+      <code>{{variable}}</code> in them is not filled in. For a GraphQL body, <code>body()</code>
+      and <code>set_body</code> work on the query.
     </p>
-    <div class="callout">
-      If a script errors, nothing partial happens: the request still runs (or the response
-      still displays), the error is shown instead of any effects, and none of that run's
-      earlier <code>set_header</code>/<code>test</code> calls are applied.
-    </div>
+    <p>
+      <code>set_header</code> and <code>set_body</code> change only the request being sent, never
+      what is saved in the editor, and they do nothing in a test script. <code>set_body</code>
+      works on JSON, Text and GraphQL bodies. A header the Auth tab sends (<code>Authorization</code>,
+      <code>Cookie</code> or the API key header) replaces any header with the same name.
+    </p>
+    <p>
+      The <code>Content-Type</code> follows the body type unless a header row or
+      <code>set_header</code> sets one: JSON and GraphQL bodies go out as
+      <code>application/json</code>, text bodies as <code>text/plain</code>.
+    </p>
+    <p>
+      <code>set_env</code> writes to the environment that was active when you pressed Send and saves
+      it, the same as editing it by hand. In a pre-request script the change applies to the request
+      it runs for: a <code>{{token}}</code> set there is the one that is sent. With no active
+      environment, <code>set_env</code> does nothing.
+    </p>
+
+    <h2 id="errors">When a script fails</h2>
+    <p>
+      A script stops at its first error: a syntax error, or a runtime error such as an unknown
+      function or comparing a string with <code>&lt;</code>. None of that script's effects apply,
+      and the scripts after it in the same phase don't run. Effects of a script that already
+      finished stay: a global script's <code>set_env</code> is kept even when the request's own
+      script then fails.
+    </p>
+    <ul>
+      <li>A failing <strong>pre-request</strong> script stops the send. The error shows in place of the response.</li>
+      <li>A failing <strong>test</strong> script leaves the response in place and shows the error in the Tests tab.</li>
+    </ul>
+    <p>
+      The error names the script, as in <code>Global pre-request script error: …</code>. Syntax
+      errors carry a line number; runtime errors don't.
+    </p>
 
     <h2 id="syntax">Syntax</h2>
 
@@ -311,25 +353,28 @@
 <span class="kw">if</span> &lt;expr&gt; { &lt;statements&gt; } <span class="kw">else</span> { &lt;statements&gt; }
 &lt;expr&gt;</pre>
     <p>
-      A trailing <code>;</code> is allowed but optional. There are no loops
-      (<code>for</code>/<code>while</code>) and no user-defined functions; scripts are a short,
-      flat (plus <code>if</code>/<code>else</code>) sequence of statements.
+      A trailing <code>;</code> is optional. There is no <code>else if</code>: put another
+      <code>if</code> inside the <code>else { }</code> block. There are no loops and no
+      user-defined functions.
     </p>
 
-    <h3>Comments &amp; literals</h3>
+    <h3>Comments and literals</h3>
     <ul>
       <li><code>// rest of line</code>. No block comments.</li>
-      <li>Numbers: <code>42</code>, <code>3.14</code>. Always floating point. <code>-5</code> is
-        <strong>not</strong> valid syntax (no unary minus for numbers); write <code>0 - 5</code>.</li>
-      <li>Strings: <code>"double-quoted"</code>, escapes <code>\n</code> <code>\t</code> <code>\"</code> <code>\\</code>.</li>
-      <li>Booleans: <code>true</code>, <code>false</code>. And <code>null</code>.</li>
+      <li>Numbers: <code>42</code>, <code>3.14</code>, all floating point. There is no unary minus, so
+        <code>-5</code> is a syntax error; write <code>0 - 5</code>.</li>
+      <li>Strings: <code>"double-quoted"</code>, with the escapes <code>\n</code> <code>\t</code>
+        <code>\"</code> <code>\\</code>. Any other escape is an error. A string may span lines.</li>
+      <li><code>true</code>, <code>false</code> and <code>null</code>.</li>
     </ul>
 
     <h3>Variables</h3>
     <p>
-      <code>let x = &lt;expr&gt;</code> binds <code>x</code> for the rest of the script. There's
-      no block scoping: everything is one flat scope, including names bound inside an
-      <code>if</code>/<code>else</code> branch.
+      <code>let x = &lt;expr&gt;</code> binds <code>x</code> for the rest of the script, and another
+      <code>let x</code> replaces it. There is no assignment without <code>let</code>. Scope is
+      flat: a name bound inside an <code>if</code> block is still bound after it. A name that was
+      never bound reads as <code>null</code>, not an error, so a misspelled name gives
+      <code>null</code>.
     </p>
 
     <h3>Operators, highest to lowest precedence</h3>
@@ -338,107 +383,141 @@
         <tr><th>#</th><th>Operators</th><th>Notes</th></tr>
         <tr><td>1</td><td><code>.field</code> / <code>.method()</code> / <code>fn(args)</code></td><td>Field access and calls</td></tr>
         <tr><td>2</td><td><code>!</code></td><td>Logical not (prefix)</td></tr>
-        <tr><td>3</td><td><code>+</code> <code>-</code></td><td>Add/subtract, see string concatenation below</td></tr>
-        <tr><td>4</td><td><code>&lt; &gt; &lt;= &gt;=</code></td><td>Numeric comparison only; runtime error on non-numbers</td></tr>
-        <tr><td>5</td><td><code>== !=</code></td><td>Equality; different types are always unequal, never coerced</td></tr>
-        <tr><td>6</td><td><code>&amp;&amp;</code></td><td>Logical and, short-circuits</td></tr>
-        <tr><td>7</td><td><code>||</code></td><td>Logical or, short-circuits</td></tr>
+        <tr><td>3</td><td><code>+</code> <code>-</code></td><td>Numbers add and subtract. <code>+</code> with a non-number joins text; <code>-</code> with one is an error.</td></tr>
+        <tr><td>4</td><td><code>&lt; &gt; &lt;= &gt;=</code></td><td>Numbers only; anything else is a runtime error</td></tr>
+        <tr><td>5</td><td><code>== !=</code></td><td>Different types are never equal. Lists are equal when their elements are, in order; objects when their fields are, in any order.</td></tr>
+        <tr><td>6</td><td><code>&amp;&amp;</code></td><td>Logical and, short-circuits, gives <code>true</code> or <code>false</code></td></tr>
+        <tr><td>7</td><td><code>||</code></td><td>Logical or, short-circuits, gives <code>true</code> or <code>false</code></td></tr>
       </table>
     </div>
-    <p>Parentheses <code>( &lt;expr&gt; )</code> group as usual.</p>
+    <p>Parentheses group as usual. There is no <code>*</code>, <code>/</code> or <code>%</code>.</p>
 
-    <h3>String concatenation</h3>
+    <h3>Joining text</h3>
     <p>
-      <code>+</code> on two numbers adds them. If <strong>either</strong> side isn't a number,
-      it falls back to string concatenation, so <code>"Bearer " + token</code> and
-      <code>"count: " + 3</code> both just work. There's no separate concat operator.
+      <code>+</code> on two numbers adds them. Otherwise both sides are turned into text and joined,
+      so <code>"Bearer " + token</code> and <code>"count: " + 3</code> both work. A list or object
+      becomes a readable form such as <code>{id: 7}</code>, not JSON; use
+      <code>json_stringify</code> when you need JSON.
     </p>
 
     <h3>Field access</h3>
     <p>
-      <code>value.field</code> reads a field off an object (from <code>jwt_decode(...)</code>,
-      <code>json_parse(...)</code>, or <code>response.json()</code>). A missing field, or a
-      field access on a non-object, evaluates to <code>null</code>, not an error. This is a
-      <strong>different convention</strong> from <code>env()</code>/<code>header()</code>/<code>cookie()</code>
-      below: JSON payload shape is expected to vary, so a missing field is a normal, silent
-      <code>null</code>; a missing env var or header instead comes back as <code>""</code>,
-      because scripts commonly branch on it with <code>!= ""</code>.
+      <code>value.field</code> reads a field of an object from <code>json_parse(...)</code>,
+      <code>jwt_decode(...)</code>, <code>headers()</code> or <code>response.json()</code>. A missing
+      field, or a field of something that isn't an object, is <code>null</code>, not an error.
+      <code>env()</code>, <code>header()</code> and <code>cookie()</code> differ on purpose: a
+      missing value is <code>""</code>, so the usual check is <code>!= ""</code>.
     </p>
 
     <h2 id="response">The response object (test scripts only)</h2>
     <ul>
-      <li><code>response.status</code> — a number, the HTTP status code.</li>
-      <li><code>response.json()</code> — parses the body as JSON into a value tree you can
-        field-access into; <code>null</code> if the body isn't valid JSON.</li>
-      <li><code>response.text()</code> — the raw response body as a string.</li>
-      <li><code>response.contains("...")</code> — true if the raw body has that text in it
-        anywhere, short for <code>response.text().contains("...")</code>.</li>
+      <li><code>response.status</code>: the HTTP status code, a number. <code>0</code> when no response came back.</li>
+      <li><code>response.json()</code>: the body parsed as JSON; <code>null</code> if it isn't valid JSON.</li>
+      <li><code>response.text()</code>: the body as a string.</li>
+      <li><code>response.contains("...")</code>: short for <code>contains(response.text(), "...")</code>.</li>
     </ul>
     <p>
-      There's no <code>response.headers</code> field; read response headers with the
-      <code>header(...)</code> builtin, which is fed response headers specifically in test
-      scripts so the same name works in both script slots.
+      There is no <code>response.headers</code>. In a test script <code>header(name)</code> and
+      <code>headers()</code> read the response's headers. Their names are lowercase, and a header
+      sent more than once, such as <code>Set-Cookie</code>, comes back as one value with a newline
+      between the copies. In a pre-request script <code>response</code> is <code>null</code>.
     </p>
 
     <h2 id="builtins">Built-in functions</h2>
+    <p>
+      An argument shown as <code>string</code> must be a string. Anything else, <code>null</code>
+      included, is a runtime error, so check a value with <code>!= null</code> before passing it on.
+    </p>
     <div class="docs-table-wrap">
       <table class="docs-table">
         <tr><th>Function</th><th>Signature</th><th>Notes</th></tr>
-        <tr><td>env(name)</td><td>(string) → string</td><td>Active environment variable. <strong>"" if unset</strong>, not null.</td></tr>
-        <tr><td>set_env(name, value)</td><td>(string, any) → null</td><td>Writes the active environment variable (effect, persisted). value can be any type — objects/arrays are JSON-stringified, everything else uses its display form.</td></tr>
-        <tr><td>header(name)</td><td>(string) → string</td><td>Case-insensitive. Request headers pre-request, response headers in a test script. <strong>"" if absent.</strong></td></tr>
-        <tr><td>headers()</td><td>() → object</td><td>Every header at once, same request-vs-response split as header(name) — for dumping everything instead of naming each one.</td></tr>
-        <tr><td>set_header(name, value)</td><td>(string, any) → null</td><td>Adds/overrides a request header. value can be any type, same auto-conversion as set_env — set_header("X-User-Detail", claims.payload) works directly.</td></tr>
-        <tr><td>cookie(name)</td><td>(string) → string</td><td>Case-insensitive lookup on the request's cookie jar. <strong>"" if absent.</strong></td></tr>
-        <tr><td>body()</td><td>() → string</td><td>The request's own body — available in <strong>both</strong> script slots (debugging what was actually sent). Use response.text()/response.json() for what came back.</td></tr>
-        <tr><td>set_body(value)</td><td>(any) → null</td><td>Replaces the outgoing request body (pre-request scripts only). Same auto-conversion as set_env/set_header.</td></tr>
-        <tr><td>url()</td><td>() → string</td><td>The request's own URL — available in both script slots.</td></tr>
-        <tr><td>test(name, condition)</td><td>(string, bool) → null</td><td>Records a pass/fail on the response's Tests tab.</td></tr>
-        <tr><td>print(value)</td><td>(any) → null</td><td>Logs value (auto-converted like set_env) to the Tests tab's console section — for debugging without an assertion.</td></tr>
-        <tr><td>base64_encode(s)</td><td>(string) → string</td><td>Standard base64 (not URL-safe).</td></tr>
-        <tr><td>base64_decode(s)</td><td>(string) → string</td><td>Accepts standard or URL-safe-no-pad base64. Null if invalid or not UTF-8 once decoded.</td></tr>
-        <tr><td>jwt_decode(token)</td><td>(string) → object</td><td>No signature verification — claims only. Accepts a bare token or one prefixed with "Bearer ". Returns <code>{ header, payload }</code>, or null if malformed.</td></tr>
-        <tr><td>contains(haystack, needle)</td><td>(value, value) → bool</td><td>Substring test on a string, membership test on an array, key test on an object. <strong>Case-sensitive.</strong> Also spelled <code>haystack.contains(needle)</code> — same function. False (never an error) on a null/bool/number haystack.</td></tr>
-        <tr><td>json_parse(s)</td><td>(string) → value</td><td>Parses arbitrary JSON text. Null on invalid JSON.</td></tr>
-        <tr><td>json_stringify(value)</td><td>(value) → string</td><td>Serializes any value back into real, properly-quoted JSON — the inverse of json_parse/jwt_decode's output.</td></tr>
-        <tr><td>aes_encrypt(text, key)</td><td>(string, string) → string</td><td>AES-256-GCM, keyed by the SHA-256 hash of key (any string works, any length). Returns base64(nonce || ciphertext).</td></tr>
-        <tr><td>aes_decrypt(text, key)</td><td>(string, string) → string</td><td>Reverses aes_encrypt with the same key. Null if the key is wrong or input is malformed — fails closed, not open.</td></tr>
+        <tr><td>env(name)</td><td>(string) → string</td><td>A variable of the active environment. <strong>"" if unset</strong>, not null.</td></tr>
+        <tr><td>set_env(name, value)</td><td>(string, any) → null</td><td>Writes a variable to the environment that was active at Send, and saves it. Lists and objects are stored as JSON, anything else as its text form.</td></tr>
+        <tr><td>header(name)</td><td>(string) → string</td><td>Case-insensitive; the first header with that name. Request headers in a pre-request script, response headers in a test script. <strong>"" if absent.</strong></td></tr>
+        <tr><td>headers()</td><td>() → object</td><td>Every header, with the same request/response split as <code>header()</code>.</td></tr>
+        <tr><td>set_header(name, value)</td><td>(string, any) → null</td><td>Sets a header on the outgoing request. Pre-request scripts only. The value converts like <code>set_env</code>, so <code>set_header("X-User-Detail", claims.payload)</code> sends JSON.</td></tr>
+        <tr><td>cookie(name)</td><td>(string) → string</td><td>Case-insensitive lookup in the request's Cookie string. <strong>"" if absent.</strong></td></tr>
+        <tr><td>body()</td><td>() → string</td><td>The request body: as written, or as <code>set_body</code> left it. In a test script, the body that was sent. <code>response.text()</code> is what came back.</td></tr>
+        <tr><td>set_body(value)</td><td>(any) → null</td><td>Replaces the JSON or Text body, or the GraphQL query, for this send. Pre-request scripts only. Converts like <code>set_env</code>.</td></tr>
+        <tr><td>url()</td><td>() → string</td><td>The request URL as typed, <code>{{variables}}</code> not filled in.</td></tr>
+        <tr><td>test(name, condition)</td><td>(string, any) → null</td><td>A pass in the Tests tab when <code>condition</code> is truthy, a fail otherwise.</td></tr>
+        <tr><td>print(value)</td><td>(any) → null</td><td>A line in the Tests tab's Console. Lists and objects print as JSON.</td></tr>
+        <tr><td>base64_encode(s)</td><td>(string) → string</td><td>Standard alphabet, with padding.</td></tr>
+        <tr><td>base64_decode(s)</td><td>(string) → string</td><td>Standard, or URL-safe without padding. <code>null</code> if invalid or not UTF-8.</td></tr>
+        <tr><td>jwt_decode(token)</td><td>(string) → object</td><td>Reads the claims without checking the signature. Accepts a bare token or <code>"Bearer &lt;token&gt;"</code>. Returns <code>{ header, payload }</code>; <code>payload</code> is <code>null</code> when the token is malformed.</td></tr>
+        <tr><td>contains(haystack, needle)</td><td>(any, any) → bool</td><td>Substring test on a string, membership test on a list, key test on an object. <strong>Case-sensitive.</strong> Also written <code>haystack.contains(needle)</code>. A non-string needle is matched by its text, so <code>contains(body(), 404)</code> works. <code>false</code>, never an error, on a null, bool or number haystack.</td></tr>
+        <tr><td>json_parse(s)</td><td>(string) → any</td><td>Parses JSON text. <code>null</code> on invalid JSON.</td></tr>
+        <tr><td>json_stringify(value)</td><td>(any) → string</td><td>Real JSON, with quoted keys and strings: the inverse of <code>json_parse</code>.</td></tr>
+        <tr><td>aes_encrypt(text, key)</td><td>(string, string) → string</td><td>AES-256-GCM, keyed by the SHA-256 hash of <code>key</code>, so any string works. Returns <code>base64(nonce || ciphertext)</code>, with a new random nonce each call.</td></tr>
+        <tr><td>aes_decrypt(text, key)</td><td>(string, string) → string</td><td>Reverses <code>aes_encrypt</code>. <code>null</code> if the key is wrong or the input is malformed.</td></tr>
       </table>
     </div>
     <p>
-      Truthiness (used by <code>if</code>, <code>!</code>, <code>&amp;&amp;</code>,
-      <code>||</code>, and <code>test</code>'s second argument): <code>null</code> and
-      <code>false</code> are falsy; <code>0</code> is falsy, any other number truthy;
-      <code>""</code> is falsy, any other string truthy; an empty array is falsy; objects are
-      always truthy.
+      Truthiness, used by <code>if</code>, <code>!</code>, <code>&amp;&amp;</code>,
+      <code>||</code> and <code>test</code>: <code>null</code>, <code>false</code>, <code>0</code>,
+      <code>""</code> and an empty list are falsy. Every other value is truthy, including every
+      object.
     </p>
     <div class="callout">
-      <code>aes_encrypt</code>/<code>aes_decrypt</code> round-trip with each other, but the exact
-      framing (SHA-256 key derivation, <code>nonce || ciphertext</code> layout) is this engine's
-      own convention, and it's <strong>not guaranteed to match another system's AES-GCM
-      implementation</strong>. If an external API dictates its own key derivation or nonce
-      handling, treat these as a starting point, not a drop-in match.
+      <code>aes_encrypt</code> and <code>aes_decrypt</code> round-trip with each other, but the
+      framing (SHA-256 key derivation, <code>nonce || ciphertext</code>) is this engine's own. It is
+      <strong>not guaranteed to match another system's AES-GCM</strong>. If an API dictates its own
+      key derivation or nonce layout, these functions won't fit it as they are.
     </div>
+
+    <h2 id="limits">Limits</h2>
+    <ul>
+      <li><strong>Nesting: 256 levels.</strong> Blocks, parentheses, call arguments, <code>!</code>
+        and operator chains such as <code>a + b + c</code> all count. Deeper nesting is a syntax error.</li>
+      <li><strong>Strings: 16 MiB.</strong> A script that would build a longer string with
+        <code>+</code>, <code>base64_encode</code>, <code>json_stringify</code> or
+        <code>aes_encrypt</code> stops with a runtime error.</li>
+    </ul>
+    <p>
+      With no loops and no functions, every script ends. Scripts can't read files or make network
+      calls.
+    </p>
 
     <h2 id="examples">Worked examples</h2>
 
     <h3>Inject a bearer token, only if one is set</h3>
-    <pre><span class="kw">let</span> token = <span class="fn">env</span>(<span class="st">"access_token"</span>)
+    <pre><span class="cm">// pre-request script</span>
+<span class="kw">let</span> token = <span class="fn">env</span>(<span class="st">"access_token"</span>)
 <span class="kw">if</span> token != <span class="st">""</span> {
     <span class="fn">set_header</span>(<span class="st">"Authorization"</span>, <span class="st">"Bearer "</span> + token)
 }</pre>
 
-    <h3>Decode a JWT from the response and stash claims</h3>
-    <pre><span class="kw">let</span> claims = <span class="fn">jwt_decode</span>(<span class="fn">header</span>(<span class="st">"Authorization"</span>))
-<span class="fn">set_env</span>(<span class="st">"user_id"</span>, claims.payload.sub)
-<span class="fn">set_env</span>(<span class="st">"access_token"</span>, claims.payload.access_token)
-<span class="fn">test</span>(<span class="st">"status is 200"</span>, response.status == <span class="nm">200</span>)
-<span class="fn">test</span>(<span class="st">"has user id"</span>, claims.payload.sub != <span class="kw">null</span>)</pre>
+    <h3>Set a variable the same request uses</h3>
+    <pre><span class="cm">// pre-request script; the URL is {{base_url}}/users/{{user_id}}</span>
+<span class="kw">let</span> claims = <span class="fn">jwt_decode</span>(<span class="fn">env</span>(<span class="st">"access_token"</span>))
+<span class="fn">set_env</span>(<span class="st">"user_id"</span>, claims.payload.sub)</pre>
+    <p>
+      Variables are filled in after the pre-request scripts, so the URL is sent with the
+      <code>user_id</code> the script just wrote.
+    </p>
+
+    <h3>Save a token from the response</h3>
+    <pre><span class="cm">// test script</span>
+<span class="kw">let</span> token = response.<span class="fn">json</span>().access_token
+<span class="fn">test</span>(<span class="st">"got a token"</span>, token != <span class="kw">null</span>)
+<span class="kw">if</span> token != <span class="kw">null</span> {
+    <span class="fn">set_env</span>(<span class="st">"access_token"</span>, token)
+    <span class="fn">set_env</span>(<span class="st">"user_id"</span>, <span class="fn">jwt_decode</span>(token).payload.sub)
+}</pre>
 
     <h3>Assert on the JSON response body</h3>
     <pre><span class="kw">let</span> body = response.<span class="fn">json</span>()
 <span class="fn">test</span>(<span class="st">"id is 7"</span>, body.id == <span class="nm">7</span>)
 <span class="fn">test</span>(<span class="st">"name matches"</span>, body.name == <span class="st">"ferris"</span>)</pre>
+
+    <h3>Compare a whole list or object</h3>
+    <pre><span class="kw">let</span> body = response.<span class="fn">json</span>()
+<span class="fn">test</span>(<span class="st">"tags are a, b"</span>, body.tags == <span class="fn">json_parse</span>(<span class="st">"[\"a\", \"b\"]"</span>))
+<span class="fn">test</span>(<span class="st">"owner matches"</span>, body.owner == <span class="fn">json_parse</span>(<span class="st">"{\"name\": \"ferris\", \"id\": 7}"</span>))</pre>
+    <p>
+      There are no list or object literals, so <code>json_parse</code> builds the expected value.
+      Lists must match in order; object fields may come in any order.
+    </p>
 
     <h3>Range check with if/else</h3>
     <pre><span class="kw">let</span> status = response.status
@@ -450,16 +529,15 @@
 
     <h3>Assert on a keyword in the response</h3>
     <p>
-      When the body isn't JSON, or the check is "did this word show up at all", test the text
-      directly. All three of these are the same test written three ways:
+      When the body isn't JSON, test the text. The last two lines are the same test written two ways:
     </p>
     <pre><span class="fn">test</span>(<span class="st">"no stack trace leaked"</span>, !<span class="fn">contains</span>(response.<span class="fn">text</span>(), <span class="st">"panicked at"</span>))
 <span class="fn">test</span>(<span class="st">"says expired"</span>, response.<span class="fn">text</span>().<span class="fn">contains</span>(<span class="st">"expired"</span>))
 <span class="fn">test</span>(<span class="st">"says expired"</span>, response.<span class="fn">contains</span>(<span class="st">"expired"</span>))</pre>
     <p>
       Matching is case-sensitive, so <code>"Expired"</code> does not match <code>"expired"</code>.
-      There's no way to change a string's case in this language, so pick a substring that's
-      already stable, like <code>"xpired"</code>, when the server's capitalization isn't.
+      The language can't change a string's case, so when the server's capitalization varies, pick a
+      substring that doesn't, like <code>"xpired"</code>.
     </p>
 
     <h3>Branch on a header, then check a role is in a list</h3>
@@ -471,120 +549,139 @@
     <span class="fn">test</span>(<span class="st">"json response"</span>, <span class="kw">false</span>)
 }</pre>
     <p>
-      On an array <code>contains</code> tests membership by equality, and on an object it tests
-      whether a key is present, so the same call answers "is admin one of these roles" and "did
-      the payload include a roles field at all".
+      On a list <code>contains</code> tests membership, and on an object it tests whether a key is
+      present.
     </p>
 
-    <h3>Check a cookie was set</h3>
-    <pre><span class="fn">test</span>(<span class="st">"has session"</span>, <span class="fn">cookie</span>(<span class="st">"session_id"</span>) != <span class="st">""</span>)</pre>
-
-    <h3>Forward a decoded JWT cookie's claims as a header</h3>
+    <h3>Check the server set a cookie</h3>
+    <pre><span class="fn">test</span>(<span class="st">"has a session cookie"</span>, <span class="fn">contains</span>(<span class="fn">header</span>(<span class="st">"Set-Cookie"</span>), <span class="st">"session_id="</span>))</pre>
     <p>
-      A common gateway/BFF pattern: a session JWT lives in a cookie, and the backend wants the
-      decoded user details forwarded as a single header rather than re-decoding the JWT itself.
+      <code>cookie()</code> reads the request's own Cookie string, so it can't see what the server
+      set. The response's <code>Set-Cookie</code> header can.
     </p>
-    <pre><span class="kw">let</span> claims = <span class="fn">jwt_decode</span>(<span class="fn">cookie</span>(<span class="st">"accessToken"</span>))
+
+    <h3>Forward a JWT cookie's claims as a header</h3>
+    <p>
+      A session JWT lives in a cookie, and the backend wants the decoded user details in one header.
+    </p>
+    <pre><span class="cm">// pre-request script</span>
+<span class="kw">let</span> claims = <span class="fn">jwt_decode</span>(<span class="fn">cookie</span>(<span class="st">"accessToken"</span>))
 <span class="fn">set_header</span>(<span class="st">"X-User-Detail"</span>, claims.payload)</pre>
     <p>
-      <code>set_header</code> auto-converts a non-string value, so passing the object directly
-      JSON-stringifies it the same as calling <code>json_stringify(claims.payload)</code> by hand.
-      If only one field is actually needed, send just that field, which is already a string:
+      <code>set_header</code> turns the object into JSON, the same as
+      <code>json_stringify(claims.payload)</code>. To send one field, pass that field:
+      <code>set_header("X-User-Id", claims.payload.sub)</code>.
     </p>
-    <pre><span class="kw">let</span> claims = <span class="fn">jwt_decode</span>(<span class="fn">cookie</span>(<span class="st">"accessToken"</span>))
-<span class="fn">set_header</span>(<span class="st">"X-User-Detail"</span>, claims.payload.masterPhrId)</pre>
 
-    <h3>Debug what a request actually sent, from its own test script</h3>
+    <h3>Print what a request sent, from its test script</h3>
     <pre><span class="fn">print</span>(<span class="fn">url</span>())
-<span class="fn">print</span>(<span class="fn">headers</span>())
-<span class="fn">print</span>(<span class="fn">body</span>())</pre>
+<span class="fn">print</span>(<span class="fn">body</span>())
+<span class="fn">print</span>(<span class="fn">headers</span>())   <span class="cm">// in a test script, the response's headers</span></pre>
 
     <h3>Encrypt the outgoing body, decrypt the response to assert on it</h3>
     <pre><span class="cm">// pre-request script</span>
-<span class="kw">let</span> plaintext = <span class="fn">body</span>()
-<span class="fn">set_body</span>(<span class="fn">aes_encrypt</span>(plaintext, <span class="fn">env</span>(<span class="st">"body_key"</span>)))</pre>
+<span class="fn">set_body</span>(<span class="fn">aes_encrypt</span>(<span class="fn">body</span>(), <span class="fn">env</span>(<span class="st">"body_key"</span>)))</pre>
     <pre><span class="cm">// test script</span>
 <span class="kw">let</span> plaintext = <span class="fn">aes_decrypt</span>(response.<span class="fn">text</span>(), <span class="fn">env</span>(<span class="st">"body_key"</span>))
-<span class="kw">let</span> parsed = <span class="fn">json_parse</span>(plaintext)
-<span class="fn">test</span>(<span class="st">"status is 200"</span>, response.status == <span class="nm">200</span>)
-<span class="fn">test</span>(<span class="st">"order id present"</span>, parsed.order_id != <span class="kw">null</span>)</pre>
+<span class="fn">test</span>(<span class="st">"response decrypts"</span>, plaintext != <span class="kw">null</span>)
+<span class="kw">if</span> plaintext != <span class="kw">null</span> {
+    <span class="fn">test</span>(<span class="st">"order id present"</span>, <span class="fn">json_parse</span>(plaintext).order_id != <span class="kw">null</span>)
+}</pre>
 
-    <h2 id="missing">What this language deliberately does not have</h2>
+    <h2 id="missing">What this language does not have</h2>
     <p>
-      No loops, no user-defined functions, no array/object literals (you can only
-      <strong>receive</strong> arrays/objects from <code>jwt_decode</code>/<code>json_parse</code>/<code>response.json()</code>,
-      not construct them), no <code>try</code>/<code>catch</code> (a runtime error just aborts
-      the script), no string indexing/slicing, no case conversion, and no regex —
-      <code>contains</code> is the whole of the pattern matching on offer. If a task needs any of these, it's out
-      of scope for a script. Solve it with headers/env vars/assertions in the shapes above
-      instead of reaching for a workaround.
+      No loops, no user-defined functions, no <code>else if</code>, no <code>*</code>,
+      <code>/</code> or <code>%</code>, no <code>[ ]</code> indexing, no list or object literals
+      (build a constant one with <code>json_parse</code>), no <code>try</code>/<code>catch</code>
+      (an error ends the script), no string slicing, no case conversion and no regex:
+      <code>contains</code> is the only pattern matching. A task that needs one of these doesn't fit
+      in a script.
     </p>
 
     <h2 id="ai">Prompt for an LLM</h2>
     <p>
-      Don't hand-write these scripts. Copy the block below into ChatGPT, Claude, or any other
-      LLM, add your own request at the end, and let it write the script for you.
+      Copy the block below into an LLM, add your request at the end, and paste the script it writes
+      into the Scripts tab.
     </p>
     <div class="prompt-block">
       <button class="prompt-copy" id="promptCopyBtn" type="button">Copy</button>
       <pre id="promptText">You write scripts in Rustman's scripting language: a small custom language
-(not JavaScript, no pm.* API). Only use what's listed below — nothing else
-exists at runtime, and inventing syntax or functions will just fail.
+(not JavaScript, no pm.* API). Use only what is listed below. Nothing else
+exists, and invented syntax or functions fail.
 
 STATEMENTS: `let x = &lt;expr&gt;`, `if &lt;expr&gt; { ... }`, `if &lt;expr&gt; { ... } else { ... }`,
-or a bare expression. Trailing `;` optional. No loops, no user-defined functions.
+or a bare expression. `;` is optional. No `else if` (nest an `if` inside
+`else { }`), no loops, no user-defined functions, no assignment without `let`.
 
-LITERALS: numbers (no negative literals — write `0 - 5`, not `-5`), "double-quoted
-strings" (\n \t \" \\ escapes), true, false, null.
+LITERALS: numbers (no negative literals: write `0 - 5`), "double-quoted
+strings" (\n \t \" \\ escapes), true, false, null. No list or object literals:
+build a constant one with json_parse("[...]").
 
 OPERATORS, low to high precedence: || , &amp;&amp; , == != , &lt; &gt; &lt;= &gt;= (numbers only) ,
-+ - (numbers add; if either side isn't a number, + concatenates as text) ,
-! (prefix not) , .field / .method() / call(...).
++ - (numbers add; + with a non-number joins text) , ! (prefix not) ,
+.field / .method() / call(...). No * / %. No [ ] indexing.
+== compares lists and objects by content. Different types are never equal.
+
+NAMES: a name never bound with `let` is null. A missing field, or a field of a
+non-object, is null.
 
 COMMENTS: `// rest of line`.
 
 BUILT-IN FUNCTIONS:
   env(name) -&gt; string                    ("" if unset)
-  set_env(name, value)
-  header(name) -&gt; string                 ("" if absent; request headers pre-request,
-                                           response headers in a test script)
-  headers() -&gt; object                    (every header at once, same split as header())
-  set_header(name, value)
-  cookie(name) -&gt; string                 ("" if absent)
-  body() -&gt; string                       (the request's own body; works in both script slots)
-  set_body(value)                        (pre-request scripts only, replaces the
-                                           outgoing body)
-  url() -&gt; string                        (the request's own URL; works in both script slots)
-  test(name, condition)                  (records a pass/fail)
+  set_env(name, value)                   (writes the active environment; in a
+                                           pre-request script, {{name}} in the
+                                           same request uses the new value)
+  header(name) -&gt; string                 ("" if absent; case-insensitive; request
+                                           headers pre-request, response headers
+                                           in a test script)
+  headers() -&gt; object                    (every header, same split as header())
+  set_header(name, value)                (pre-request scripts only)
+  cookie(name) -&gt; string                 ("" if absent; the request's Cookie
+                                           string, not the response's Set-Cookie)
+  body() -&gt; string                       (the request body as written; in a test
+                                           script, the body that was sent)
+  set_body(value)                        (pre-request only; replaces a JSON or
+                                           Text body, or the GraphQL query)
+  url() -&gt; string                        (the request URL as typed)
+  test(name, condition)                  (passes when condition is truthy)
   print(value)                           (debug log, no assertion)
-  base64_encode(s) / base64_decode(s)
+  base64_encode(s) / base64_decode(s)    (decode gives null if invalid)
   jwt_decode(token) -&gt; {header, payload}  (no signature check; accepts a bare
-                                           token or "Bearer &lt;token&gt;")
-  contains(haystack, needle) -&gt; bool     (substring in a string, membership in an
-                                           array, key in an object; case-sensitive.
+                                           token or "Bearer &lt;token&gt;"; payload is
+                                           null if the token is malformed)
+  contains(haystack, needle) -&gt; bool     (substring in a string, membership in a
+                                           list, key in an object; case-sensitive.
                                            Also written haystack.contains(needle))
-  json_parse(s) -&gt; value
+  json_parse(s) -&gt; value                 (null on invalid JSON)
   json_stringify(value) -&gt; string
   aes_encrypt(text, key) / aes_decrypt(text, key)   (AES-256-GCM, key is any
-                                           string, SHA-256 derived, base64(nonce||ciphertext))
-  response.status (test scripts only, number) / response.json() / response.text()
-  response.contains(needle)              (short for response.text().contains(needle))
+                                           string, SHA-256 derived,
+                                           base64(nonce||ciphertext); decrypt
+                                           gives null on failure)
 
-set_env/set_header/set_body accept ANY value type — objects/arrays are
-auto-JSON-stringified, everything else uses its plain text form. So
-`set_header("X-User-Detail", claims.payload)` is valid directly.
+RESPONSE (test scripts only; null in a pre-request script):
+  response.status (number; 0 if no response came back), response.json() (null
+  if not JSON), response.text(), response.contains(needle).
+  To check a cookie the server set: contains(header("Set-Cookie"), "name=").
 
-CONVENTIONS: env()/header()/cookie() return "" for a missing value — check with
-`!= ""`. Field access on an object from json_parse/jwt_decode/response.json()
-returns null for a missing field — check that with `!= null`, not `!= ""`.
+Arguments that are names or text (env, header, cookie, set_env/set_header
+names, base64_*, jwt_decode, json_parse, aes_*) must be strings: null is a
+runtime error, so check with `!= null` first. set_env, set_header, set_body
+and print accept any value: objects and lists become JSON, anything else its
+plain text form.
+
+CONVENTIONS: env()/header()/cookie() return "" for a missing value: check with
+`!= ""`. A missing JSON field is null: check with `!= null`.
+
+LIMITS: nesting at most 256 levels deep; strings at most 16 MiB.
 
 There's a GLOBAL pre-request/test script pair that runs before every
-request's own script and can be overridden by it — mention this only if the
-user's request is clearly about something that should apply to every
-request, not just one.
+request's own scripts. Mention it only if the request clearly applies to
+every request.
 
-Output ONLY the script itself — no explanation, no markdown code fences, no
-JS syntax, no pm.* API.
+Output ONLY the script: no explanation, no markdown code fences, no JS
+syntax, no pm.* API.
 
 My request: &lt;describe what you want the script to do&gt;</pre>
     </div>
@@ -593,11 +690,11 @@ My request: &lt;describe what you want the script to do&gt;</pre>
 
 <footer>
   <p>
-    Made with ❤️ by <a href="https://animesh.us" target="_blank" rel="noopener">Animesh Chaudhri</a>
+    Made by <a href="https://animesh.us" target="_blank" rel="noopener">Animesh Chaudhri</a>
     &nbsp;·&nbsp;
     <a href="https://github.com/rust-man-org/rustman" target="_blank" rel="noopener">GitHub</a>
     &nbsp;·&nbsp;
-    <a href="https://github.com/rust-man-org/rustman/tree/master/vendor/rustman-engine" target="_blank" rel="noopener">Engine source</a>
+    <a href="https://github.com/rust-man-org/rustman-engine" target="_blank" rel="noopener">Engine source</a>
   </p>
 </footer>
 

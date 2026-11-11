@@ -1,163 +1,42 @@
-use iced::{
-    Background, Element, Length,
-    widget::{button, checkbox, column, container, row, scrollable, text},
+//! The Params tab: a key-value table kept in sync with the URL's query.
+
+use iced::Element;
+
+use crate::message::{Message, RequestMsg};
+use crate::state::tabs::RequestTabState;
+use crate::ui::components::kv_table::{Actions, Row, kv_table};
+use crate::ui::components::scroll;
+use crate::ui::theme::Tokens;
+use crate::ui::widgets::kv_table as bulk;
+
+const HELP: &str = "Query parameters stay in sync with the URL. Type ?key=value there, or add a row here.";
+
+const ACTIONS: Actions<Message> = Actions {
+    toggle: |i| Message::Request(RequestMsg::ParamToggled(i)),
+    key: |i, s| Message::Request(RequestMsg::ParamKeyChanged(i, s)),
+    value: |i, s| Message::Request(RequestMsg::ParamValueChanged(i, s)),
+    remove: |i| Message::Request(RequestMsg::ParamRemoved(i)),
+    append: |field, s| Message::Request(RequestMsg::ParamAppended(field, s)),
 };
 
-use crate::{
-    domain::environment::substitute,
-    message::{Message, RequestMsg},
-    state::tabs::RequestTabState,
-    ui::{
-        icons,
-        theme::{Palette, TEXT_SM, TEXT_XS},
-        widgets::kv_table,
-    },
-};
-
-pub fn view<'a>(
-    tab: &'a RequestTabState,
-    env: Option<&'a crate::domain::environment::AppEnvironment>,
-) -> Element<'a, Message> {
-    match &tab.params_bulk {
-        Some(content) => kv_table::bulk_panel(
+pub fn view<'a>(tab: &'a RequestTabState, t: &'a Tokens) -> Element<'a, Message> {
+    if let Some(content) = &tab.params_bulk {
+        return bulk::bulk_panel(
             content,
             |a| Message::Request(RequestMsg::ParamsBulkEdited(a)),
             Message::Request(RequestMsg::ParamsBulkToggle),
-        ),
-        None => param_table(&tab.params, env),
+        );
     }
-}
-
-fn param_table<'a>(
-    items: &'a [crate::domain::request::KeyValue],
-    env: Option<&'a crate::domain::environment::AppEnvironment>,
-) -> Element<'a, Message> {
-    let has_env = env.is_some()
-        && items
-            .iter()
-            .any(|p| p.key.contains("{{") || p.value.contains("{{"));
-
-    let header = row![
-        container(text("").size(1)).width(24),
-        container(text("").size(1)).width(24),
-        text("Key")
-            .size(TEXT_SM)
-            .color(Palette::text_muted())
-            .width(Length::Fill),
-        text("Value")
-            .size(TEXT_SM)
-            .color(Palette::text_muted())
-            .width(Length::Fill),
-        container(text("").size(1)).width(28),
-    ]
-    .spacing(6)
-    .padding(iced::Padding {
-        top: 6.0,
-        right: 10.0,
-        bottom: 6.0,
-        left: 10.0,
-    });
-
-    let header = container(header)
-        .style(crate::ui::styles::section_header)
-        .width(Length::Fill);
-
-    let footer = || {
-        kv_table::table_footer(
-            Message::Request(RequestMsg::ParamAdded),
-            "Add param",
-            Message::Request(RequestMsg::ParamsBulkToggle),
-        )
-    };
-
-    if items.is_empty() {
-        return column![header, footer()].spacing(0).into();
-    }
-
-    let mut col = column![header].spacing(0);
-
-    for (i, item) in items.iter().enumerate() {
-        let is_even = i % 2 == 0;
-        let bg = if is_even {
-            Palette::row_even()
-        } else {
-            Palette::row_odd()
-        };
-
-        let row_el = container(
-            row![
-                checkbox(item.enabled)
-                    .on_toggle(move |_| Message::Request(RequestMsg::ParamToggled(i)))
-                    .size(12)
-                    .spacing(0)
-                    .style(crate::ui::styles::checkbox),
-                text(format!("{}", i + 1))
-                    .size(TEXT_XS)
-                    .color(Palette::text_subtle())
-                    .font(crate::ui::theme::MONO)
-                    .width(20),
-                super::cell::text_cell("key", &item.key, TEXT_SM, [5, 6], Length::Fill, move |s| {
-                    Message::Request(RequestMsg::ParamKeyChanged(i, s))
-                },),
-                super::cell::text_cell(
-                    "value",
-                    &item.value,
-                    TEXT_SM,
-                    [5, 6],
-                    Length::Fill,
-                    move |s| Message::Request(RequestMsg::ParamValueChanged(i, s)),
-                ),
-                button(icons::close().size(TEXT_XS).color(Palette::text_subtle()))
-                    .on_press(Message::Request(RequestMsg::ParamRemoved(i)))
-                    .style(iced::widget::button::text)
-                    .padding([2, 6]),
-            ]
-            .spacing(4)
-            .padding(iced::Padding {
-                top: 4.0,
-                right: 8.0,
-                bottom: 4.0,
-                left: 10.0,
-            })
-            .align_y(iced::Alignment::Center),
-        )
-        .style(move |_| iced::widget::container::Style {
-            background: Some(Background::Color(bg)),
-            ..Default::default()
+    let rows = tab
+        .params
+        .iter()
+        .map(|p| Row {
+            id: p.id.as_str(),
+            enabled: p.enabled,
+            key: p.key.as_str(),
+            value: p.value.as_str(),
+            suffix: None,
         })
-        .width(Length::Fill);
-
-        col = col.push(row_el);
-
-        if has_env && (item.key.contains("{{") || item.value.contains("{{")) {
-            let expanded_key = substitute(&item.key, env);
-            let expanded_val = substitute(&item.value, env);
-            let preview = format!("↳ {}: {}", expanded_key, expanded_val);
-            col = col.push(
-                container(
-                    text(preview)
-                        .size(9)
-                        .color(Palette::accent())
-                        .font(crate::ui::theme::MONO),
-                )
-                .padding(iced::Padding {
-                    top: 0.0,
-                    right: 8.0,
-                    bottom: 2.0,
-                    left: 70.0,
-                })
-                .width(Length::Fill),
-            );
-        }
-    }
-
-    col = col.push(footer());
-
-    scrollable(col)
-        .height(Length::Fill)
-        .direction(iced::widget::scrollable::Direction::Vertical(
-            crate::ui::theme::grabbable_scrollbar(),
-        ))
-        .style(crate::ui::theme::thin_scrollbar)
-        .into()
+        .collect();
+    scroll::vertical(t, kv_table(t, rows, ACTIONS, "Add parameter", Some(HELP))).into()
 }

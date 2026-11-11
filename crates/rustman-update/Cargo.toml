@@ -1,0 +1,29 @@
+[package]
+name = "rustman-update"
+description = "Rustman's self-update from GitHub releases"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+reqwest.workspace = true
+self-replace.workspace = true
+serde.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt"] }
+
+[target.'cfg(not(windows))'.dependencies]
+flate2.workspace = true
+tar.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+zip.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

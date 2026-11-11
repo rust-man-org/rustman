@@ -1,0 +1,23 @@
+{
+  "repos": [
+    {
+      "id": "local",
+      "name": "Local",
+      "path": "/data/rustman/collections",
+      "remote_url": null,
+      "collection_ids": [
+        "col-storefront"
+      ]
+    },
+    {
+      "id": "team-api",
+      "name": "team-api",
+      "path": "/data/rustman/repos/team-api",
+      "remote_url": "https://example.invalid/team/api.git",
+      "collection_ids": [
+        "col-auth",
+        "col-billing"
+      ]
+    }
+  ]
+}

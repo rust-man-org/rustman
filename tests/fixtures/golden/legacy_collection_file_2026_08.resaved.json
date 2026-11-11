@@ -1,0 +1,114 @@
+{
+  "collection": {
+    "id": "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b",
+    "name": "Users API",
+    "created_at": 1754000000000
+  },
+  "requests": [
+    {
+      "id": "5b1f3c2e-0d4a-4f7e-9a51-2c8e7d6b9a10",
+      "collection_id": "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b",
+      "group_id": null,
+      "sort_order": 0,
+      "name": "Get profile",
+      "method": "Get",
+      "url": "https://api.example.com/users/me",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "body_type": "Json",
+      "graphql_variables": "",
+      "auth_type": "None",
+      "bearer_token": "",
+      "basic_user": "",
+      "basic_pass": "",
+      "api_key_name": "",
+      "api_key_value": "",
+      "api_key_location": "Header",
+      "form_data_fields": [
+        {
+          "id": "c3d2e1f0-1111-4222-8333-444455556666",
+          "key": "avatar",
+          "value": "",
+          "field_type": "File",
+          "enabled": true,
+          "file_name": null,
+          "file_data": null,
+          "mime_type": null
+        }
+      ],
+      "cookie_string": "",
+      "cookies": [],
+      "jwt_secret": "",
+      "jwt_subject": "",
+      "jwt_algo": "HS256",
+      "pre_request_script": "",
+      "test_script": ""
+    },
+    {
+      "id": "7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d",
+      "collection_id": "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b",
+      "group_id": null,
+      "sort_order": 0,
+      "name": "Upload avatar",
+      "method": "Post",
+      "url": "{{base_url}}/users/me/avatar",
+      "headers": [
+        {
+          "id": "0f1e2d3c-aaaa-4bbb-8ccc-dddd00001111",
+          "key": "Accept",
+          "value": "application/json",
+          "enabled": true
+        }
+      ],
+      "params": [
+        {
+          "id": "0f1e2d3c-aaaa-4bbb-8ccc-dddd00002222",
+          "key": "resize",
+          "value": "256",
+          "enabled": false
+        }
+      ],
+      "body": "",
+      "body_type": "FormData",
+      "graphql_variables": "",
+      "auth_type": "Bearer",
+      "bearer_token": "{{token}}",
+      "basic_user": "",
+      "basic_pass": "",
+      "api_key_name": "",
+      "api_key_value": "",
+      "api_key_location": "Header",
+      "form_data_fields": [
+        {
+          "id": "0f1e2d3c-aaaa-4bbb-8ccc-dddd00003333",
+          "key": "avatar",
+          "value": "",
+          "field_type": "File",
+          "enabled": true,
+          "file_name": "me.png",
+          "file_data": "iVBORw0KGgo=",
+          "mime_type": "image/png"
+        },
+        {
+          "id": "0f1e2d3c-aaaa-4bbb-8ccc-dddd00004444",
+          "key": "alt",
+          "value": "My avatar",
+          "field_type": "Text",
+          "enabled": true,
+          "file_name": null,
+          "file_data": null,
+          "mime_type": null
+        }
+      ],
+      "cookie_string": "",
+      "cookies": [],
+      "jwt_secret": "",
+      "jwt_subject": "",
+      "jwt_algo": "HS256",
+      "pre_request_script": "",
+      "test_script": "test(\"created\", status == 201)"
+    }
+  ],
+  "groups": []
+}

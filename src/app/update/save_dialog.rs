@@ -1,97 +1,99 @@
+//! Saving a tab. A saved tab whose request still has its collection saves
+//! in place; any other asks where to put it, and the answer goes to the
+//! tab the dialog was opened for.
+
 use iced::Task;
 
 use crate::app::AppState;
-use crate::app::request_ops::save_request;
-use crate::domain::collection::Collection;
+use crate::app::request_ops::{Placement, current_placement, save_request};
 use crate::message::{Message, SaveDialogMsg};
-use crate::services::storage;
+use crate::state::sidebar::SaveDialog;
+
+use super::sidebar::{NEW_COLLECTION, new_collection};
+
+/// Ctrl+S and the Save button.
+pub(super) fn save(state: &mut AppState) -> Task<Message> {
+    let tab = state.tabs.active_tab();
+    let tab_id = tab.id.clone();
+    if let Some((request_id, placement)) = current_placement(state, &tab_id) {
+        return save_request(state, &tab_id, request_id, placement);
+    }
+    let name = if tab.url.is_empty() { tab.title.clone() } else { tab.url.clone() };
+    state.save_dialog = Some(SaveDialog {
+        tab_id,
+        name,
+        parent: None,
+        new_collection: state.collections.is_empty().then(String::new),
+    });
+    Task::none()
+}
 
 pub(super) fn handle(state: &mut AppState, msg: SaveDialogMsg) -> Task<Message> {
+    if let SaveDialogMsg::Confirm = msg {
+        return confirm(state);
+    }
+    let Some(dialog) = state.save_dialog.as_mut() else {
+        return Task::none();
+    };
     match msg {
-        SaveDialogMsg::Close => {
-            state.save_dialog_open = false;
-            state.save_dialog_new_col = false;
-            state.save_dialog_new_col_name = String::new();
-        }
-        SaveDialogMsg::NameChanged(s) => state.save_dialog_name = s,
+        SaveDialogMsg::Close => state.save_dialog = None,
+        SaveDialogMsg::NameChanged(name) => dialog.name = name,
         SaveDialogMsg::ParentSelected(id) => {
-            // The picker lists collections and folders; resolve which kind
-            // was picked so the request lands in the right parent.
-            if state.groups.iter().any(|g| g.id == id) {
-                state.save_dialog_group_id = Some(id);
-            } else {
-                state.save_dialog_group_id = None;
-                state.save_dialog_collection_id = Some(id);
-            }
-            state.save_dialog_new_col = false;
+            dialog.parent = Some(id);
+            dialog.new_collection = None;
         }
         SaveDialogMsg::ToggleNewCollection => {
-            state.save_dialog_new_col = !state.save_dialog_new_col;
+            dialog.new_collection = dialog.new_collection.is_none().then(String::new);
+            if dialog.new_collection.is_some() {
+                dialog.parent = None;
+            }
         }
-        SaveDialogMsg::NewCollectionNameChanged(s) => state.save_dialog_new_col_name = s,
-        SaveDialogMsg::Confirm => {
-            state.save_dialog_open = false;
-            let name = state.save_dialog_name.clone();
-
-            if state.save_dialog_new_col {
-                let col_name = if state.save_dialog_new_col_name.trim().is_empty() {
-                    "New Collection".to_owned()
-                } else {
-                    state.save_dialog_new_col_name.trim().to_owned()
-                };
-                let new_col_id = uuid::Uuid::new_v4().to_string();
-                let col = Collection {
-                    id: new_col_id.clone(),
-                    name: col_name,
-                    created_at: chrono::Utc::now().timestamp_millis(),
-                };
-                if let Some(db) = &state.db {
-                    let _ = storage::create_collection(db, &col);
-                }
-                state.collections.push(col);
-                state.save_dialog_collection_id = Some(new_col_id);
-                state.save_dialog_new_col = false;
-                state.save_dialog_new_col_name = String::new();
+        SaveDialogMsg::NewCollectionNameChanged(name) => {
+            if let Some(typed) = dialog.new_collection.as_mut() {
+                *typed = name;
             }
-
-            // A picked folder implies its root collection; resolve it here so
-            // `save_request` only has to read the two dialog fields.
-            if let Some(gid) = state.save_dialog_group_id.clone() {
-                if let Some(root) = crate::app::tree::root_collection_of(&state.groups, &gid) {
-                    state.save_dialog_collection_id = Some(root);
-                } else {
-                    state.save_dialog_group_id = None;
-                }
-            }
-
-            let col_id = state
-                .save_dialog_collection_id
-                .clone()
-                .or_else(|| state.collections.first().map(|c| c.id.clone()))
-                .unwrap_or_default();
-
-            if col_id.is_empty() {
-                let new_col_id = uuid::Uuid::new_v4().to_string();
-                let col = Collection {
-                    id: new_col_id.clone(),
-                    name: "My Requests".to_owned(),
-                    created_at: chrono::Utc::now().timestamp_millis(),
-                };
-                if let Some(db) = &state.db {
-                    let _ = storage::create_collection(db, &col);
-                }
-                state.collections.push(col);
-                state.save_dialog_collection_id = Some(new_col_id);
-            }
-
-            let col_id = state.save_dialog_collection_id.clone().unwrap_or_default();
-            let tab = state.tabs.active_tab_mut();
-            let req_id = uuid::Uuid::new_v4().to_string();
-            tab.title = name.clone();
-            tab.saved_as = Some((col_id.clone(), req_id.clone()));
-
-            return save_request(state);
         }
+        SaveDialogMsg::Confirm => {}
     }
     Task::none()
 }
+
+/// Saves where the dialog points, first creating the collection typed into
+/// it. Without a location the dialog stays open.
+fn confirm(state: &mut AppState) -> Task<Message> {
+    let Some(dialog) = state.save_dialog.take() else {
+        return Task::none();
+    };
+    if !state.tabs.tabs.iter().any(|t| t.id == dialog.tab_id) {
+        state.status_message = Some("Nothing saved: the tab was closed".into());
+        return Task::none();
+    }
+    let Some((collection_id, group_id)) = destination(state, &dialog) else {
+        state.save_dialog = Some(dialog);
+        return Task::none();
+    };
+    let name = dialog.name.trim();
+    if let Some(tab) = state.tabs.get_mut(&dialog.tab_id)
+        && !name.is_empty()
+    {
+        name.clone_into(&mut tab.title);
+    }
+    let placement = Placement::last_in(state, collection_id, group_id);
+    save_request(state, &dialog.tab_id, uuid::Uuid::new_v4().to_string(), placement)
+}
+
+fn destination(state: &mut AppState, dialog: &SaveDialog) -> Option<(String, Option<String>)> {
+    if let Some(typed) = &dialog.new_collection {
+        let name = if typed.trim().is_empty() { NEW_COLLECTION } else { typed.trim() };
+        return Some((new_collection(state, name), None));
+    }
+    let parent = dialog.parent.as_ref()?;
+    if state.collections.iter().any(|c| &c.id == parent) {
+        return Some((parent.clone(), None));
+    }
+    let collection = crate::app::tree::root_collection_of(&state.groups, parent)?;
+    Some((collection, Some(parent.clone())))
+}
+
+#[cfg(test)]
+mod tests;

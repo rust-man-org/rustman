@@ -1,190 +1,153 @@
-use iced::{
-    Alignment, Background, Border, Color, Element, Length,
-    widget::{button, container, row, text},
-};
+//! The request pane's tab bar. On the Body tab its end holds the Format
+//! action and the body-type menu, so the body starts right under the bar.
 
-use crate::{
-    message::{Message, RequestMsg, RequestTab},
-    state::tabs::RequestTabState,
-    ui::{
-        icons,
-        theme::{Palette, TEXT_SM, TEXT_XS},
-    },
-};
+use iced::widget::{row, text};
+use iced::{Alignment, Element};
 
-pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
-    let tabs = [
-        (RequestTab::Params, "Params"),
-        (RequestTab::Headers, "Headers"),
-        (RequestTab::Body, "Body"),
-        (RequestTab::Auth, "Auth"),
-        (RequestTab::Scripts, "Scripts"),
-    ];
+use crate::domain::request::BodyType;
+use crate::message::{AppMsg, MenuId, Message, RequestMsg, RequestTab};
+use crate::state::tabs::RequestTabState;
+use crate::ui::components::button::{Size, Variant, button};
+use crate::ui::components::icon_button::IconSize;
+use crate::ui::components::menu::{self, Align, Entry, Item};
+use crate::ui::components::tab_bar::{Tab, TabBar};
+use crate::ui::components::{icon_button, tooltip};
+use crate::ui::icons;
+use crate::ui::theme::{SPACE_XS, TEXT_SM, Tokens};
 
-    let btns: Vec<Element<Message>> = tabs
-        .iter()
-        .map(|(t, label)| {
-            let active = &tab.active_request_tab == t;
-            let (badge, dot): (Option<usize>, Option<Color>) = match t {
-                RequestTab::Params => {
-                    let n = tab
-                        .params
-                        .iter()
-                        .filter(|p| p.enabled && !p.key.is_empty())
-                        .count();
-                    (if n > 0 { Some(n) } else { None }, None)
-                }
-                RequestTab::Headers => {
-                    let n = tab
-                        .headers
-                        .iter()
-                        .filter(|h| h.enabled && !h.key.is_empty())
-                        .count();
-                    (if n > 0 { Some(n) } else { None }, None)
-                }
-                RequestTab::Auth => {
-                    let has_auth = !tab.bearer_token.is_empty()
-                        || !tab.basic_user.is_empty()
-                        || !tab.basic_pass.is_empty()
-                        || !tab.api_key_name.is_empty()
-                        || !tab.api_key_value.is_empty()
-                        || !tab.cookie_string.is_empty()
-                        || !tab.jwt_secret.is_empty()
-                        || !tab.jwt_subject.is_empty();
-                    (
-                        None,
-                        if has_auth {
-                            Some(Palette::accent())
-                        } else {
-                            None
-                        },
-                    )
-                }
-                _ => (None, None),
-            };
-            pill_tab(
-                label,
-                badge,
-                dot,
-                active,
-                Message::Request(RequestMsg::TabSelected(t.clone())),
-            )
-        })
-        .collect();
+const TABS: [(RequestTab, &str); 5] = [
+    (RequestTab::Params, "Params"),
+    (RequestTab::Headers, "Headers"),
+    (RequestTab::Body, "Body"),
+    (RequestTab::Auth, "Auth"),
+    (RequestTab::Scripts, "Scripts"),
+];
 
-    // Segmented control on a recessed track.
-    container(container(row(btns).spacing(2).padding(3)).style(|_| {
-        iced::widget::container::Style {
-            background: Some(Background::Color(Palette::background())),
-            border: Border {
-                color: Palette::border_subtle(),
-                width: 1.0,
-                radius: 9.0.into(),
-            },
-            ..Default::default()
-        }
-    }))
-    .padding([8, 12])
-    .width(Length::Fill)
+const BODY_TYPES: [(BodyType, &str); 5] = [
+    (BodyType::None, "None"),
+    (BodyType::Json, "JSON"),
+    (BodyType::Text, "Text"),
+    (BodyType::FormData, "Form"),
+    (BodyType::GraphQL, "GraphQL"),
+];
+
+/// Width of the body-type menu panel.
+const BODY_MENU_WIDTH: f32 = 200.0;
+
+pub fn view<'a>(tab: &'a RequestTabState, t: &'a Tokens, open_menu: Option<MenuId>) -> Element<'a, Message> {
+    let bar = TABS.iter().fold(TabBar::new(t), |bar, (kind, label)| {
+        bar.tab(
+            Tab::new(label, Message::Request(RequestMsg::TabSelected(kind.clone())))
+                .active(&tab.active_request_tab == kind)
+                .count(count(tab, kind)),
+        )
+    });
+    match tab.active_request_tab {
+        RequestTab::Body => bar.trailing(body_controls(tab, t, open_menu == Some(MenuId::BodyType))),
+        RequestTab::Params => bar.trailing(bulk_toggle(t, tab.params_bulk.is_some(), RequestMsg::ParamsBulkToggle)),
+        RequestTab::Headers => bar.trailing(bulk_toggle(t, tab.headers_bulk.is_some(), RequestMsg::HeadersBulkToggle)),
+        _ => bar,
+    }
     .into()
 }
 
-pub fn pill_tab<'a>(
-    label: &str,
-    badge: Option<usize>,
-    dot: Option<Color>,
-    active: bool,
-    msg: Message,
-) -> Element<'a, Message> {
-    let mut content = row![].align_y(Alignment::Center).spacing(6);
-    if let Some(color) = dot {
-        content = content.push(icons::dot(color));
+/// The rows that will be sent, by the request's own rules: a param needs a
+/// key or a value (`?=v` counts), a header needs a name.
+fn count(tab: &RequestTabState, kind: &RequestTab) -> usize {
+    match kind {
+        RequestTab::Params => tab.params.iter().filter(|p| p.enabled && !p.is_blank()).count(),
+        RequestTab::Headers => tab.headers.iter().filter(|h| h.enabled && !h.key.is_empty()).count(),
+        _ => 0,
     }
-    content = content.push(
-        text(label.to_owned())
-            .size(TEXT_SM)
-            .color(if active {
-                Palette::text()
-            } else {
-                Palette::text_muted()
-            })
-            .font(if active {
-                crate::ui::theme::UI_FONT_MEDIUM
-            } else {
-                crate::ui::theme::UI_FONT
-            }),
-    );
-    if let Some(n) = badge {
-        content = content.push(
-            container(text(n.to_string()).size(TEXT_XS).color(if active {
-                Palette::accent()
-            } else {
-                Palette::text_subtle()
-            }))
-            .padding([1, 6])
-            .style(move |_| iced::widget::container::Style {
-                background: Some(Background::Color(if active {
-                    Palette::accent_soft()
-                } else {
-                    Palette::surface_high()
-                })),
-                border: Border {
-                    radius: 100.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }),
-        );
-    }
+}
 
-    button(content)
-        .on_press(msg)
-        .style(move |_, status| pill_tab_style(status, active))
-        .padding([6, 12])
+fn bulk_toggle(t: &Tokens, bulk: bool, msg: RequestMsg) -> Element<'_, Message> {
+    let label = if bulk { "Table view" } else { "Bulk edit" };
+    button(t, label, Variant::Ghost, Size::Compact)
+        .on_press(Message::Request(msg))
         .into()
 }
 
-fn pill_tab_style(
-    status: iced::widget::button::Status,
-    active: bool,
-) -> iced::widget::button::Style {
-    let hovered = matches!(status, iced::widget::button::Status::Hovered);
-    iced::widget::button::Style {
-        background: if active {
-            Some(Background::Color(Palette::surface_raised()))
-        } else if hovered {
-            Some(Background::Color(Palette::hover()))
-        } else {
-            None
-        },
-        text_color: if active {
-            Palette::text()
-        } else {
-            Palette::text_muted()
-        },
-        border: Border {
-            color: if active {
-                Palette::border()
-            } else {
-                Color::TRANSPARENT
-            },
-            width: if active { 1.0 } else { 0.0 },
-            radius: 7.0.into(),
-        },
-        shadow: if active {
-            iced::Shadow {
-                color: Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.0,
-                    a: 0.25,
-                },
-                offset: iced::Vector::new(0.0, 1.0),
-                blur_radius: 4.0,
-            }
-        } else {
-            iced::Shadow::default()
-        },
-        ..Default::default()
+fn body_controls<'a>(tab: &'a RequestTabState, t: &'a Tokens, menu_open: bool) -> Element<'a, Message> {
+    let mut controls = row![].spacing(SPACE_XS).align_y(Alignment::Center);
+    if tab.body_type == BodyType::Json {
+        controls = controls.push(tooltip(
+            t,
+            icon_button(t, icons::braces(), IconSize::Small)
+                .on_press(Message::Request(RequestMsg::FormatBody)),
+            "Format JSON",
+            None,
+        ));
+    }
+    controls.push(body_type_menu(tab, t, menu_open)).into()
+}
+
+fn body_type_menu<'a>(tab: &'a RequestTabState, t: &'a Tokens, open: bool) -> Element<'a, Message> {
+    let trigger = menu::trigger(t, text(body_type_label(&tab.body_type)).size(TEXT_SM), open)
+        .on_press(Message::App(AppMsg::MenuToggled(MenuId::BodyType)));
+    let panel = open.then(|| menu::panel(t, body_type_entries(tab), BODY_MENU_WIDTH));
+    tooltip(
+        t,
+        menu::popover(trigger, panel, Align::End, Message::App(AppMsg::MenuDismissed)),
+        "Body type",
+        None,
+    )
+}
+
+fn body_type_entries<'a>(tab: &RequestTabState) -> Vec<Entry<'a, Message>> {
+    let mut entries: Vec<Entry<'a, Message>> = BODY_TYPES
+        .iter()
+        .map(|(kind, label)| {
+            Item::new(*label, Message::Request(RequestMsg::BodyTypeChanged(kind.clone())))
+                .checked(&tab.body_type == kind)
+                .into()
+        })
+        .collect();
+    if matches!(tab.body_type, BodyType::Json | BodyType::Text) {
+        entries.push(Entry::Separator);
+        entries.push(
+            Item::new("Indent with tabs", Message::Request(RequestMsg::ToggleBodyIndentStyle))
+                .checked(tab.body_indent_tabs)
+                .into(),
+        );
+    }
+    entries
+}
+
+pub fn body_type_label(kind: &BodyType) -> &'static str {
+    BODY_TYPES
+        .iter()
+        .find(|(k, _)| k == kind)
+        .map_or("None", |(_, label)| label)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn counts_only_rows_that_will_be_sent() {
+        let mut tab = RequestTabState::new();
+        let row = |key: &str, enabled| crate::domain::request::KeyValue {
+            id: key.to_owned(),
+            key: key.to_owned(),
+            value: String::new(),
+            enabled,
+        };
+        tab.params = vec![row("page", true), row("", true), row("off", false)];
+        assert_eq!(count(&tab, &RequestTab::Params), 1);
+        assert_eq!(count(&tab, &RequestTab::Body), 0);
+    }
+
+    #[test]
+    fn every_body_type_has_a_label_and_the_indent_toggle_only_for_text_bodies() {
+        let mut tab = RequestTabState::new();
+        for (kind, label) in BODY_TYPES {
+            assert_eq!(body_type_label(&kind), label);
+        }
+        tab.body_type = BodyType::FormData;
+        assert_eq!(body_type_entries(&tab).len(), BODY_TYPES.len());
+        tab.body_type = BodyType::Json;
+        assert_eq!(body_type_entries(&tab).len(), BODY_TYPES.len() + 2);
     }
 }

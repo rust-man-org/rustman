@@ -5,18 +5,22 @@ on:
     branches: [master]
     paths:
       - "src/**"
+      - "crates/**"
       - "tests/**"
       - "build.rs"
       - "Cargo.toml"
       - "Cargo.lock"
+      - "clippy.toml"
       - ".github/workflows/ci-iced.yml"
   pull_request:
     paths:
       - "src/**"
+      - "crates/**"
       - "tests/**"
       - "build.rs"
       - "Cargo.toml"
       - "Cargo.lock"
+      - "clippy.toml"
       - ".github/workflows/ci-iced.yml"
 
 jobs:
@@ -60,7 +64,7 @@ jobs:
         run: cargo build --release
 
       - name: Check distro build (no self-update feature)
-        run: cargo check --no-default-features --all-targets
+        run: cargo check --workspace --no-default-features --all-targets
 
       - name: Upload binary artefact
         uses: actions/upload-artifact@v4
@@ -69,3 +73,72 @@ jobs:
           path: target/release/rustman
           if-no-files-found: error
           retention-days: 7
+
+  test:
+    name: Test · Linux x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            libxkbcommon-dev libxkbcommon-x11-dev libxi-dev libx11-dev \
+            libxcb1-dev libxcb-xkb-dev libdbus-1-dev pkg-config cmake build-essential
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache build artefacts
+        uses: Swatinem/rust-cache@v2
+
+      # Both feature sets: distro packages build without the updater, and
+      # tests must pass there too.
+      - name: Test
+        run: cargo test --workspace --all-targets
+      - name: Test (no default features)
+        run: cargo test --workspace --all-targets --no-default-features
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    env:
+      # The library crates are held to fmt + clippy (with the curated
+      # pedantic set in [workspace.lints]) now; the app joins once its own
+      # cleanup lands.
+      LIB_CRATES: >-
+        -p rustman-cli -p rustman-core -p rustman-formats -p rustman-git
+        -p rustman-http -p rustman-script -p rustman-store -p rustman-testkit
+        -p rustman-update
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            libxkbcommon-dev libxkbcommon-x11-dev libxi-dev libx11-dev \
+            libxcb1-dev libxcb-xkb-dev libdbus-1-dev pkg-config cmake build-essential
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache build artefacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: rustfmt (library crates)
+        run: cargo fmt --check $LIB_CRATES
+
+      - name: clippy (library crates)
+        run: cargo clippy $LIB_CRATES --all-targets -- -D warnings
+
+      - name: rustfmt (workspace)
+        continue-on-error: true
+        run: cargo fmt --all --check
+
+      - name: clippy (workspace)
+        continue-on-error: true
+        run: cargo clippy --workspace --all-targets -- -D warnings

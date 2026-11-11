@@ -1,12 +1,16 @@
 pub mod command_palette;
+pub mod components;
+pub mod format;
 pub mod icons;
 pub mod layout;
 pub mod request;
 pub mod response;
+pub mod settings;
+pub mod start;
 pub mod sidebar;
 pub mod styles;
 pub mod theme;
 pub mod tree_label;
 #[cfg(feature = "self-update")]
-pub mod update_banner;
+pub mod update_chip;
 pub mod widgets;

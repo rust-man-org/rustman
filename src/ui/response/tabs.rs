@@ -1,61 +1,49 @@
-use iced::{
-    Background, Border, Element, Length,
-    widget::{container, row},
-};
+//! The response pane's tab bar.
 
-use crate::{
-    message::{Message, ResponseMsg, ResponseTab},
-    state::tabs::RequestTabState,
-    ui::{request::tabs::pill_tab, theme::Palette},
-};
+use crate::message::{Message, ResponseMsg, ResponseTab};
+use crate::state::tabs::RequestTabState;
+use crate::ui::components::tab_bar::{Tab, TabBar};
+use crate::ui::theme::Tokens;
 
-pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
-    let tabs: Vec<(ResponseTab, &str)> = vec![
-        (ResponseTab::Body, "Body"),
-        (ResponseTab::Headers, "Headers"),
-        (ResponseTab::Cookies, "Cookies"),
-        (ResponseTab::Tests, "Tests"),
-    ];
+const TABS: [(ResponseTab, &str); 4] = [
+    (ResponseTab::Body, "Body"),
+    (ResponseTab::Headers, "Headers"),
+    (ResponseTab::Cookies, "Cookies"),
+    (ResponseTab::Tests, "Tests"),
+];
 
-    let btns: Vec<Element<Message>> = tabs
-        .iter()
-        .map(|(t, label)| {
-            let active = &tab.active_response_tab == t;
-            let (badge, dot) = if *t == ResponseTab::Tests && !tab.test_results.is_empty() {
-                let failed = tab.test_results.iter().any(|r| !r.passed);
-                (
-                    Some(tab.test_results.len()),
-                    Some(if failed {
-                        Palette::ERROR
-                    } else {
-                        Palette::SUCCESS
-                    }),
-                )
-            } else {
-                (None, None)
-            };
-            pill_tab(
-                label,
-                badge,
-                dot,
-                active,
-                Message::Response(ResponseMsg::TabSelected(t.clone())),
-            )
-        })
-        .collect();
+/// The bar with the pane's tabs; `trailing` goes at its end.
+pub fn bar<'a>(tab: &'a RequestTabState, t: &'a Tokens) -> TabBar<'a, Message> {
+    TABS.iter().fold(TabBar::new(t), |bar, (kind, label)| {
+        bar.tab(
+            Tab::new(label, Message::Response(ResponseMsg::TabSelected(kind.clone())))
+                .active(&tab.active_response_tab == kind)
+                .count(count(tab, kind))
+                .dot(tests_dot(tab, kind, t)),
+        )
+    })
+}
 
-    container(container(row(btns).spacing(2).padding(3)).style(|_| {
-        iced::widget::container::Style {
-            background: Some(Background::Color(Palette::background())),
-            border: Border {
-                color: Palette::border_subtle(),
-                width: 1.0,
-                radius: 9.0.into(),
-            },
-            ..Default::default()
-        }
-    }))
-    .padding([8, 12])
-    .width(Length::Fill)
-    .into()
+fn count(tab: &RequestTabState, kind: &ResponseTab) -> usize {
+    let headers = || tab.response.as_ref().filter(|r| r.status != 0).map(|r| &r.headers);
+    match kind {
+        ResponseTab::Headers => headers().map_or(0, std::collections::HashMap::len),
+        ResponseTab::Cookies => headers().map_or(0, |h| {
+            h.keys().filter(|k| k.eq_ignore_ascii_case("set-cookie")).count()
+        }),
+        ResponseTab::Tests => tab.test_results.len(),
+        ResponseTab::Body => 0,
+    }
+}
+
+/// Green when every test passed, red when any failed.
+fn tests_dot(tab: &RequestTabState, kind: &ResponseTab, t: &Tokens) -> Option<iced::Color> {
+    if *kind != ResponseTab::Tests || tab.test_results.is_empty() {
+        return None;
+    }
+    Some(if tab.test_results.iter().any(|r| !r.passed) {
+        t.status.error
+    } else {
+        t.status.success
+    })
 }

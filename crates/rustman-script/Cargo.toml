@@ -1,0 +1,15 @@
+[package]
+name = "rustman-script"
+description = "Rustman's pre-request and test scripts, run by rustman-engine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustman-core.workspace = true
+rustman-engine.workspace = true
+
+[lints]
+workspace = true

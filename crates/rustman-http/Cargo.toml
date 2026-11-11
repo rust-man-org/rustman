@@ -1,0 +1,28 @@
+[package]
+name = "rustman-http"
+description = "Rustman's HTTP and WebSocket transport"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustman-core.workspace = true
+
+async-compression.workspace = true
+base64.workspace = true
+futures-util.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["io-util", "rt", "sync"] }
+tokio-tungstenite.workspace = true
+tokio-util = { workspace = true, features = ["io"] }
+
+[dev-dependencies]
+http = "1"
+tokio = { workspace = true, features = ["macros", "net", "rt"] }
+
+[lints]
+workspace = true

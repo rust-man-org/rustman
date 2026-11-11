@@ -100,10 +100,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "allocator-api2"
-version = "0.2.21"
+name = "alloc-no-stdlib"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
+checksum = "cc7bb162ec39d46ab1ca8c77bf72e890535becd1751bb45f64c597edb4c8c6b3"
+
+[[package]]
+name = "alloc-stdlib"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e76a019e91224d279006ff972f1e984179a6e9feb050adba6ce8274aef23195"
+dependencies = [
+ "alloc-no-stdlib",
+]
 
 [[package]]
 name = "android-activity"
@@ -238,6 +247,18 @@ dependencies = [
  "event-listener-strategy",
  "futures-core",
  "pin-project-lite",
+]
+
+[[package]]
+name = "async-compression"
+version = "0.4.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e79b3f8a79cccc2898f31920fc69f304859b3bd567490f75ebf51ae1c792a9ac"
+dependencies = [
+ "compression-codecs",
+ "compression-core",
+ "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]
@@ -414,9 +435,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.18.2"
+version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faac5829c2b74c28f830747e7818ccfb684261b5f48a1118b1e2a13d36dfab13"
+checksum = "048006790404103c488e6c5616b3e7e702a71292aadda08e8f7698a9e0d2eb53"
 dependencies = [
  "aws-lc-sys",
  "zeroize",
@@ -424,9 +445,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.46.0"
+version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1622d8446a2d4b2ce0c7eefc73dd43a99779028d5ee5c2dd8073a658ba8a2bc"
+checksum = "8bfbe32ac36b3c428696ce315464181bc4029d689fd58e3f2a4e58c252242f52"
 dependencies = [
  "cc",
  "cmake",
@@ -557,6 +578,27 @@ dependencies = [
  "futures-io",
  "futures-lite",
  "piper",
+]
+
+[[package]]
+name = "brotli"
+version = "8.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cc91aac060a7a1e25823bdccbfb6af1875b88f17c6daac97894eed8207166b3"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
+ "brotli-decompressor",
+]
+
+[[package]]
+name = "brotli-decompressor"
+version = "5.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a32acac15fe1967bc3986b2a6347dffc965602354ea6f450ad07e8bfd253583"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
 ]
 
 [[package]]
@@ -832,6 +874,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "compression-codecs"
+version = "0.4.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce2548391e9c1929c21bf6aa2680af86fe4c1b33e6cea9ac1cfeec0bd11218cf"
+dependencies = [
+ "brotli",
+ "compression-core",
+ "flate2",
+ "memchr",
+ "zstd",
+ "zstd-safe",
+]
+
+[[package]]
+name = "compression-core"
+version = "0.4.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc14f565cf027a105f7a44ccf9e5b424348421a1d8952a8fc9d499d313107789"
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1035,7 +1097,7 @@ checksum = "08bc795bdbccdbd461736fb163930a009da6597b226d6f6fce33e7a8eb6ec519"
 dependencies = [
  "cosmic-text",
  "etagere",
- "lru 0.16.4",
+ "lru",
  "rustc-hash 2.1.2",
  "wgpu",
 ]
@@ -1309,7 +1371,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1953,11 +2015,6 @@ name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
-dependencies = [
- "allocator-api2",
- "equivalent",
- "foldhash 0.2.0",
-]
 
 [[package]]
 name = "hashlink"
@@ -2150,8 +2207,8 @@ dependencies = [
 
 [[package]]
 name = "iced-code-editor"
-version = "0.3.11"
-source = "git+https://github.com/rust-man-org/iced-code-editor-rustman?tag=v0.3.11#5424d69dbb9315cc8885d5dd14d156dca1f12259"
+version = "0.3.13"
+source = "git+https://github.com/rust-man-org/iced-code-editor-rustman?tag=v0.3.13#6de999d9b5a2917c5f8eadb82ddbf231a24fd4b8"
 dependencies = [
  "iced",
  "iced_aw",
@@ -2960,15 +3017,6 @@ name = "lru"
 version = "0.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f66e8d5d03f609abc3a39e6f08e4164ebf1447a732906d39eb9b99b7919ef39"
-
-[[package]]
-name = "lru"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a860605968fce16869fd239cf4237a82f3ac470723415db603b0e8b6c8d4fb9"
-dependencies = [
- "hashbrown 0.17.1",
-]
 
 [[package]]
 name = "lru-slab"
@@ -4692,7 +4740,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4749,7 +4797,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4760,9 +4808,9 @@ checksum = "f87165f0995f63a9fbeea62b64d10b4d9d8e78ec6d7d51fb2125fda7bb36788f"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.15"
+version = "0.103.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
+checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
 dependencies = [
  "aws-lc-rs",
  "ring",
@@ -4772,35 +4820,33 @@ dependencies = [
 
 [[package]]
 name = "rustman"
-version = "0.3.15"
+version = "0.4.0"
 dependencies = [
  "base64 0.23.0",
  "calamine",
  "chrono",
  "dirs",
- "flate2",
  "futures-util",
- "git2",
- "hmac",
  "iced",
  "iced-code-editor",
  "iced_core",
+ "iced_runtime",
  "image",
- "lru 0.18.0",
  "open",
  "reqwest",
  "rfd",
  "rusqlite",
- "rustls",
- "rustman-engine",
- "self-replace",
+ "rustman-core",
+ "rustman-formats",
+ "rustman-git",
+ "rustman-http",
+ "rustman-script",
+ "rustman-store",
+ "rustman-testkit",
+ "rustman-update",
  "serde",
  "serde_json",
- "serde_yaml",
- "sha2 0.11.0",
- "tar",
  "tokio",
- "tokio-tungstenite",
  "tokio-util",
  "ttf-parser",
  "uuid",
@@ -4809,14 +4855,130 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustman-cli"
+version = "0.4.0"
+dependencies = [
+ "dirs",
+ "rustman-core",
+ "rustman-formats",
+ "rustman-http",
+ "rustman-script",
+ "rustman-store",
+ "rustman-testkit",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "rustman-core"
+version = "0.4.0"
+dependencies = [
+ "base64 0.23.0",
+ "hmac",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "uuid",
+]
+
+[[package]]
 name = "rustman-engine"
-version = "0.1.0"
-source = "git+https://github.com/rust-man-org/rustman-engine?tag=v0.1.0#c86ec3a8021aa4037a1ede6e8c4efb06e801e6c1"
+version = "0.1.1"
+source = "git+https://github.com/rust-man-org/rustman-engine?tag=v0.1.1#2f481d70fe34afeff3ecde3c7a855b4e13b57698"
 dependencies = [
  "aes-gcm",
  "base64 0.23.0",
  "serde_json",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "rustman-formats"
+version = "0.4.0"
+dependencies = [
+ "base64 0.23.0",
+ "rustman-core",
+ "rustman-testkit",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "uuid",
+]
+
+[[package]]
+name = "rustman-git"
+version = "0.4.0"
+dependencies = [
+ "git2",
+ "rustman-core",
+ "rustman-testkit",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "rustman-http"
+version = "0.4.0"
+dependencies = [
+ "async-compression",
+ "base64 0.23.0",
+ "futures-util",
+ "http",
+ "reqwest",
+ "rustls",
+ "rustman-core",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+]
+
+[[package]]
+name = "rustman-script"
+version = "0.4.0"
+dependencies = [
+ "rustman-core",
+ "rustman-engine",
+]
+
+[[package]]
+name = "rustman-store"
+version = "0.4.0"
+dependencies = [
+ "rusqlite",
+ "rustman-core",
+ "rustman-testkit",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
+name = "rustman-testkit"
+version = "0.4.0"
+dependencies = [
+ "rustman-core",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "rustman-update"
+version = "0.4.0"
+dependencies = [
+ "flate2",
+ "reqwest",
+ "self-replace",
+ "serde",
+ "sha2 0.11.0",
+ "tar",
+ "thiserror 2.0.18",
+ "tokio",
+ "zip",
 ]
 
 [[package]]
@@ -5439,10 +5601,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6565,7 +6727,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7401,6 +7563,34 @@ dependencies = [
  "crc32fast",
  "log",
  "simd-adler32",
+]
+
+[[package]]
+name = "zstd"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
+dependencies = [
+ "zstd-safe",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "7.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f49c4d5f0abb602a93fb8736af2a4f4dd9512e36f7f570d66e65ff867ed3b9d"
+dependencies = [
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "2.0.16+zstd.1.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91e19ebc2adc8f83e43039e79776e3fda8ca919132d68a1fed6a5faca2683748"
+dependencies = [
+ "cc",
+ "pkg-config",
 ]
 
 [[package]]

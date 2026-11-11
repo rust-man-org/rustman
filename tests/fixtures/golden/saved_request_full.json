@@ -1,0 +1,95 @@
+{
+  "id": "req-full",
+  "collection_id": "col-storefront",
+  "group_id": "grp-products",
+  "sort_order": 7,
+  "name": "Update product (every field)",
+  "method": "Patch",
+  "url": "{{base_url}}/products/42?expand=variants&trace=on",
+  "headers": [
+    {
+      "id": "h-ct",
+      "key": "Content-Type",
+      "value": "application/json",
+      "enabled": true
+    },
+    {
+      "id": "h-debug",
+      "key": "X-Debug",
+      "value": "1",
+      "enabled": false
+    }
+  ],
+  "params": [
+    {
+      "id": "p-expand",
+      "key": "expand",
+      "value": "variants",
+      "enabled": true
+    },
+    {
+      "id": "p-trace",
+      "key": "trace",
+      "value": "on",
+      "enabled": true
+    },
+    {
+      "id": "p-draft",
+      "key": "draft",
+      "value": "true",
+      "enabled": false
+    }
+  ],
+  "body": "query Product($id: ID!) { product(id: $id) { id name } }",
+  "body_type": "GraphQL",
+  "graphql_variables": "{\n  \"id\": \"42\"\n}",
+  "auth_type": "JwtUser",
+  "bearer_token": "bearer-token-123",
+  "basic_user": "alice",
+  "basic_pass": "s3cret: with spaces",
+  "api_key_name": "X-Api-Key",
+  "api_key_value": "key-456",
+  "api_key_location": "Query",
+  "form_data_fields": [
+    {
+      "id": "ff-text",
+      "key": "caption",
+      "value": "Front view",
+      "field_type": "Text",
+      "enabled": true,
+      "file_name": null,
+      "file_data": null,
+      "mime_type": null
+    },
+    {
+      "id": "ff-file",
+      "key": "image",
+      "value": "",
+      "field_type": "File",
+      "enabled": false,
+      "file_name": "front.png",
+      "file_data": "aGVsbG8gd29ybGQ=",
+      "mime_type": "image/png"
+    }
+  ],
+  "cookie_string": "session=abc; theme=dark",
+  "cookies": [
+    {
+      "id": "c-session",
+      "key": "session",
+      "value": "abc",
+      "enabled": true
+    },
+    {
+      "id": "c-theme",
+      "key": "theme",
+      "value": "dark",
+      "enabled": false
+    }
+  ],
+  "jwt_secret": "jwt-signing-secret",
+  "jwt_subject": "user-42",
+  "jwt_algo": "HS256",
+  "pre_request_script": "env.set(\"started\", now())\n",
+  "test_script": "test(\"ok\", status == 200)\n"
+}

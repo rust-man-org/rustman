@@ -316,3 +316,30 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           files: rustman-windows-${{ matrix.arch }}.zip
+
+  # ── Checksums the in-app updater verifies downloads against ──────────────────
+  checksums:
+    name: Publish SHA256SUMS
+    needs: [prepare, build-linux-iced, build-macos-iced, build-windows-iced]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Hash the release archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir assets
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir assets \
+            --pattern '*.tar.gz' --pattern '*.zip' --pattern '*.dmg'
+          (cd assets && sha256sum -- *) > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          files: SHA256SUMS

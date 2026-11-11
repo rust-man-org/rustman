@@ -1,0 +1,4 @@
+{
+  "pre_request_script": "env.set(\"run_id\", uuid())\n",
+  "test_script": "test(\"fast\", duration < 2000)\n"
+}

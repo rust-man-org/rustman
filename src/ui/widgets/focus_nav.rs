@@ -17,3 +17,16 @@ pub fn focus_previous<Message: Send + 'static>() -> iced::Task<Message> {
     )
     .discard()
 }
+
+/// Tab traversal kept inside the widget with id `scope`: under a modal, the
+/// focus cycles through the modal's fields and never reaches the window
+/// behind it.
+pub fn focus_next_in<Message: Send + 'static>(scope: &'static str) -> iced::Task<Message> {
+    use iced::advanced::widget::operation::{focusable, scope as within};
+    iced::advanced::widget::operate(within(scope.into(), focusable::focus_next::<()>())).discard()
+}
+
+pub fn focus_previous_in<Message: Send + 'static>(scope: &'static str) -> iced::Task<Message> {
+    use iced::advanced::widget::operation::{focusable, scope as within};
+    iced::advanced::widget::operate(within(scope.into(), focusable::focus_previous::<()>())).discard()
+}

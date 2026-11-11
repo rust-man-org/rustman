@@ -1,6 +1,6 @@
 use iced::{
     Background, Border, Element, Length,
-    widget::{column, container, row, scrollable, text},
+    widget::{column, container, row, text},
 };
 
 use crate::{
@@ -14,21 +14,7 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
         return kv_table::empty_state("No response yet.");
     };
 
-    let cookies: Vec<(&str, &str)> = resp
-        .headers
-        .iter()
-        .filter(|(k, _)| k.to_ascii_lowercase() == "set-cookie")
-        .flat_map(|(_, v)| {
-            // The first attribute is "name=value"; extras are ";Path=..." etc.
-            let name_val = v.split(';').next().unwrap_or(v.trim());
-            let (name, value) = if let Some(eq) = name_val.find('=') {
-                (&name_val[..eq], &name_val[eq + 1..])
-            } else {
-                (name_val, "")
-            };
-            Some((name.trim(), value.trim()))
-        })
-        .collect();
+    let cookies = set_cookies(&resp.headers);
 
     if cookies.is_empty() {
         return kv_table::empty_state("No Set-Cookie headers in this response.");
@@ -133,12 +119,38 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
         );
     }
 
-    scrollable(col)
+    crate::ui::components::scroll::vertical(crate::ui::theme::Palette::tokens(), col)
         .width(Length::Fill)
         .height(Length::Fill)
-        .direction(iced::widget::scrollable::Direction::Vertical(
-            crate::ui::theme::grabbable_scrollbar(),
-        ))
-        .style(crate::ui::theme::thin_scrollbar)
         .into()
+}
+
+/// Name and value of every cookie a response sets. Repeated `Set-Cookie`
+/// headers arrive joined by newlines in one header entry.
+fn set_cookies(headers: &std::collections::HashMap<String, String>) -> Vec<(&str, &str)> {
+    headers
+        .iter()
+        .filter(|(k, _)| k.eq_ignore_ascii_case("set-cookie"))
+        .flat_map(|(_, v)| v.lines())
+        .filter_map(|line| {
+            // "name=value" comes first; `Path=…`, `HttpOnly` etc. follow `;`.
+            let pair = line.split(';').next()?.trim();
+            let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
+            (!name.trim().is_empty()).then(|| (name.trim(), value.trim()))
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_set_cookie_header_is_listed() {
+        let headers = std::collections::HashMap::from([(
+            "set-cookie".to_owned(),
+            "sid=abc; Path=/; HttpOnly\ntheme=dark\nempty=".to_owned(),
+        )]);
+        assert_eq!(set_cookies(&headers), [("sid", "abc"), ("theme", "dark"), ("empty", "")]);
+    }
 }

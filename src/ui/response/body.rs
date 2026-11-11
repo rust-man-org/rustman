@@ -1,6 +1,8 @@
+use std::fmt::Write as _;
+
 use iced::{
-    Alignment, Background, Border, Color, Element, Length,
-    widget::{Space, button, column, container, row, scrollable, text},
+    Alignment, Background, Border, Element, Length,
+    widget::{Space, button, column, container, row, text, text_input},
 };
 
 use crate::{
@@ -10,22 +12,14 @@ use crate::{
     state::tabs::{RequestTabState, ResponsePreview},
     ui::{
         icons,
-        theme::{MONO, Palette, TEXT_LG, TEXT_SM, TEXT_XS},
+        theme::{MONO, Palette, SPACE_LG, SPACE_XS, TEXT_CAPTION, TEXT_LG, TEXT_SM},
     },
 };
 
-pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
-    if tab.is_loading {
-        return loading_view(spinner_frame);
-    }
-
+pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
     let Some(resp) = tab.response.as_ref() else {
-        return empty_view();
+        return Space::new().into();
     };
-
-    if let Some(err) = &resp.error {
-        return error_view(err);
-    }
 
     if resp.is_binary {
         // An oversized binary download has no bytes kept in memory at all, so
@@ -53,111 +47,10 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
         return simple_html_view(rendered, !resp.body_stored);
     }
 
-    let page_count = tab.viewer_page_count();
-    let size_note: Element<Message> = match tab.response_truncated_bytes {
-        Some(held_len) => {
-            let mut note = format!(
-                " · page {}/{} · showing {} of {}",
-                tab.viewer_page + 1,
-                page_count,
-                human_bytes(tab.response_editor_bytes()),
-                human_bytes(held_len),
-            );
-            // Bodies past the HTTP inline cap are cut before the viewer ever
-            // sees them — say how much never made it, instead of implying the
-            // pages cover everything.
-            if resp.body_stored {
-                let beyond = resp.body_size.saturating_sub(resp.body.len());
-                if beyond > 0 {
-                    note.push_str(&format!(" (+{} past preview limit)", human_bytes(beyond)));
-                }
-            }
-            text(note).size(TEXT_XS).color(Palette::WARNING).into()
-        }
-        None => Space::new().into(),
-    };
+    text_body(tab, resp)
+}
 
-    let page_nav: Element<Message> = if page_count > 1 {
-        let page = tab.viewer_page;
-        let prev = button(icons::arrow_left().size(11).color(Palette::text_muted()))
-            .padding([4, 6])
-            .style(iced::widget::button::text);
-        let prev = if page > 0 {
-            prev.on_press(Message::Response(ResponseMsg::ViewerPagePrev))
-        } else {
-            prev
-        };
-        let next = button(icons::arrow_right().size(11).color(Palette::text_muted()))
-            .padding([4, 6])
-            .style(iced::widget::button::text);
-        let next = if page + 1 < page_count {
-            next.on_press(Message::Response(ResponseMsg::ViewerPageNext))
-        } else {
-            next
-        };
-        row![
-            prev,
-            text(format!("Page {}/{}", page + 1, page_count))
-                .size(TEXT_XS)
-                .color(Palette::text_muted()),
-            next,
-        ]
-        .spacing(2)
-        .align_y(Alignment::Center)
-        .into()
-    } else {
-        Space::new().into()
-    };
-
-    // Truncated bodies can't be saved accurately, so the action only appears
-    // while the full body is in memory.
-    let save_action: Element<Message> = if resp.body_stored {
-        Space::new().width(0).into()
-    } else {
-        save_text_button()
-    };
-
-    let toolbar = container(
-        row![
-            text(format!("{} lines", tab.response_viewer_lines))
-                .size(TEXT_XS)
-                .color(Palette::text_subtle()),
-            size_note,
-            Space::new().width(Length::Fill),
-            page_nav,
-            save_action,
-            button(
-                row![
-                    icons::copy().size(11).color(Palette::text_muted()),
-                    text("Copy").size(TEXT_SM).color(Palette::text_muted()),
-                ]
-                .spacing(5)
-                .align_y(Alignment::Center),
-            )
-            .on_press(Message::Response(ResponseMsg::CopyBody))
-            .style(|_t, status| {
-                let hovered = matches!(status, iced::widget::button::Status::Hovered);
-                iced::widget::button::Style {
-                    background: if hovered {
-                        Some(Background::Color(Palette::hover()))
-                    } else {
-                        None
-                    },
-                    text_color: Palette::text_muted(),
-                    border: Border {
-                        radius: 6.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
-            })
-            .padding([4, 8]),
-        ]
-        .align_y(Alignment::Center)
-        .padding([2, 12]),
-    )
-    .width(Length::Fill);
-
+fn text_body<'a>(tab: &'a RequestTabState, resp: &'a HttpResponse) -> Element<'a, Message> {
     let body: Element<Message> = if tab.viewer_processing {
         container(text("Parsing…").size(TEXT_SM).color(Palette::text_subtle()))
             .padding([8, 12])
@@ -169,14 +62,301 @@ pub fn view(tab: &RequestTabState, spinner_frame: u32) -> Element<'_, Message> {
             .view()
             .map(|m| Message::Response(ResponseMsg::ViewerEdited(m)))
     };
+    let mut panel = column![].height(Length::Fill);
+    if let Some(bar) = paging_bar(tab, resp) {
+        panel = panel.push(bar);
+    }
+    if tab.viewer_search.open {
+        panel = panel.push(find_bar(&tab.viewer_search));
+    }
+    panel
+        .push(container(body).width(Length::Fill).height(Length::Fill))
+        .into()
+}
 
-    let body = container(body)
-        .padding([0,2])
+/// Shown only for a body too large for one viewer page: which page this
+/// is, how much of the body it holds, and the page arrows.
+fn paging_bar<'a>(tab: &RequestTabState, resp: &HttpResponse) -> Option<Element<'a, Message>> {
+    let held = tab.response_truncated_bytes?;
+    let page_count = tab.viewer_page_count();
+    let (start, end) = tab.viewer_page_span();
+    let mut note = format!(
+        "Page {} of {} · showing {} of {}",
+        tab.viewer_page + 1,
+        page_count,
+        human_bytes(end - start),
+        human_bytes(held),
+    );
+    let beyond = resp.body_size.saturating_sub(resp.body.len());
+    if resp.body_stored && beyond > 0 {
+        let _ = write!(note, " (+{} past the preview limit)", human_bytes(beyond));
+    }
+    let page = tab.viewer_page;
+    let step = |icon: text::Text<'a>, enabled: bool, msg: ResponseMsg| {
+        button(icon.size(11).color(Palette::text_muted()))
+            .padding([4, 6])
+            .style(crate::ui::styles::ghost_button)
+            .on_press_maybe(enabled.then_some(Message::Response(msg)))
+    };
+    Some(
+        container(
+            row![
+                text(note).size(TEXT_CAPTION).color(Palette::warning()),
+                Space::new().width(Length::Fill),
+                step(icons::arrow_left(), page > 0, ResponseMsg::ViewerPagePrev),
+                step(icons::arrow_right(), page + 1 < page_count, ResponseMsg::ViewerPageNext),
+            ]
+            .spacing(2)
+            .align_y(Alignment::Center),
+        )
+        .padding([2, 12])
         .width(Length::Fill)
-        .height(Length::Fill);
+        .into(),
+    )
+}
 
-    let panel = column![].spacing(0).height(Length::Fill);
-    panel.push(toolbar).push(body).into()
+/// Widget id of the find field, for focus operations.
+pub const SEARCH_INPUT_ID: &str = "response-body-search";
+
+/// The body find bar: query field, match-case toggle, "3 / 41" counter,
+/// previous/next and close. It searches the whole body, across pages (see
+/// `services::format::BodySearch`); everything shown here was computed when
+/// the query changed, so rendering does no searching. The query itself is
+/// clamped to `MAX_SEARCH_QUERY_BYTES`, so the field never shapes a
+/// megabyte paste.
+fn find_bar(search: &crate::services::format::BodySearch) -> Element<'_, Message> {
+    let has_matches = !search.matches.is_empty();
+
+    let input = text_input("Find in body", &search.query)
+        .id(SEARCH_INPUT_ID)
+        .on_input(|q| Message::Response(ResponseMsg::SearchQueryChanged(q)))
+        // Fallback only: `FindKeys` handles Enter itself so it can tell
+        // Shift+Enter apart.
+        .on_submit(Message::Response(ResponseMsg::SearchNext))
+        .size(TEXT_SM)
+        .padding([3, 8])
+        .width(Length::Fixed(240.0))
+        .style(crate::ui::styles::field_input);
+
+    let counter: Element<Message> = match search.counter() {
+        Some(label) => text(label)
+            .size(TEXT_CAPTION)
+            .color(if search.no_results() {
+                Palette::error()
+            } else {
+                Palette::text_muted()
+            })
+            .into(),
+        None => Space::new().into(),
+    };
+
+    let case_on = search.case_sensitive;
+    let case_toggle = crate::ui::styles::tip(
+        button(text("Aa").size(TEXT_SM).font(MONO))
+            .on_press(Message::Response(ResponseMsg::SearchToggleCase))
+            .padding([2, 6])
+            .style(move |theme, status| {
+                let mut style = crate::ui::styles::ghost_button(theme, status);
+                if case_on {
+                    style.background = Some(Background::Color(Palette::accent_soft()));
+                    style.text_color = Palette::accent();
+                }
+                style
+            }),
+        if case_on {
+            "Match case: on"
+        } else {
+            "Match case: off"
+        },
+    );
+
+    let step_button = |icon: text::Text<'static>, msg: ResponseMsg, label: &str| {
+        let btn = button(icon.size(11))
+            .padding([4, 6])
+            .style(crate::ui::styles::ghost_button);
+        let btn = if has_matches {
+            btn.on_press(Message::Response(msg))
+        } else {
+            btn
+        };
+        crate::ui::styles::tip(btn, label.to_owned())
+    };
+
+    let bar = row![
+        icons::search().size(11).color(Palette::text_subtle()),
+        Element::new(FindKeys {
+            input: input.into()
+        }),
+        case_toggle,
+        // Fixed width so the step buttons don't shift as the count changes
+        // under the pointer.
+        container(counter).width(Length::Fixed(96.0)),
+        step_button(
+            icons::arrow_up(),
+            ResponseMsg::SearchPrev,
+            "Previous match (Shift+Enter)"
+        ),
+        step_button(
+            icons::arrow_down(),
+            ResponseMsg::SearchNext,
+            "Next match (Enter)"
+        ),
+        crate::ui::styles::tip(
+            button(icons::close().size(11))
+                .on_press(Message::Response(ResponseMsg::SearchClose))
+                .padding([4, 6])
+                .style(crate::ui::styles::ghost_button),
+            "Close (Esc)",
+        ),
+    ]
+    .spacing(6)
+    .align_y(Alignment::Center);
+
+    container(bar)
+        .padding([4, 12])
+        .width(Length::Fill)
+        .into()
+}
+
+/// Keys the find field owns while it is focused: Enter / F3 step forward and
+/// Shift+Enter / Shift+F3 back (a bare `text_input` can't tell those apart —
+/// `on_submit` carries no modifiers), Escape closes the bar, and Ctrl+F
+/// re-selects the query. The keys are captured so nothing else acts on them;
+/// while the field is not focused every event passes straight through.
+struct FindKeys<'a> {
+    input: Element<'a, Message>,
+}
+
+impl FindKeys<'_> {
+    /// Whether the wrapped `text_input` has keyboard focus. Its state is
+    /// checked by tag before the downcast, so a different child widget can
+    /// never trigger the downcast's panic (fatal under `panic = "abort"`).
+    fn input_focused(tree: &iced::advanced::widget::Tree) -> bool {
+        use iced::advanced::widget::tree;
+        type InputState =
+            text_input::State<<iced::Renderer as iced::advanced::text::Renderer>::Paragraph>;
+        tree.tag == tree::Tag::of::<InputState>()
+            && tree.state.downcast_ref::<InputState>().is_focused()
+    }
+}
+
+impl iced::advanced::Widget<Message, iced::Theme, iced::Renderer> for FindKeys<'_> {
+    fn size(&self) -> iced::Size<Length> {
+        self.input.as_widget().size()
+    }
+
+    fn size_hint(&self) -> iced::Size<Length> {
+        self.input.as_widget().size_hint()
+    }
+
+    fn children(&self) -> Vec<iced::advanced::widget::Tree> {
+        vec![iced::advanced::widget::Tree::new(&self.input)]
+    }
+
+    fn diff(&self, tree: &mut iced::advanced::widget::Tree) {
+        tree.diff_children(std::slice::from_ref(&self.input));
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut iced::advanced::widget::Tree,
+        renderer: &iced::Renderer,
+        limits: &iced::advanced::layout::Limits,
+    ) -> iced::advanced::layout::Node {
+        self.input
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut iced::advanced::widget::Tree,
+        layout: iced::advanced::Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        self.input
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut iced::advanced::widget::Tree,
+        event: &iced::Event,
+        layout: iced::advanced::Layout<'_>,
+        cursor: iced::advanced::mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn iced::advanced::Clipboard,
+        shell: &mut iced::advanced::Shell<'_, Message>,
+        viewport: &iced::Rectangle,
+    ) {
+        use iced::keyboard::{self, Key, key::Named};
+        if let iced::Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event
+            && Self::input_focused(&tree.children[0])
+        {
+            let msg = match key.as_ref() {
+                Key::Named(Named::Enter | Named::F3) if modifiers.shift() => {
+                    Some(ResponseMsg::SearchPrev)
+                }
+                Key::Named(Named::Enter | Named::F3) => Some(ResponseMsg::SearchNext),
+                Key::Named(Named::Escape) => Some(ResponseMsg::SearchClose),
+                Key::Character(c) if c.eq_ignore_ascii_case("f") && modifiers.command() => {
+                    Some(ResponseMsg::SearchOpen)
+                }
+                _ => None,
+            };
+            if let Some(msg) = msg {
+                shell.publish(Message::Response(msg));
+                shell.capture_event();
+                return;
+            }
+        }
+        self.input.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &iced::advanced::widget::Tree,
+        layout: iced::advanced::Layout<'_>,
+        cursor: iced::advanced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> iced::advanced::mouse::Interaction {
+        self.input
+            .as_widget()
+            .mouse_interaction(&tree.children[0], layout, cursor, viewport, renderer)
+    }
+
+    fn draw(
+        &self,
+        tree: &iced::advanced::widget::Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &iced::advanced::renderer::Style,
+        layout: iced::advanced::Layout<'_>,
+        cursor: iced::advanced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        self.input.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
+    }
 }
 
 /// Readable-text HTML rendering. Borrows the pre-rendered fallback (computed
@@ -193,14 +373,15 @@ fn simple_html_view<'a>(rendered: &'a str, full_body: bool) -> Element<'a, Messa
         column![
             row![
                 text("HTML shown as readable text. Open or save the response for the full source.")
-                    .size(TEXT_XS)
+                    .size(TEXT_CAPTION)
                     .color(Palette::text_subtle()),
                 Space::new().width(Length::Fill),
                 open_action,
                 save_action,
             ]
             .align_y(Alignment::Center),
-            scrollable(text(rendered).size(TEXT_SM).color(Palette::text())).height(Length::Fill),
+            crate::ui::components::scroll::vertical(crate::ui::theme::Palette::tokens(), text(rendered).size(TEXT_SM).color(Palette::text()))
+                .height(Length::Fill),
         ]
         .spacing(4)
         .height(Length::Fill),
@@ -260,93 +441,6 @@ fn human_bytes(bytes: usize) -> String {
     } else {
         format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
     }
-}
-
-/// A keyboard-key chip: bordered, mono font, slight bottom "keycap" shadow.
-fn kbd_chip(label: &str) -> Element<'static, Message> {
-    container(
-        text(label.to_owned())
-            .size(TEXT_XS)
-            .color(Palette::text_muted())
-            .font(MONO),
-    )
-    .padding([3, 8])
-    .style(|_| container::Style {
-        background: Some(Background::Color(Palette::surface_high())),
-        border: Border {
-            color: Palette::border(),
-            width: 1.0,
-            radius: 5.0.into(),
-        },
-        shadow: iced::Shadow {
-            color: Color {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: 0.4,
-            },
-            offset: iced::Vector::new(0.0, 1.5),
-            blur_radius: 0.0,
-        },
-        ..Default::default()
-    })
-    .into()
-}
-
-fn empty_view() -> Element<'static, Message> {
-    let modifier = if cfg!(target_os = "macos") {
-        "Cmd"
-    } else {
-        "Ctrl"
-    };
-    let content = column![
-        text("Send a request")
-            .size(TEXT_LG)
-            .color(Palette::text())
-            .font(crate::ui::theme::UI_FONT_MEDIUM),
-        Space::new().height(8),
-        row![
-            text("Press").size(TEXT_SM).color(Palette::text_subtle()),
-            kbd_chip(modifier),
-            kbd_chip("Enter"),
-            text("or click Send to run the request")
-                .size(TEXT_SM)
-                .color(Palette::text_subtle()),
-        ]
-        .spacing(6)
-        .align_y(Alignment::Center),
-    ]
-    .align_x(Alignment::Center);
-
-    container(content)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
-        .into()
-}
-
-fn error_view(err: &str) -> Element<'static, Message> {
-    let content = column![
-        text("Request failed")
-            .size(TEXT_LG)
-            .color(Palette::ERROR)
-            .font(crate::ui::theme::UI_FONT_MEDIUM),
-        Space::new().height(4),
-        text(err.to_owned())
-            .size(TEXT_SM)
-            .color(Palette::text_muted()),
-    ]
-    .max_width(480)
-    .align_x(Alignment::Center);
-
-    container(content)
-        .padding([24, 24])
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
-        .into()
 }
 
 fn binary_view(resp: &HttpResponse) -> Element<'static, Message> {
@@ -434,166 +528,23 @@ fn binary_view_with_note(resp: &HttpResponse, note: &str) -> Element<'static, Me
         .into()
 }
 
-/// A simple scrollable grid preview of a parsed spreadsheet's first sheet.
-fn spreadsheet_view(sheet: &ParsedSheet) -> Element<'static, Message> {
-    let mut rows_col = column![].spacing(0);
-    for (row_idx, cells) in sheet.rows.iter().enumerate() {
-        let is_header = row_idx == 0;
-        let mut row_widget = row![].spacing(0);
-        for cell in cells {
-            row_widget = row_widget.push(
-                container(text(cell.clone()).size(TEXT_SM).color(if is_header {
-                    Palette::text()
-                } else {
-                    Palette::text_muted()
-                }))
-                .padding([6, 10])
-                .width(Length::Fixed(140.0))
-                .style(move |_| container::Style {
-                    background: if is_header {
-                        Some(Background::Color(Palette::surface_high()))
-                    } else {
-                        None
-                    },
-                    border: Border {
-                        color: Palette::border(),
-                        width: 1.0,
-                        radius: 0.0.into(),
-                    },
-                    ..Default::default()
-                }),
-            );
-        }
-        rows_col = rows_col.push(row_widget);
+/// The first sheet as plain text in fixed-width columns: two paragraphs
+/// laid out once, where a widget per cell cost a rebuild of every cell on
+/// every frame.
+fn spreadsheet_view(sheet: &ParsedSheet) -> Element<'_, Message> {
+    fn cells(lines: &str, color: iced::Color) -> iced::widget::Text<'_> {
+        text(lines).font(MONO).size(TEXT_SM).color(color).wrapping(iced_core::text::Wrapping::None)
     }
-
-    let toolbar = container(
-        text(format!(
-            "Sheet: {} · {} row(s)",
-            sheet.sheet_name,
-            sheet.rows.len()
-        ))
-        .size(TEXT_XS)
-        .color(Palette::text_subtle()),
-    )
-    .padding([6, 12]);
-
+    let t = Palette::tokens();
+    let toolbar = container(text(sheet.summary.as_str()).size(TEXT_CAPTION).color(t.text_subtle))
+        .padding([SPACE_XS, SPACE_LG]);
+    let table = column![cells(&sheet.header, t.text), cells(&sheet.body, t.text_muted)].padding([SPACE_XS, SPACE_LG]);
     column![
         toolbar,
-        scrollable(rows_col)
-            .direction(scrollable::Direction::Both {
-                vertical: scrollable::Scrollbar::default(),
-                horizontal: scrollable::Scrollbar::default(),
-            })
+        crate::ui::components::scroll::both(t, table)
             .width(Length::Fill)
             .height(Length::Fill),
     ]
     .height(Length::Fill)
     .into()
-}
-
-fn loading_view<'a>(spinner_frame: u32) -> Element<'a, Message> {
-    let art = spinner_frame_art(spinner_frame);
-
-    container(
-        column![
-            text(art)
-                .size(11)
-                .font(MONO)
-                .line_height(iced::widget::text::LineHeight::Relative(1.0))
-                .color(Palette::accent()),
-            Space::new().height(14),
-            text("sending request…")
-                .size(13)
-                .color(Palette::text_muted()),
-        ]
-        .spacing(0)
-        .align_x(Alignment::Center),
-    )
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .center_x(Length::Fill)
-    .center_y(Length::Fill)
-    .into()
-}
-
-/// Number of pre-rendered spinner frames that are cycled while a request runs.
-///
-/// `donut` is a little software raytracer: its `theta`/`phi` loops run ~52,000
-/// iterations with a `sin_cos` each. It used to be recomputed from scratch on the
-/// UI thread for every frame at 30fps, competing for CPU with the very request it
-/// was reporting on. The animation depends only on the frame counter, so the
-/// frames are rendered once and reused.
-const SPINNER_FRAMES: usize = 60;
-
-/// Returns the pre-rendered art for `spinner_frame`, building the set on first
-/// use.
-fn spinner_frame_art(spinner_frame: u32) -> &'static str {
-    use std::sync::OnceLock;
-    static FRAMES: OnceLock<Vec<String>> = OnceLock::new();
-
-    let frames = FRAMES.get_or_init(|| {
-        (0..SPINNER_FRAMES)
-            .map(|i| {
-                let f = i as f32;
-                donut(f * 0.04, f * 0.023)
-            })
-            .collect()
-    });
-
-    // `SPINNER_FRAMES` is non-zero, so the modulo is always in range.
-    frames[(spinner_frame as usize) % SPINNER_FRAMES].as_str()
-}
-
-fn donut(a: f32, b: f32) -> String {
-    const W: usize = 72;
-    const H: usize = 22;
-    const K2: f32 = 5.0;
-    const R1: f32 = 1.0;
-    const R2: f32 = 2.0;
-    let kx = W as f32 * 0.27;
-    let ky = kx * 0.47;
-    let chars = b".,-~:;=!*#$@";
-
-    let mut out = vec![b' '; W * H];
-    let mut zbuf = vec![0.0f32; W * H];
-    let (sa, ca) = a.sin_cos();
-    let (sb, cb) = b.sin_cos();
-
-    let mut theta = 0.0f32;
-    while theta < std::f32::consts::TAU {
-        let (st, ct) = theta.sin_cos();
-        let mut phi = 0.0f32;
-        while phi < std::f32::consts::TAU {
-            let (sp, cp) = phi.sin_cos();
-            let cx = R2 + R1 * ct;
-            let cy = R1 * st;
-            let x = cx * (cb * cp + sa * sb * sp) - cy * ca * sb;
-            let y = cx * (sb * cp - sa * cb * sp) + cy * ca * cb;
-            let z = K2 + ca * cx * sp + cy * sa;
-            let ooz = 1.0 / z;
-            let xp = (W as f32 / 2.0 + kx * ooz * x) as isize;
-            let yp = (H as f32 / 2.0 - ky * ooz * y) as isize;
-            let lum = cp * ct * sb - ca * ct * sp - sa * st + cb * (ca * st - ct * sa * sp);
-            if xp >= 0 && xp < W as isize && yp >= 0 && yp < H as isize {
-                let o = xp as usize + yp as usize * W;
-                if ooz > zbuf[o] {
-                    zbuf[o] = ooz;
-                    let li = (lum * 8.0) as isize;
-                    out[o] = chars[li.clamp(0, chars.len() as isize - 1) as usize];
-                }
-            }
-            phi += 0.015;
-        }
-        theta += 0.05;
-    }
-
-    let mut s = String::with_capacity(W * H + H);
-    for row in 0..H {
-        s.push_str(std::str::from_utf8(&out[row * W..row * W + W]).unwrap());
-        if row + 1 < H {
-            s.push('\n');
-        }
-    }
-    s
 }

@@ -1,6 +1,6 @@
 use iced::{
     Background, Border, Element, Length,
-    widget::{column, container, row, scrollable, text},
+    widget::{column, container, row, text},
 };
 
 use crate::{
@@ -78,12 +78,8 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
         .padding(iced::padding::right(12).left(2).top(4).bottom(4));
     }
 
-    scrollable(col)
+    crate::ui::components::scroll::vertical(crate::ui::theme::Palette::tokens(), col)
         .width(Length::Fill)
         .height(Length::Fill)
-        .direction(iced::widget::scrollable::Direction::Vertical(
-            crate::ui::theme::grabbable_scrollbar(),
-        ))
-        .style(crate::ui::theme::thin_scrollbar)
         .into()
 }

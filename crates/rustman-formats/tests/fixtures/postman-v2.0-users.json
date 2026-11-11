@@ -1,0 +1,127 @@
+{
+	"variables": [],
+	"info": {
+		"name": "Legacy Users API",
+		"_postman_id": "8a7b6c5d-4e3f-4a2b-9c1d-0e9f8a7b6c5d",
+		"description": "",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Users",
+			"description": "",
+			"item": [
+				{
+					"name": "Get user",
+					"request": {
+						"url": "https://api.example.com/users/1",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "Create user",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": {
+								"username": "admin",
+								"password": "hunter2",
+								"saveHelperData": true,
+								"showPassword": false
+							}
+						},
+						"url": "https://api.example.com/users",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"name\": \"Ada\"}"
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Search users",
+			"request": {
+				"url": {
+					"raw": "https://api.example.com/users?q=ada&active=true",
+					"protocol": "https",
+					"host": [
+						"api",
+						"example",
+						"com"
+					],
+					"path": [
+						"users"
+					],
+					"query": [
+						{
+							"key": "q",
+							"value": "ada",
+							"equals": true,
+							"description": ""
+						},
+						{
+							"key": "active",
+							"value": "true",
+							"equals": true,
+							"description": ""
+						}
+					],
+					"variable": []
+				},
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Upload avatar",
+			"request": {
+				"url": "https://api.example.com/users/1/avatar",
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "avatar",
+							"type": "file",
+							"enabled": true,
+							"src": "avatar.png"
+						},
+						{
+							"key": "note",
+							"value": "hi",
+							"type": "text",
+							"enabled": true
+						}
+					]
+				},
+				"description": ""
+			},
+			"response": []
+		}
+	]
+}

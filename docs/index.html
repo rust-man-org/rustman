@@ -154,7 +154,7 @@
     }
     .btn-gh:hover { color: var(--text); border-color: var(--dim); background: var(--bg3); text-decoration: none; }
 
-    /* ── APP FRAME ── */
+    /* ── APP FRAME: a mock of the app in its Violet theme ── */
     .frame-section {
       max-width: 1140px; margin: 0 auto;
       padding: 0 2rem 7rem; position: relative;
@@ -163,156 +163,231 @@
     .frame-halo {
       position: absolute; bottom: 5rem; left: 50%; transform: translateX(-50%);
       width: 70%; height: 160px;
-      background: radial-gradient(ellipse, rgba(249,115,22,0.09) 0%, transparent 70%);
+      background: radial-gradient(ellipse, rgba(138,122,255,0.12) 0%, transparent 70%);
       filter: blur(16px); pointer-events: none;
     }
 
     .app-frame {
+      --af-canvas: #151722; --af-surface: #1d202e;
+      --af-border: #25283a; --af-border-strong: #3e435a;
+      --af-text: #f3f4fb; --af-muted: #9ba2b8; --af-subtle: #686f88;
+      --af-accent: #8a7aff; --af-accent-soft: #1e1b3d; --af-accent-fill: #6e62cc;
+      --af-get: #22c57a; --af-post: #fc941c; --af-put: #818cf8; --af-delete: #f87171;
+      --af-success: #22c57a;
+      --af-str: #a5d6a7; --af-num: #f5a97f; --af-lit: #7dc4e4;
       border-radius: 14px;
-      border: 1px solid var(--bord2);
+      border: 1px solid var(--af-border-strong);
       overflow: hidden;
+      background: var(--af-canvas); color: var(--af-text);
+      font-size: 12px; line-height: 18px;
       box-shadow: 0 0 0 1px rgba(255,255,255,0.03) inset,
                   0 60px 120px rgba(0,0,0,0.75);
     }
-
-    .frame-bar {
-      display: flex; align-items: center; gap: 0.4rem;
-      padding: 0.6rem 0.9rem;
-      background: var(--bg3); border-bottom: 1px solid var(--border);
+    .app-frame svg {
+      width: 14px; height: 14px; flex-shrink: 0;
+      fill: none; stroke: currentColor; stroke-width: 1.8;
+      stroke-linecap: round; stroke-linejoin: round;
     }
+    .af-ib {
+      width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--af-muted);
+    }
+    .af-m { font-family: "JetBrains Mono", monospace; font-size: 10.5px; flex-shrink: 0; }
+    .af-get { color: var(--af-get); } .af-post { color: var(--af-post); }
+    .af-put { color: var(--af-put); } .af-del { color: var(--af-delete); }
+
+    /* Title bar: window controls, the command search, layout buttons */
+    .af-title {
+      height: 36px; display: grid; grid-template-columns: 1fr minmax(180px, 280px) 1fr;
+      align-items: center; padding: 0 8px 0 12px; border-bottom: 1px solid var(--af-border);
+    }
+    .af-brand { display: flex; align-items: center; gap: 0.75rem; font-weight: 500; }
+    .af-lights { display: flex; gap: 6px; }
     .tl { width: 11px; height: 11px; border-radius: 50%; }
     .tl-r { background: #ff5f57; } .tl-y { background: #febc2e; } .tl-g { background: #28c840; }
-    .frame-tabs {
-      display: flex; gap: 0.15rem; margin-left: 0.6rem; overflow: hidden;
+    .af-search {
+      height: 26px; display: flex; align-items: center; gap: 8px; padding: 0 3px 0 8px;
+      background: var(--af-surface); border: 1px solid var(--af-border); border-radius: 6px;
+      color: var(--af-muted); font-size: 11.5px; white-space: nowrap; overflow: hidden;
     }
-    .ftab {
-      display: flex; align-items: center; gap: 0.35rem;
-      padding: 0.18rem 0.65rem; border-radius: 5px 5px 0 0;
-      font-size: 0.66rem; font-weight: 500; color: var(--muted);
-      background: var(--bg2); border: 1px solid var(--border); border-bottom: none;
+    .af-kbd {
+      margin-left: auto; height: 18px; padding: 0 5px; display: inline-flex; align-items: center;
+      border: 1px solid var(--af-border); border-radius: 4px; background: var(--af-canvas);
+      font-size: 10.5px; color: var(--af-muted);
     }
-    .ftab.fa { background: var(--bg1); color: var(--text); }
+    .af-tright { display: flex; justify-content: flex-end; gap: 4px; }
+
+    .af-body { display: grid; grid-template-columns: 44px 210px minmax(0, 1fr); height: 396px; }
+
+    /* Rail */
+    .af-rail {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 8px 0; border-right: 1px solid var(--af-border);
+    }
+    .af-rail .af-ib { width: 30px; height: 30px; }
+    .af-rail .on { background: var(--af-accent-soft); color: var(--af-accent); }
+    .af-rail .af-sp { flex: 1; }
+
+    /* Sidebar tree: method column, selected row with an accent edge */
+    .af-side { min-width: 0; overflow: hidden; border-right: 1px solid var(--af-border); }
+    .af-side-head {
+      height: 36px; display: flex; align-items: center; padding: 0 8px 0 12px;
+      border-bottom: 1px solid var(--af-border);
+    }
+    .af-side-head b { flex: 1; font-size: 13px; font-weight: 500; }
+    .af-new {
+      height: 24px; display: inline-flex; align-items: center; gap: 4px; padding: 0 6px 0 10px;
+      background: var(--af-surface); border: 1px solid var(--af-border-strong); border-radius: 6px;
+      font-size: 11.5px;
+    }
+    .af-new svg { width: 12px; height: 12px; color: var(--af-muted); }
+    .af-tree { padding: 4px 0; }
+    .af-row { height: 26px; display: flex; align-items: center; position: relative; white-space: nowrap; }
+    .af-row .af-name { overflow: hidden; text-overflow: ellipsis; }
+    .af-row.col .af-name { font-weight: 500; }
+    .af-row svg { width: 12px; height: 12px; margin-right: 6px; color: var(--af-muted); }
+    .af-row .af-m { width: 40px; }
+    .af-row.sel { background: var(--af-accent-soft); }
+    .af-row.sel::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+      background: var(--af-accent);
+    }
+
+    .af-main { display: flex; flex-direction: column; min-width: 0; }
+
+    /* Open tabs: the active one opens into the page below it */
+    .af-tabs {
+      height: 36px; flex: none; display: flex; align-items: stretch;
+      border-bottom: 1px solid var(--af-border); overflow: hidden;
+    }
+    .af-dtab {
+      display: flex; align-items: center; gap: 7px; min-width: 0; max-width: 170px;
+      padding: 0 8px 0 12px; margin-bottom: -1px; font-size: 11.5px; color: var(--af-muted);
+      border: 1px solid transparent; border-top: 0; white-space: nowrap;
+    }
+    .af-dtab:first-child { border-left: 0; }
+    .af-dtab.on {
+      color: var(--af-text); background: var(--af-canvas);
+      border-color: var(--af-border); border-bottom-color: var(--af-canvas);
+    }
+    .af-dtab .af-t { overflow: hidden; text-overflow: ellipsis; }
+    .af-dtab svg { width: 12px; height: 12px; color: var(--af-muted); }
+    .af-udot { width: 6px; height: 6px; margin: 0 3px; border-radius: 50%; background: var(--af-muted); flex-shrink: 0; }
+    .af-add { align-self: center; margin-left: 4px; }
+
+    /* URL row: one field with the method inside it */
+    .af-urlrow { height: 52px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+    .af-field {
+      flex: 1; min-width: 0; height: 32px; display: flex; align-items: center;
+      background: var(--af-surface); border: 1px solid var(--af-border); border-radius: 6px;
+    }
+    .af-mdd {
+      width: 76px; height: 100%; flex: none; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 8px 0 10px;
+      border-right: 1px solid var(--af-border); color: var(--af-muted);
+    }
+    .af-mdd .af-m { font-size: 11.5px; }
+    .af-mdd svg { width: 12px; height: 12px; }
+    .af-url {
+      flex: 1; min-width: 0; padding: 0 10px;
+      font-family: "JetBrains Mono", monospace; font-size: 12px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .af-url .af-var { color: var(--af-accent); }
+    .af-send {
+      height: 32px; padding: 0 18px; flex: none; display: inline-flex; align-items: center;
+      border-radius: 6px; background: var(--af-accent-fill); color: #fff;
+      font-size: 12px; font-weight: 500;
+    }
+    .af-env {
+      height: 32px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 8px 0 10px;
+      border: 1px solid var(--af-border); border-radius: 6px; font-size: 11.5px;
+    }
+    .af-env svg { width: 12px; height: 12px; color: var(--af-muted); }
+    .af-edot { width: 6px; height: 6px; border-radius: 50%; background: var(--af-success); }
+
+    /* Request and response panes, each with an underline-tab bar */
+    .af-panes { flex: 1; display: flex; min-height: 0; }
+    .af-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .af-req { width: 42%; flex: none; border-right: 1px solid var(--af-border); }
+    .af-res { flex: 1; }
+    .af-ptabs {
+      height: 32px; flex: none; display: flex; align-items: stretch; gap: 14px;
+      padding: 0 10px 0 12px; border-bottom: 1px solid var(--af-border);
+      white-space: nowrap; overflow: hidden;
+    }
+    .af-ptab { display: flex; align-items: center; gap: 5px; position: relative; font-size: 11.5px; color: var(--af-muted); }
+    .af-ptab.on { color: var(--af-text); }
+    .af-ptab.on::after {
+      content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+      background: var(--af-accent);
+    }
+    .af-n { font-size: 10.5px; color: var(--af-muted); }
+    .af-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .af-status { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; color: var(--af-success); }
+    .af-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .af-meta { font-size: 11.5px; color: var(--af-muted); font-variant-numeric: tabular-nums; }
+
+    .af-kv-row {
+      height: 30px; display: grid; grid-template-columns: 30px 38% minmax(0, 1fr);
+      border-bottom: 1px solid var(--af-border);
+      font-family: "JetBrains Mono", monospace; font-size: 11.5px;
+    }
+    .af-kv-row > span {
+      display: flex; align-items: center; min-width: 0; padding: 0 8px;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    }
+    .af-kv-row .af-v { border-left: 1px solid var(--af-border); }
+    .af-kv-row .af-var { color: var(--af-accent); }
+    .af-kv-row.ph > span { color: var(--af-muted); font-family: "Inter", system-ui, sans-serif; }
+    .af-cb {
+      width: 13px; height: 13px; border-radius: 4px; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--af-accent-fill); color: #fff;
+    }
+    .af-cb svg { width: 9px; height: 9px; stroke-width: 3; }
+
+    .af-code {
+      flex: 1; min-height: 0; overflow: hidden; padding: 8px 0;
+      font-family: "JetBrains Mono", monospace; font-size: 11.5px; line-height: 19px; white-space: pre;
+    }
+    .af-ln { display: flex; }
+    .af-ln i { width: 40px; flex: none; padding-right: 14px; text-align: right; font-style: normal; color: var(--af-subtle); }
+    .af-k { color: var(--af-accent); } .af-s { color: var(--af-str); } .af-nu { color: var(--af-num); }
+    .af-l { color: var(--af-lit); } .af-p { color: var(--af-muted); }
+
+    .af-statusbar {
+      height: 26px; display: flex; align-items: center; gap: 14px; padding: 0 12px;
+      border-top: 1px solid var(--af-border); font-size: 11px; color: var(--af-muted);
+    }
+    .af-sb { display: inline-flex; align-items: center; gap: 6px; }
+    .af-sb svg { width: 12px; height: 12px; }
+    .af-statusbar .af-sp { flex: 1; }
+
+    /* Method colors for the feature cards below */
     .mg { color: #34d399; font-weight: 800; font-size: 0.6rem; }
     .mp { color: #f97316; font-weight: 800; font-size: 0.6rem; }
     .md { color: #f87171; font-weight: 800; font-size: 0.6rem; }
 
-    .frame-body {
-      display: grid; grid-template-columns: 42px 196px 1fr; min-height: 430px;
+    @media (max-width: 1040px) {
+      .af-body { grid-template-columns: 44px minmax(0, 1fr); }
+      .af-side { display: none; }
     }
-
-    .fi-rail {
-      background: var(--bg3); border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; align-items: center;
-      padding: 0.6rem 0; gap: 0.2rem;
-    }
-    .fi {
-      width: 28px; height: 28px; border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: default;
-    }
-    .fi svg { width: 14px; height: 14px; stroke: var(--muted); fill: none; stroke-width: 1.8; }
-    .fi.on { background: var(--adim); }
-    .fi.on svg { stroke: var(--accent); }
-
-    .fc-list {
-      background: rgba(12,12,24,0.7); border-right: 1px solid var(--border);
-      display: flex; flex-direction: column;
-    }
-    .fc-head {
-      padding: 0.55rem 0.7rem 0.25rem;
-      font-size: 0.59rem; font-weight: 700; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--muted);
-    }
-    .fc-grp {
-      display: flex; align-items: center; gap: 0.3rem;
-      padding: 0.28rem 0.7rem; font-size: 0.7rem; font-weight: 600; color: var(--dim);
-    }
-    .fc-grp svg { width: 9px; height: 9px; stroke: var(--muted); fill: none; stroke-width: 2; flex-shrink: 0; }
-    .fc-item {
-      display: flex; align-items: center; gap: 0.35rem;
-      padding: 0.28rem 0.7rem 0.28rem 1.35rem;
-      font-size: 0.68rem; color: var(--muted);
-    }
-    .fc-item.sel {
-      background: rgba(249,115,22,0.06); color: var(--text);
-      border-right: 2px solid var(--accent);
-    }
-
-    .frame-main { display: flex; flex-direction: column; background: var(--bg1); min-width: 0; }
-
-    .url-row {
-      display: flex; align-items: center; gap: 0.45rem;
-      padding: 0.5rem 0.7rem;
-      background: var(--bg3); border-bottom: 1px solid var(--border);
-    }
-    .method-tag {
-      padding: 0.18rem 0.5rem; border-radius: 5px;
-      font-size: 0.62rem; font-weight: 800;
-      background: rgba(249,115,22,0.10); color: var(--accent);
-      border: 1px solid rgba(249,115,22,0.18); flex-shrink: 0;
-    }
-    .url-txt {
-      flex: 1; font-family: "JetBrains Mono", monospace; font-size: 0.68rem;
-      color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .url-txt .uv { color: var(--accent); }
-    .send-tag {
-      flex-shrink: 0; padding: 0.22rem 0.7rem; border-radius: 5px;
-      font-size: 0.66rem; font-weight: 700; background: var(--accent); color: #fff;
-    }
-
-    .req-tabs {
-      display: flex; padding: 0 0.4rem;
-      background: var(--bg3); border-bottom: 1px solid var(--border);
-    }
-    .rtab {
-      padding: 0.42rem 0.7rem; font-size: 0.65rem; font-weight: 500;
-      color: var(--muted); border-bottom: 2px solid transparent;
-    }
-    .rtab.ra { color: var(--accent); border-bottom-color: var(--accent); }
-
-    .body-code {
-      padding: 0.7rem 0.9rem; font-family: "JetBrains Mono", monospace;
-      font-size: 0.66rem; line-height: 1.7; flex: 1;
-    }
-    .ck { color: #7dd3fc; } .cs { color: #86efac; }
-    .cn { color: #fb923c; } .cm { color: #5a5a7a; }
-
-    .resp-bar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0.35rem 0.7rem; border-top: 1px solid var(--border);
-      background: var(--bg3); font-size: 0.63rem;
-    }
-    .rtabs2 { display: flex; gap: 0.1rem; }
-    .rtab2 { padding: 0.18rem 0.5rem; border-radius: 4px; color: var(--muted); font-weight: 500; }
-    .rtab2.ra2 { background: var(--bg2); color: var(--text); }
-    .resp-meta { display: flex; gap: 0.5rem; }
-    .rbadge {
-      padding: 0.12rem 0.45rem; border-radius: 4px;
-      font-weight: 700; font-size: 0.6rem;
-    }
-    .rb-ok { background: rgba(52,211,153,0.12); color: var(--green); }
-    .rb-ms { background: rgba(255,255,255,0.04); color: var(--muted); }
-
-    .resp-body {
-      padding: 0.7rem 0.9rem; font-family: "JetBrains Mono", monospace;
-      font-size: 0.66rem; line-height: 1.7; height: 140px;
-      overflow: hidden; background: var(--bg); border-top: 1px solid var(--border);
+    @media (max-width: 900px) {
+      .af-body { height: auto; }
+      .af-env { display: none; }
+      .af-panes { flex-direction: column; }
+      .af-req { width: auto; border-right: none; border-bottom: 1px solid var(--af-border); }
+      .af-res { height: 240px; flex: none; }
     }
 
     @media (max-width: 680px) {
-      .fi-rail, .fc-list { display: none; }
-      .frame-body { grid-template-columns: 1fr; min-height: 320px; }
       .frame-section { padding-left: 0; padding-right: 0; padding-bottom: 4rem; }
       .app-frame { border-radius: 0; border-left: none; border-right: none; }
-      .frame-bar { padding: 0.5rem 0.7rem; }
-      .req-tabs { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
-      .req-tabs::-webkit-scrollbar { display: none; }
-      .rtab { white-space: nowrap; }
-      .url-txt { font-size: 0.62rem; }
-      .resp-body { height: 90px; }
+      .af-rail, .af-tright { display: none; }
+      .af-body { grid-template-columns: minmax(0, 1fr); }
     }
-
     /* ── BENTO GRID ── */
     .bento-section { max-width: 1140px; margin: 0 auto; padding: 0 2rem 7rem; }
 
@@ -828,8 +903,6 @@
     /* ── RESPONSIVE ── */
     .nav-links { display: flex; align-items: center; gap: 0.1rem; }
     .cmp-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--r); }
-    .frame-tabs { overflow-x: auto; scrollbar-width: none; }
-    .frame-tabs::-webkit-scrollbar { display: none; }
     .script-card pre { overflow-x: auto; }
 
     /* Mobile feature list — hidden on desktop */
@@ -936,7 +1009,7 @@
   <a href="#" class="logo">
     <div class="logo-mark"><img src="rustman-logo.svg" alt="Rustman" /></div>
     RUSTMAN
-    <span class="logo-ver" id="logoVer">v0.3.15</span>
+    <span class="logo-ver" id="logoVer">v0.4.0</span>
   </a>
   <div class="nav-sp"></div>
   <div class="nav-links">
@@ -957,7 +1030,7 @@
 <section class="hero">
   <div class="hero-kicker">Built in Rust with iced &nbsp;·&nbsp; <span>MIT License</span></div>
   <h1>Stop paying for your API client. <em>Seriously.</em></h1>
-  <p>I wanted an API client that opens fast, keeps my data on my own machine, and does not ask me to log in. I could not find one I liked, so I wrote Rustman in Rust. It is free, it is open source, and it is yours to use.</p>
+  <p>I wanted an API client that keeps my data on my machine and doesn't ask me to log in, so I wrote Rustman in Rust. It is free and open source. Version 0.4.0 is the UI overhaul.</p>
   <div class="hero-cta">
     <a href="#download" class="btn-dl">
       Download Free
@@ -980,80 +1053,174 @@
 <!-- APP FRAME -->
 <div class="frame-section">
   <div class="frame-halo" aria-hidden="true"></div>
-  <div class="app-frame">
-    <div class="frame-bar">
-      <div class="tl tl-r"></div><div class="tl tl-y"></div><div class="tl tl-g"></div>
-      <div class="frame-tabs">
-        <div class="ftab"><span class="mp">POST</span> /auth/login</div>
-        <div class="ftab fa"><span class="mg">GET</span> /users/me</div>
-        <div class="ftab"><span class="md">DEL</span> /users/:id</div>
+  <div class="app-frame" role="img" aria-label="Rustman 0.4.0 in the Violet theme, with a request and its JSON response side by side">
+    <div class="af-title">
+      <div class="af-brand">
+        <span class="af-lights"><span class="tl tl-r"></span><span class="tl tl-y"></span><span class="tl tl-g"></span></span>
+        Rustman
+      </div>
+      <div class="af-search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Search or run command
+        <span class="af-kbd">Ctrl K</span>
+      </div>
+      <div class="af-tright">
+        <span class="af-ib"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></span>
+        <span class="af-ib"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg></span>
       </div>
     </div>
-    <div class="frame-body">
-      <div class="fi-rail">
-        <div class="fi on">
-          <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-        </div>
-        <div class="fi">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-        </div>
-        <div class="fi">
-          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+
+    <div class="af-body">
+      <div class="af-rail">
+        <span class="af-ib on"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+        <span class="af-ib"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></span>
+        <span class="af-ib"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg></span>
+        <span class="af-ib"><svg viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10"/><path d="M18 9a6 6 0 0 1-6 6H6"/></svg></span>
+        <span class="af-sp"></span>
+        <span class="af-ib"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></span>
+      </div>
+
+      <div class="af-side">
+        <div class="af-side-head"><b>Collections</b><span class="af-new">New<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></div>
+        <div class="af-tree">
+          <div class="af-row col" style="padding-left:8px"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg><span class="af-name">Auth Service</span></div>
+          <div class="af-row" style="padding-left:28px"><span class="af-m af-post">POST</span><span class="af-name">Login</span></div>
+          <div class="af-row" style="padding-left:28px"><span class="af-m af-post">POST</span><span class="af-name">Refresh token</span></div>
+          <div class="af-row sel" style="padding-left:28px"><span class="af-m af-get">GET</span><span class="af-name">Who am I</span></div>
+          <div class="af-row col" style="padding-left:8px"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg><span class="af-name">Acme API</span></div>
+          <div class="af-row" style="padding-left:28px"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg><span class="af-name">Users</span></div>
+          <div class="af-row" style="padding-left:48px"><span class="af-m af-get">GET</span><span class="af-name">List users</span></div>
+          <div class="af-row" style="padding-left:48px"><span class="af-m af-post">POST</span><span class="af-name">Create user</span></div>
+          <div class="af-row" style="padding-left:48px"><span class="af-m af-put">PUT</span><span class="af-name">Update user</span></div>
+          <div class="af-row" style="padding-left:48px"><span class="af-m af-del">DEL</span><span class="af-name">Deactivate user</span></div>
+          <div class="af-row" style="padding-left:28px"><span class="af-m af-get">GET</span><span class="af-name">Health check</span></div>
         </div>
       </div>
-      <div class="fc-list">
-        <div class="fc-head">Collections</div>
-        <div class="fc-grp"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg> Auth API</div>
-        <div class="fc-item"><span class="mp" style="font-size:.58rem">POST</span> /login</div>
-        <div class="fc-item sel"><span class="mg" style="font-size:.58rem">GET</span> /me</div>
-        <div class="fc-item"><span class="mp" style="font-size:.58rem">POST</span> /refresh</div>
-        <div class="fc-grp" style="margin-top:.3rem"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg> Users</div>
-        <div class="fc-item"><span class="mg" style="font-size:.58rem">GET</span> /users</div>
-        <div class="fc-item"><span style="font-size:.58rem;color:#a78bfa;font-weight:800">PUT</span> /users/:id</div>
-        <div class="fc-item"><span class="md" style="font-size:.58rem">DEL</span> /users/:id</div>
-      </div>
-      <div class="frame-main">
-        <div class="url-row">
-          <div class="method-tag">GET</div>
-          <div class="url-txt"><span class="uv">{{baseUrl}}</span>/users/me</div>
-          <div class="send-tag">Send</div>
+
+      <div class="af-main">
+        <div class="af-tabs">
+          <div class="af-dtab on"><span class="af-m af-get">GET</span><span class="af-t">Who am I</span><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
+          <div class="af-dtab"><span class="af-m af-post">POST</span><span class="af-t">Login</span></div>
+          <div class="af-dtab"><span class="af-m af-get">GET</span><span class="af-t">List users</span><span class="af-udot"></span></div>
+          <span class="af-ib af-add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
         </div>
-        <div class="req-tabs">
-          <div class="rtab">Params</div>
-          <div class="rtab ra">Headers</div>
-          <div class="rtab">Auth</div>
-          <div class="rtab">Scripts</div>
-        </div>
-        <div class="body-code">
-          <span class="cm">Authorization</span>: <span class="cs">Bearer <span class="cn">{{authToken}}</span></span><br>
-          <span class="cm">Content-Type</span>: <span class="cs">application/json</span><br>
-          <span class="cm">X-Request-ID</span>: <span class="cs">req_<span class="cn">{{timestamp}}</span></span>
-        </div>
-        <div class="resp-bar">
-          <div class="rtabs2">
-            <div class="rtab2 ra2">Pretty</div>
-            <div class="rtab2">Raw</div>
-            <div class="rtab2">Headers</div>
-            <div class="rtab2">Tests</div>
+
+        <div class="af-urlrow">
+          <div class="af-field">
+            <span class="af-mdd"><span class="af-m af-get">GET</span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+            <span class="af-url"><span class="af-var">{{base_url}}</span>/users/me</span>
           </div>
-          <div class="resp-meta">
-            <span class="rbadge rb-ok">200 OK</span>
-            <span class="rbadge rb-ms">48 ms</span>
-            <span class="rbadge rb-ms">1.2 KB</span>
+          <span class="af-send">Send</span>
+          <span class="af-env"><span class="af-edot"></span>Staging<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+        </div>
+
+        <div class="af-panes">
+          <div class="af-pane af-req">
+            <div class="af-ptabs">
+              <span class="af-ptab">Params</span>
+              <span class="af-ptab on">Headers<span class="af-n">3</span></span>
+              <span class="af-ptab">Body</span>
+              <span class="af-ptab">Auth</span>
+              <span class="af-ptab">Scripts</span>
+            </div>
+            <div class="af-kv-row"><span><span class="af-cb"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></span></span><span>Authorization</span><span class="af-v">Bearer&nbsp;<span class="af-var">{{token}}</span></span></div>
+            <div class="af-kv-row"><span><span class="af-cb"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></span></span><span>Accept</span><span class="af-v">application/json</span></div>
+            <div class="af-kv-row"><span><span class="af-cb"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></span></span><span>X-Tenant</span><span class="af-v"><span class="af-var">{{tenant}}</span></span></div>
+            <div class="af-kv-row ph"><span></span><span>Add header</span><span class="af-v">Value</span></div>
+          </div>
+
+          <div class="af-pane af-res">
+            <div class="af-ptabs">
+              <span class="af-ptab on">Body</span>
+              <span class="af-ptab">Headers<span class="af-n">6</span></span>
+              <span class="af-ptab">Cookies<span class="af-n">1</span></span>
+              <span class="af-ptab">Tests<span class="af-n">2</span></span>
+              <div class="af-end"><span class="af-status">200 OK</span><span class="af-meta">48 ms · 1.2 KB</span></div>
+            </div>
+            <div class="af-code"><div class="af-ln"><i>1</i><span><span class="af-p">{</span></span></div><div class="af-ln"><i>2</i><span>  <span class="af-k">"id"</span><span class="af-p">:</span> <span class="af-nu">42</span><span class="af-p">,</span></span></div><div class="af-ln"><i>3</i><span>  <span class="af-k">"name"</span><span class="af-p">:</span> <span class="af-s">"Ada Lovelace"</span><span class="af-p">,</span></span></div><div class="af-ln"><i>4</i><span>  <span class="af-k">"email"</span><span class="af-p">:</span> <span class="af-s">"ada@example.com"</span><span class="af-p">,</span></span></div><div class="af-ln"><i>5</i><span>  <span class="af-k">"role"</span><span class="af-p">:</span> <span class="af-s">"admin"</span><span class="af-p">,</span></span></div><div class="af-ln"><i>6</i><span>  <span class="af-k">"active"</span><span class="af-p">:</span> <span class="af-l">true</span><span class="af-p">,</span></span></div><div class="af-ln"><i>7</i><span>  <span class="af-k">"teams"</span><span class="af-p">: [</span><span class="af-s">"core"</span><span class="af-p">,</span> <span class="af-s">"billing"</span><span class="af-p">],</span></span></div><div class="af-ln"><i>8</i><span>  <span class="af-k">"manager"</span><span class="af-p">:</span> <span class="af-l">null</span><span class="af-p">,</span></span></div><div class="af-ln"><i>9</i><span>  <span class="af-k">"createdAt"</span><span class="af-p">:</span> <span class="af-s">"2024-01-15T10:30:00Z"</span></span></div><div class="af-ln"><i>10</i><span><span class="af-p">}</span></span></div></div>
           </div>
         </div>
-        <div class="resp-body">
-          <span class="cm">{</span><br>
-          &nbsp;&nbsp;<span class="ck">"id"</span>: <span class="cn">42</span>,<br>
-          &nbsp;&nbsp;<span class="ck">"email"</span>: <span class="cs">"user@example.com"</span>,<br>
-          &nbsp;&nbsp;<span class="ck">"role"</span>: <span class="cs">"admin"</span>,<br>
-          &nbsp;&nbsp;<span class="ck">"createdAt"</span>: <span class="cs">"2024-01-15T10:30:00Z"</span><br>
-          <span class="cm">}</span>
-        </div>
       </div>
+    </div>
+
+    <div class="af-statusbar">
+      <span class="af-sb"><svg viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10"/><path d="M18 9a6 6 0 0 1-6 6H6"/></svg>main</span>
+      <span class="af-sp"></span>
+      <span class="af-sb">Staging</span>
     </div>
   </div>
 </div>
+
+<!-- WHAT'S NEW -->
+<section class="roadmap-section" id="whats-new">
+  <div class="sec-label">What's new</div>
+  <h2 style="font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:.75rem">What's new in 0.4.0</h2>
+  <p style="font-size:.95rem;color:var(--dim);max-width:520px;line-height:1.75;margin-bottom:2rem">0.4.0 is the UI overhaul: a new design, about 115 bugs fixed, faster requests and history, saving in the background, and safer Git.</p>
+
+  <div class="rm-grid">
+
+    <!-- Redesign -->
+    <div class="rm-group rm-lead">
+      <div class="rm-head"><div class="rm-dot rd-flow"></div><span>The redesign</span></div>
+      <div class="rm-lead-items">
+        <div class="rm-item">
+          <div class="rm-item-top">
+            <div class="rm-item-t">One calm surface</div>
+          </div>
+          <div class="rm-item-d">Underline tabs, one URL field with the method inside it, and the response status, time and size in the tab bar. Loading and error states have a Retry button.</div>
+        </div>
+        <div class="rm-item">
+          <div class="rm-item-top">
+            <div class="rm-item-t">Settings as a page</div>
+          </div>
+          <div class="rm-item-d">Eight themes as preview cards, plus General, Network &amp; TLS, Git, Shortcuts and About. The command palette groups open tabs, saved requests, history and commands.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Speed -->
+    <div class="rm-group">
+      <div class="rm-head"><div class="rm-dot rd-proto"></div><span>Speed</span></div>
+      <div class="rm-item">
+        <div class="rm-item-top">
+          <div class="rm-item-t">Opening requests and history</div>
+        </div>
+        <div class="rm-item-d">Opening a request or a history entry took 1–3 s. It now takes a few milliseconds.</div>
+      </div>
+      <div class="rm-item">
+        <div class="rm-item-top">
+          <div class="rm-item-t">Saving in the background</div>
+        </div>
+        <div class="rm-item-d">With a 5 MB request open, autosave froze the window for about 0.1 s. It now takes about 1 ms, and quitting writes the latest changes first.</div>
+      </div>
+    </div>
+
+    <!-- Fixes -->
+    <div class="rm-group">
+      <div class="rm-head"><div class="rm-dot rd-script"></div><span>Fixes and safety</span></div>
+      <div class="rm-item">
+        <div class="rm-item-top">
+          <div class="rm-item-t">About 115 bugs fixed</div>
+        </div>
+        <div class="rm-item-d">From cURL paste, Windows cmd and PowerShell copies included, and compressed responses to Postman import, drag and drop, and settings that reset on restart.</div>
+      </div>
+      <div class="rm-item">
+        <div class="rm-item-top">
+          <div class="rm-item-t">Safer Git</div>
+        </div>
+        <div class="rm-item-d">Tokens and passwords stay out of commits and are kept locally. Switching branches with uncommitted changes asks first, and a pull, branch switch or restore no longer throws away your edits.</div>
+      </div>
+      <div class="rm-item">
+        <div class="rm-item-top">
+          <div class="rm-item-t"><code>rustman-cli run</code></div>
+          <span class="rm-chip ch-ship">New</span>
+        </div>
+        <div class="rm-item-d">Sends a collection's requests from a terminal or CI, and exits with status 1 when one fails.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
 
 <!-- BENTO FEATURES -->
 <section class="bento-section" id="features">
@@ -1064,12 +1231,12 @@
     <div class="bcard b-a">
       <div class="bcard-label">Core</div>
       <div class="bcard-title">Native Rust HTTP engine</div>
-      <div class="bcard-desc">Runs through <code>reqwest</code>, so no browser CORS limits, no size caps, no 30s timeouts.</div>
+      <div class="bcard-desc">Requests go through <code>reqwest</code>, not a browser, so there are no CORS limits. Compressed responses are decoded, and you see the headers and size as they came over the wire.</div>
       <div class="http-demo">
         <div class="hline req"><span class="hacc">→</span> POST /auth/login HTTP/1.1</div>
         <div class="hline req"><span class="hkey">Authorization:</span> <span class="hval">Bearer ey••••••</span></div>
         <div class="hline req"><span class="hkey">Content-Type:</span> <span class="hval">application/json</span></div>
-        <div class="hline req"><span class="hkey">X-Request-ID:</span> <span class="hval">req_1716559812</span></div>
+        <div class="hline req"><span class="hkey">X-Tenant:</span> <span class="hval">acme</span></div>
         <hr class="hsep"/>
         <div class="hline resp-ok">← HTTP/1.1 200 OK &nbsp;<span class="hms">48ms</span></div>
         <div class="hline resp-data"><span class="hkey">"token":</span> <span class="hval">"eyJhbGci..."</span></div>
@@ -1081,7 +1248,7 @@
     <div class="bcard b-b">
       <div class="bcard-label">Privacy</div>
       <div class="bcard-title">Zero telemetry</div>
-      <div class="bcard-desc">Your requests never leave your machine. No analytics, no crash reports, no hidden pings.</div>
+      <div class="bcard-desc">Collections, history and environments stay on your machine. No analytics, no crash reports, and no network call you didn't start.</div>
       <div class="privacy-icon">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
       </div>
@@ -1141,8 +1308,8 @@
         </div>
         <div class="test-row pass">
           <div class="test-dot tdot-pass"></div>
-          roll back to any commit
-          <span class="test-ms">undo</span>
+          secrets stay out of commits
+          <span class="test-ms">safe</span>
         </div>
         <div class="test-summary">
           <span class="ts-pass">your git, your keys</span>
@@ -1154,8 +1321,8 @@
     <!-- F: Themes -->
     <div class="bcard b-f">
       <div class="bcard-label">Theming</div>
-      <div class="bcard-title">Accent colors</div>
-      <div class="bcard-desc">Seven themes to pick from, each with its own accent color. Rustman remembers the one you choose.</div>
+      <div class="bcard-title">Eight themes</div>
+      <div class="bcard-desc">Violet, Amber, Midnight, Nord, Dracula, Kanagawa, Solarized and Light, picked from preview cards in Settings.</div>
       <div class="theme-dots">
         <div class="tdot td-flame active"></div>
         <div class="tdot td-violet"></div>
@@ -1170,12 +1337,12 @@
     <div class="bcard b-g">
       <div class="bcard-label">Speed</div>
       <div class="bcard-title">Command palette</div>
-      <div class="bcard-desc">Hit one key, search every action, and jump straight there. The whole app is keyboard first.</div>
+      <div class="bcard-desc">Ctrl/Cmd+K searches open tabs, saved requests, history and commands, in groups.</div>
       <div class="coll-mini" style="margin-top:.7rem">
-        <div class="cm-row" style="color:var(--accent)">⌘  type a command…</div>
-        <div class="cm-row cmsel">Send request</div>
-        <div class="cm-row">New tab</div>
-        <div class="cm-row">Switch environment</div>
+        <div class="cm-row" style="color:var(--accent)">⌘K  search requests, tabs, history…</div>
+        <div class="cm-row cmsel">Send Request</div>
+        <div class="cm-row">New Tab</div>
+        <div class="cm-row">Import cURL From Clipboard</div>
       </div>
     </div>
 
@@ -1198,19 +1365,19 @@
   <div class="mob-features">
     <div class="mob-feat">
       <div class="mob-feat-ic"><svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
-      <div><div class="mob-feat-t">Native Rust HTTP</div><div class="mob-feat-d">Runs through reqwest, so no browser CORS limits, no size caps, no 30s timeouts.</div></div>
+      <div><div class="mob-feat-t">Native Rust HTTP</div><div class="mob-feat-d">Requests go through reqwest, not a browser, so there are no CORS limits. Compressed responses are decoded.</div></div>
     </div>
     <div class="mob-feat">
       <div class="mob-feat-ic"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
-      <div><div class="mob-feat-t">Zero telemetry</div><div class="mob-feat-d">Your requests never leave your machine. No analytics, no hidden pings, ever.</div></div>
+      <div><div class="mob-feat-t">Zero telemetry</div><div class="mob-feat-d">Your data stays on your machine. No analytics, and no network call you didn't start.</div></div>
     </div>
     <div class="mob-feat">
       <div class="mob-feat-ic"><svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
-      <div><div class="mob-feat-t">Git for collections</div><div class="mob-feat-d">Commit, branch, and restore. Clone, pull, and push through your own system git.</div></div>
+      <div><div class="mob-feat-t">Git for collections</div><div class="mob-feat-d">Commit, branch and restore. Clone, pull and push through your system git. Tokens and passwords stay out of commits.</div></div>
     </div>
     <div class="mob-feat">
       <div class="mob-feat-ic"><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-      <div><div class="mob-feat-t">WebSocket</div><div class="mob-feat-d">Type a ws or wss URL and the panel flips into WebSocket mode. Send and receive on a live feed.</div></div>
+      <div><div class="mob-feat-t">WebSocket</div><div class="mob-feat-d">Type a ws or wss URL and the panel switches to WebSocket mode. Send and receive on a live feed.</div></div>
     </div>
     <div class="mob-feat">
       <div class="mob-feat-ic"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
@@ -1218,15 +1385,19 @@
     </div>
     <div class="mob-feat">
       <div class="mob-feat-ic"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></div>
-      <div><div class="mob-feat-t">Collections &amp; history</div><div class="mob-feat-d">Organize requests into collections. Replay from history. All stored in local SQLite.</div></div>
+      <div><div class="mob-feat-t">Collections &amp; history</div><div class="mob-feat-d">Folders, drag and drop, and history that records each request as it was sent. Stored in local SQLite.</div></div>
     </div>
     <div class="mob-feat">
       <div class="mob-feat-ic"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-      <div><div class="mob-feat-t">All auth types</div><div class="mob-feat-d">Bearer, Basic, API Key, Cookie, and JWT, plus environment variable substitution.</div></div>
+      <div><div class="mob-feat-t">All auth types</div><div class="mob-feat-d">Bearer, Basic, API key, Cookie and JWT, with <code>{{variables}}</code> in every field.</div></div>
     </div>
     <div class="mob-feat">
       <div class="mob-feat-ic"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-      <div><div class="mob-feat-t">Accent colors</div><div class="mob-feat-d">Seven themes, each with its own accent color. Rustman remembers the one you pick.</div></div>
+      <div><div class="mob-feat-t">Eight themes</div><div class="mob-feat-d">Violet, Amber, Midnight, Nord, Dracula, Kanagawa, Solarized and Light.</div></div>
+    </div>
+    <div class="mob-feat">
+      <div class="mob-feat-ic"><svg viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg></div>
+      <div><div class="mob-feat-t">Command line runner</div><div class="mob-feat-d"><code>rustman-cli run</code> sends a collection from a terminal or CI and exits non-zero when a request fails.</div></div>
     </div>
   </div>
 </section>
@@ -1235,7 +1406,7 @@
 <section class="scripts-section" id="scripts">
   <div class="sec-label">Scripting</div>
   <h2 style="font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:.75rem">A scripting language built in Rust, not borrowed from Node.</h2>
-  <p style="font-size:.95rem;color:var(--dim);max-width:560px;line-height:1.75;margin-bottom:2rem">Pre-request and test scripts run on <strong style="color:var(--text)">rustman-engine</strong>, a small interpreted language written from scratch in Rust — no embedded JS runtime, no <code style="font-family:'JetBrains Mono',monospace;font-size:.85em;background:var(--bg3);padding:.1em .35em;border-radius:4px;color:var(--accent);border:1px solid var(--bord2)">pm.*</code> API to memorize. It is small on purpose: env vars, headers, cookies, JWT decoding, base64, and JSON assertions, in a syntax simple enough for an AI to generate correctly from a plain-English request. Full grammar and built-ins are on the <a href="scripting.html">scripting docs page</a>.</p>
+  <p style="font-size:.95rem;color:var(--dim);max-width:560px;line-height:1.75;margin-bottom:2rem">Pre-request and test scripts run on <strong style="color:var(--text)">rustman-engine</strong>, a small interpreted language written in Rust. There is no embedded JS runtime and no <code style="font-family:'JetBrains Mono',monospace;font-size:.85em;background:var(--bg3);padding:.1em .35em;border-radius:4px;color:var(--accent);border:1px solid var(--bord2)">pm.*</code> API to memorize. It covers env vars, headers, cookies, JWT decoding, base64 and JSON assertions, in a syntax small enough for an LLM to write correctly from a plain-English request. A pre-request script's <code style="font-family:'JetBrains Mono',monospace;font-size:.85em;background:var(--bg3);padding:.1em .35em;border-radius:4px;color:var(--accent);border:1px solid var(--bord2)">set_env</code> applies to the request it runs for. The grammar and built-ins are on the <a href="scripting.html">scripting docs page</a>.</p>
   <div class="scripts-grid">
     <div class="script-card">
       <div class="sc-head"><div class="scdot sd-pre"></div><span>Pre-request script</span></div>
@@ -1247,14 +1418,14 @@
     </div>
     <div class="script-card">
       <div class="sc-head"><div class="scdot sd-test"></div><span>Test script, post-response</span></div>
-      <pre><span class="pc">// decode the response's JWT and stash claims</span>
-<span class="pk">let</span> claims = <span class="pf">jwt_decode</span>(<span class="pf">header</span>(<span class="ps">"Authorization"</span>))
-<span class="pf">set_env</span>(<span class="ps">"user_id"</span>, claims.payload.sub)
-
+      <pre><span class="pc">// check the login, then save its token</span>
 <span class="pf">test</span>(<span class="ps">"status is 200"</span>, response.status == <span class="pn">200</span>)
 
-<span class="pk">let</span> body = response.<span class="pf">json</span>()
-<span class="pf">test</span>(<span class="ps">"has a token"</span>, body.token != <span class="pk">null</span>)</pre>
+<span class="pk">let</span> token = response.<span class="pf">json</span>().token
+<span class="pf">test</span>(<span class="ps">"has a token"</span>, token != <span class="pk">null</span>)
+<span class="pk">if</span> token != <span class="pk">null</span> {
+    <span class="pf">set_env</span>(<span class="ps">"user_id"</span>, <span class="pf">jwt_decode</span>(token).payload.sub)
+}</pre>
     </div>
   </div>
 </section>
@@ -1272,9 +1443,9 @@
     <div class="mob-stat"><div class="mob-stat-v">0 bytes</div><div class="mob-stat-l">sent to any server</div></div>
     <div class="mob-stat"><div class="mob-stat-v">No login</div><div class="mob-stat-l">account never required</div></div>
     <div class="mob-why">
-      <div class="mob-why-title">Only Rustman has</div>
-      <div class="mob-why-row"><span class="cv">✓</span> Native HTTP engine, no CORS, no size limits</div>
-      <div class="mob-why-row"><span class="cv">✓</span> Git for collections with your own remote</div>
+      <div class="mob-why-title">Rustman also has</div>
+      <div class="mob-why-row"><span class="cv">✓</span> Native HTTP engine, no CORS limits</div>
+      <div class="mob-why-row"><span class="cv">✓</span> Git for collections with your own remote, secrets kept out</div>
       <div class="mob-why-row"><span class="cv">✓</span> Native GUI, no webview and no Electron</div>
       <div class="mob-why-row"><span class="cv">✓</span> Session restore, pick up where you left off</div>
     </div>
@@ -1303,10 +1474,11 @@
       <tr><td class="fname">WebSocket</td><td class="cu"><span class="cv">✓</span></td><td><span class="cv">✓</span></td><td><span class="cx">✗</span></td></tr>
       <tr><td class="fname">Code editor</td><td class="cu"><span class="cv">✓ syntect</span></td><td><span class="cp">Basic</span></td><td><span class="cp">Basic</span></td></tr>
       <tr><td class="fname">Large response viewer</td><td class="cu"><span class="cv">✓</span></td><td><span class="cx">✗</span></td><td><span class="cx">✗</span></td></tr>
-      <tr><td class="fname">Postman collection import</td><td class="cu"><span class="cv">✓ v2.1</span></td><td><span class="cv">✓</span></td><td><span class="cv">✓</span></td></tr>
+      <tr><td class="fname">Postman collection import</td><td class="cu"><span class="cv">✓ v2.0 / v2.1</span></td><td><span class="cv">✓</span></td><td><span class="cv">✓</span></td></tr>
       <tr><td class="fname">Multi-tab editing</td><td class="cu"><span class="cv">✓</span></td><td><span class="cv">✓</span></td><td><span class="cp">Limited</span></td></tr>
       <tr><td class="fname">Session restore</td><td class="cu"><span class="cv">✓</span></td><td><span class="cv">✓</span></td><td><span class="cx">✗</span></td></tr>
       <tr><td class="fname">Pre/post scripts</td><td class="cu"><span class="cv">✓ Rust-native</span></td><td><span class="cv">✓</span></td><td><span class="cv">✓</span></td></tr>
+      <tr><td class="fname">Command line runner</td><td class="cu"><span class="cv">✓ rustman-cli</span></td><td><span class="cv">✓ Newman</span></td><td><span class="cv">✓ Bruno CLI</span></td></tr>
     </tbody>
   </table>
   </div>
@@ -1368,9 +1540,9 @@
       <div class="rm-item">
         <div class="rm-item-top">
           <div class="rm-item-t">Collection runner</div>
-          <span class="rm-chip ch-plan">Planned</span>
+          <span class="rm-chip ch-ship">CLI in 0.4.0</span>
         </div>
-        <div class="rm-item-d">One pass over a whole collection in order, with all of the test results in one place.</div>
+        <div class="rm-item-d"><code>rustman-cli run</code> sends a whole collection in order and prints every result. A runner inside the app is still planned.</div>
       </div>
       <div class="rm-item">
         <div class="rm-item-top">
@@ -1433,12 +1605,12 @@
   <div class="sec-label" style="justify-content:center">Download</div>
   <div class="dl-top">
     <h2>Get Rustman</h2>
-    <p>Free, open source, around 30 MB. No sign up. No telemetry. Just download and run.</p>
+    <p>Free, open source, around 30 MB. No sign up and no telemetry.</p>
     <a class="dl-btn" href="https://github.com/rust-man-org/rustman/releases/latest" target="_blank" rel="noopener">
       <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
       Download Latest Release
     </a><br>
-    <span class="dl-ver"><span id="dlVer">v0.3.15</span> · macOS · Windows · Linux · MIT License</span>
+    <span class="dl-ver"><span id="dlVer">v0.4.0</span> · macOS · Windows · Linux · MIT License</span>
     <div class="dl-plats">
       <a class="dl-plat" href="https://github.com/rust-man-org/rustman/releases/latest" target="_blank" rel="noopener">
         <div class="dl-plat-name">macOS</div>
@@ -1447,12 +1619,12 @@
       </a>
       <a class="dl-plat" href="https://github.com/rust-man-org/rustman/releases/latest" target="_blank" rel="noopener">
         <div class="dl-plat-name">Windows</div>
-        <div class="dl-plat-fmt">x86_64 .zip</div>
+        <div class="dl-plat-fmt">x86_64 and arm64 .zip</div>
         <div class="dl-plat-cta">Download →</div>
       </a>
       <a class="dl-plat" href="https://github.com/rust-man-org/rustman/releases/latest" target="_blank" rel="noopener">
         <div class="dl-plat-name">Linux</div>
-        <div class="dl-plat-fmt">x86_64 .tar.gz</div>
+        <div class="dl-plat-fmt">x86_64 and arm64 .tar.gz</div>
         <div class="dl-plat-cta">Download →</div>
       </a>
     </div>
@@ -1463,19 +1635,19 @@
       <span>Build from source</span>
       <a href="https://github.com/rust-man-org/rustman" style="font-size:.72rem;color:var(--accent);font-weight:600" target="_blank" rel="noopener">View on GitHub →</a>
     </div>
-    <pre><span class="pc2"># Requires Rust 1.85+, a C toolchain, and CMake</span>
+    <pre><span class="pc2"># Requires Rust 1.88+, a C compiler and CMake</span>
 <span class="pcmd">git clone</span> https://github.com/rust-man-org/rustman
 <span class="pcmd">cd</span> rustman
 <span class="pcmd">cargo build --release</span></pre>
   </div>
   <p class="req-note">
-    Needs a <a href="https://www.rust-lang.org/tools/install" target="_blank" rel="noopener">Rust toolchain</a> (1.85 or newer), plus a C compiler and CMake for the vendored libgit2, OpenSSL, and SQLite. The full guide is in <a href="https://github.com/rust-man-org/rustman/blob/master/docs/DEVELOPMENT.md" target="_blank" rel="noopener">docs/DEVELOPMENT.md</a>.
+    Needs a <a href="https://www.rust-lang.org/tools/install" target="_blank" rel="noopener">Rust toolchain</a> (1.88 or newer), plus a C compiler and CMake for the vendored libgit2, OpenSSL and SQLite. <code style="font-family:'JetBrains Mono',monospace">cargo build --release -p rustman-cli</code> builds the command line runner. The full guide is in <a href="https://github.com/rust-man-org/rustman/blob/master/docs/DEVELOPMENT.md" target="_blank" rel="noopener">docs/DEVELOPMENT.md</a>.
   </p>
 </section>
 
 <footer>
   <p>
-    Made with ❤️ by <a href="https://animesh.us" target="_blank" rel="noopener">Animesh Chaudhri</a>
+    Made by <a href="https://animesh.us" target="_blank" rel="noopener">Animesh Chaudhri</a>
     &nbsp;·&nbsp;
     <a href="https://github.com/rust-man-org/rustman" target="_blank" rel="noopener">GitHub</a>
     &nbsp;·&nbsp;

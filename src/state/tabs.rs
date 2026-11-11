@@ -1,3 +1,4 @@
+use crate::state::response_view::{ResponseView, Sent};
 use iced::widget::text_editor;
 use iced_code_editor::CodeEditor;
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ use crate::domain::{
     request::{ApiKeyLocation, AuthType, BodyType, FormField, HttpMethod, KeyValue},
     response::HttpResponse,
 };
-use crate::jobs::JobManager;
+use crate::jobs::{JobKind, JobManager};
 
 #[derive(Debug, Default)]
 pub struct WsState {
@@ -17,14 +18,82 @@ pub struct WsState {
     pub connected: bool,
     pub connecting: bool,
     pub draft: String,
-    pub messages: Vec<WsMessage>,
+    pub messages: WsFeed,
     pub outgoing_tx: Option<mpsc::Sender<String>>,
+}
+
+/// Messages a WebSocket feed keeps, the oldest dropped first. Each keeps at
+/// most [`PREVIEW_BYTES`] of its text, so a busy socket stays under a few
+/// megabytes.
+pub const FEED_MESSAGES: usize = 1_000;
+/// Text a feed message keeps; past it the message is cut with "…".
+const PREVIEW_BYTES: usize = 4 * 1024;
+/// Leading bytes of a binary frame shown in hex.
+const HEX_PREVIEW_BYTES: usize = 16;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WsFrame {
+    Sent,
+    Received,
+    Binary,
 }
 
 #[derive(Debug, Clone)]
 pub struct WsMessage {
     pub text: String,
-    pub is_outgoing: bool,
+    pub frame: WsFrame,
+}
+
+impl WsMessage {
+    /// A text frame, cut to the preview length.
+    pub fn text(text: &str, frame: WsFrame) -> Self {
+        let head = rustman_core::text::head_capped(text, PREVIEW_BYTES);
+        let text = if head.len() < text.len() { format!("{head}…") } else { head.to_owned() };
+        WsMessage { text, frame }
+    }
+
+    /// A binary frame: its size and its first bytes in hex.
+    pub fn binary(data: &[u8]) -> Self {
+        use std::fmt::Write as _;
+        let mut text = format!("binary · {}", rustman_core::text::human_size(data.len()));
+        for (i, byte) in data.iter().take(HEX_PREVIEW_BYTES).enumerate() {
+            let _ = write!(text, "{}{byte:02x}", if i == 0 { " · " } else { " " });
+        }
+        if data.len() > HEX_PREVIEW_BYTES {
+            text.push_str(" …");
+        }
+        WsMessage { text, frame: WsFrame::Binary }
+    }
+}
+
+/// A socket's messages, newest last, at most [`FEED_MESSAGES`] of them.
+#[derive(Debug, Default)]
+pub struct WsFeed(std::collections::VecDeque<WsMessage>);
+
+impl WsFeed {
+    pub fn push(&mut self, message: WsMessage) {
+        if self.0.len() == FEED_MESSAGES {
+            self.0.pop_front();
+        }
+        self.0.push_back(message);
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The newest `n` messages, oldest first.
+    pub fn newest(&self, n: usize) -> impl Iterator<Item = &WsMessage> {
+        self.0.iter().skip(self.0.len().saturating_sub(n))
+    }
 }
 
 /// A rich preview for a binary response body, populated asynchronously once
@@ -88,6 +157,18 @@ pub struct RequestTabState {
     pub active_request_tab: crate::message::RequestTab,
     pub active_response_tab: crate::message::ResponseTab,
     pub response: Option<HttpResponse>,
+    /// Display strings for `response`, derived when it is set.
+    pub response_view: Option<ResponseView>,
+    /// The request last put on the wire, for the loading state and the
+    /// failure card.
+    pub sent: Option<Sent>,
+    /// Whether the failure card shows the raw error.
+    pub failure_details_open: bool,
+    /// What the tab strip shows, refreshed after every update.
+    pub strip_label: StripLabel,
+    /// The user has worked with this tab (opened it, focused or pasted into
+    /// its URL). Until then a lone pristine tab shows the Start card.
+    pub revealed: bool,
     pub is_loading: bool,
     pub modified: bool,
     pub body_indent_tabs: bool,
@@ -109,9 +190,11 @@ pub struct RequestTabState {
     pub html_fallback_text: Option<String>,
     /// Currently shown page into `viewer_page_starts`.
     pub viewer_page: usize,
+    /// Find bar over the whole of `viewer_full` (not just the shown page).
+    /// Rescanned in `set_viewer_content`; driven by `ResponseMsg::Search*`.
+    pub viewer_search: crate::services::format::BodySearch,
     pub viewer_full_is_json: bool,
     pub viewer_processing: bool,
-    pub parsed_json: Option<serde_json::Value>,
     pub response_preview: ResponsePreview,
     /// Results of the last test-script run against this tab's response.
     pub test_results: Vec<TestResult>,
@@ -141,13 +224,14 @@ pub struct RequestTabState {
 
 /// Identifies the field an edit targets, so a run of keystrokes in one field
 /// coalesces into a single undo entry instead of one per character.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditKind {
     Url,
-    HeaderKey(usize),
-    HeaderValue(usize),
-    ParamKey(usize),
-    ParamValue(usize),
+    /// A row's field, by the row's id.
+    HeaderKey(String),
+    HeaderValue(String),
+    ParamKey(String),
+    ParamValue(String),
     HeadersBulk,
     ParamsBulk,
     Bearer,
@@ -161,8 +245,10 @@ pub enum EditKind {
     JwtAlgo,
 }
 
-/// A restorable checkpoint of the text-editable request fields. The body and
-/// script editors are excluded — they manage their own undo history.
+/// A restorable checkpoint of the text-editable request fields. The body is
+/// kept only by checkpoints of edits that replace it whole (imports): copying
+/// it into every keystroke checkpoint would cost a full body each. Other body
+/// and script edits go through the editors' own undo history.
 #[derive(Clone)]
 pub struct EditSnapshot {
     url: String,
@@ -180,21 +266,147 @@ pub struct EditSnapshot {
     jwt_secret: String,
     jwt_subject: String,
     jwt_algo: String,
+    body: Option<Box<BodySnapshot>>,
+}
+
+impl EditSnapshot {
+    /// About how much text it holds.
+    fn bytes(&self) -> usize {
+        let rows = |rows: &[KeyValue]| rows.iter().map(|r| r.key.len() + r.value.len()).sum::<usize>();
+        let fields = [
+            &self.url,
+            &self.bearer_token,
+            &self.basic_user,
+            &self.basic_pass,
+            &self.api_key_name,
+            &self.api_key_value,
+            &self.cookie_string,
+            &self.jwt_secret,
+            &self.jwt_subject,
+            &self.jwt_algo,
+        ];
+        let body = self.body.as_ref().map_or(0, |b| {
+            let form: usize = b
+                .form_fields
+                .iter()
+                .map(|f| f.key.len() + f.value.len() + f.file_data.as_ref().map_or(0, String::len))
+                .sum();
+            b.text.len() + b.graphql_variables.len() + form
+        });
+        fields.iter().map(|f| f.len()).sum::<usize>() + rows(&self.params) + rows(&self.headers) + body
+    }
+}
+
+/// Undo checkpoints a tab keeps, and the bytes they may hold together: one
+/// taken before an import carries the whole body, files included.
+const UNDO_ENTRIES: usize = 200;
+const UNDO_BYTES: usize = 32 * 1024 * 1024;
+
+#[derive(Clone)]
+struct BodySnapshot {
+    body_type: BodyType,
+    text: String,
+    graphql_variables: String,
+    form_fields: Vec<FormField>,
+}
+
+/// The tab strip's label for one tab: the title fitted to the tab, and the
+/// tab's width. `key` identifies the inputs it was derived from, so it is
+/// only recomputed when the title, URL or method change.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StripLabel {
+    pub key: u64,
+    pub text: String,
+    pub width: f32,
+    pub cut: bool,
 }
 
 impl RequestTabState {
+    /// The tab as a request: the one conversion from editor state to the
+    /// model. Identity is the tab's own; saving sets the collection.
+    pub fn to_request(&self) -> rustman_core::domain::model::Request {
+        use rustman_core::domain::model::{
+            ApiKeyAuth, AuthSettings, BasicAuth, BearerAuth, BodySettings, CookieAuth, JwtAuth,
+            Request, Scripts,
+        };
+        Request {
+            id: self.id.clone().into(),
+            collection_id: String::new().into(),
+            group_id: None,
+            sort_order: 0,
+            name: self.title.clone(),
+            method: self.method.clone(),
+            url: self.url.clone(),
+            params: self.params.clone(),
+            headers: self.headers.clone(),
+            body: BodySettings {
+                kind: self.body_type.clone().into(),
+                text: self.body_editor.content(),
+                graphql_variables: self.graphql_variables_editor.content(),
+                form: self.form_fields.clone(),
+            },
+            auth: AuthSettings {
+                active: self.auth_type.clone().into(),
+                basic: BasicAuth {
+                    user: self.basic_user.clone(),
+                    pass: self.basic_pass.clone(),
+                },
+                bearer: BearerAuth {
+                    token: self.bearer_token.clone(),
+                },
+                api_key: ApiKeyAuth {
+                    name: self.api_key_name.clone(),
+                    value: self.api_key_value.clone(),
+                    location: self.api_key_location,
+                },
+                cookie: CookieAuth {
+                    cookies: self.cookie_string.clone(),
+                },
+                jwt: JwtAuth {
+                    secret: self.jwt_secret.clone(),
+                    subject: self.jwt_subject.clone(),
+                },
+            },
+            script_cookies: self.cookies.clone(),
+            scripts: Scripts {
+                pre_request: self.pre_request_editor.content(),
+                test: self.test_editor.content(),
+            },
+        }
+    }
+
+    /// Never saved, no URL, no edits, no response.
+    pub fn is_pristine(&self) -> bool {
+        self.saved_as.is_none() && self.url.trim().is_empty() && !self.modified && self.response.is_none()
+    }
+
+    /// Show `resp` and derive what the header and failure card say.
+    pub fn set_response(&mut self, resp: HttpResponse, timeout_ms: u64) {
+        let elapsed = self.sent.as_ref().map_or_else(Default::default, |s| s.started.elapsed());
+        self.response_view = Some(ResponseView::of(&resp, self.sent.as_ref(), elapsed, timeout_ms));
+        self.failure_details_open = false;
+        self.response = Some(resp);
+    }
+
     pub fn new() -> Self {
+        Self::from_parts(EditorText::EMPTY)
+    }
+
+    /// A fresh tab whose editors open on `text`. Every editor is built here
+    /// and only here: each one costs font measurement, so building one only
+    /// to replace it doubles the cost of opening a tab.
+    fn from_parts(text: EditorText<'_>) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             title: "New Request".to_owned(),
             method: HttpMethod::Get,
-            url: String::new(),
-            url_editor: text_editor::Content::new(),
+            url_editor: text_editor::Content::with_text(&text.url),
+            url: text.url,
             headers: Vec::new(),
             params: Vec::new(),
             body_type: BodyType::None,
-            body_editor: make_code_editor("", "json"),
-            graphql_variables_editor: make_code_editor("", "json"),
+            body_editor: make_code_editor(text.body, text.body_syntax),
+            graphql_variables_editor: make_code_editor(text.graphql_variables, "json"),
             form_fields: Vec::new(),
             form_viewers: std::collections::HashMap::new(),
             auth_type: AuthType::None,
@@ -209,12 +421,17 @@ impl RequestTabState {
             jwt_secret: String::new(),
             jwt_subject: String::new(),
             jwt_algo: "HS256".to_owned(),
-            pre_request_editor: make_code_editor("", "txt"),
-            test_editor: make_code_editor("", "txt"),
+            pre_request_editor: make_code_editor(text.pre_request_script, "txt"),
+            test_editor: make_code_editor(text.test_script, "txt"),
             active_request_tab: crate::message::RequestTab::Params,
             active_response_tab: crate::message::ResponseTab::Body,
             ws: WsState::default(),
             response: None,
+            response_view: None,
+            sent: None,
+            failure_details_open: false,
+            strip_label: StripLabel::default(),
+            revealed: false,
             is_loading: false,
             modified: false,
             body_indent_tabs: false,
@@ -225,9 +442,9 @@ impl RequestTabState {
             viewer_page_starts: Vec::new(),
             html_fallback_text: None,
             viewer_page: 0,
+            viewer_search: crate::services::format::BodySearch::default(),
             viewer_full_is_json: false,
             viewer_processing: false,
-            parsed_json: None,
             response_preview: ResponsePreview::default(),
             test_results: Vec::new(),
             script_error: None,
@@ -266,40 +483,86 @@ impl RequestTabState {
             basic_pass: self.basic_pass.clone(),
             api_key_name: self.api_key_name.clone(),
             api_key_value: self.api_key_value.clone(),
-            api_key_location: self.api_key_location.clone(),
+            api_key_location: self.api_key_location,
             cookie_string: self.cookie_string.clone(),
             jwt_secret: self.jwt_secret.clone(),
             jwt_subject: self.jwt_subject.clone(),
             jwt_algo: self.jwt_algo.clone(),
+            body: None,
         }
     }
 
-    /// Restore a snapshot produced by [`Self::edit_snapshot`].
-    pub fn restore_edit(&mut self, s: EditSnapshot) {
-        self.url_editor = text_editor::Content::with_text(&s.url);
-        self.url = s.url;
-        self.method = s.method;
-        self.params = s.params;
-        self.headers = s.headers;
-        self.auth_type = s.auth_type;
-        self.bearer_token = s.bearer_token;
-        self.basic_user = s.basic_user;
-        self.basic_pass = s.basic_pass;
-        self.api_key_name = s.api_key_name;
-        self.api_key_value = s.api_key_value;
-        self.api_key_location = s.api_key_location;
-        self.cookie_string = s.cookie_string;
-        self.jwt_secret = s.jwt_secret;
-        self.jwt_subject = s.jwt_subject;
-        self.jwt_algo = s.jwt_algo;
+    /// Restore a checkpoint and return one of the state it replaced, for the
+    /// opposite stack. The body is swapped only if the checkpoint kept it.
+    pub fn restore_edit(&mut self, s: EditSnapshot) -> EditSnapshot {
+        use std::mem::replace;
+        let body = s.body.map(|body| Box::new(self.swap_body(*body)));
+        let replaced = EditSnapshot {
+            url: replace(&mut self.url, s.url),
+            method: replace(&mut self.method, s.method),
+            params: replace(&mut self.params, s.params),
+            headers: replace(&mut self.headers, s.headers),
+            auth_type: replace(&mut self.auth_type, s.auth_type),
+            bearer_token: replace(&mut self.bearer_token, s.bearer_token),
+            basic_user: replace(&mut self.basic_user, s.basic_user),
+            basic_pass: replace(&mut self.basic_pass, s.basic_pass),
+            api_key_name: replace(&mut self.api_key_name, s.api_key_name),
+            api_key_value: replace(&mut self.api_key_value, s.api_key_value),
+            api_key_location: replace(&mut self.api_key_location, s.api_key_location),
+            cookie_string: replace(&mut self.cookie_string, s.cookie_string),
+            jwt_secret: replace(&mut self.jwt_secret, s.jwt_secret),
+            jwt_subject: replace(&mut self.jwt_subject, s.jwt_subject),
+            jwt_algo: replace(&mut self.jwt_algo, s.jwt_algo),
+            body,
+        };
+        self.url_editor = text_editor::Content::with_text(&self.url);
+        replaced
+    }
+
+    fn swap_body(&mut self, body: BodySnapshot) -> BodySnapshot {
+        // A format of the body being swapped out must not land on this one.
+        self.jobs.cancel(JobKind::Format);
+        let replaced = BodySnapshot {
+            body_type: std::mem::replace(&mut self.body_type, body.body_type),
+            text: self.body_editor.content(),
+            graphql_variables: self.graphql_variables_editor.content(),
+            form_fields: std::mem::replace(&mut self.form_fields, body.form_fields),
+        };
+        self.reset_body_editor(&body.text);
+        self.graphql_variables_editor = make_code_editor(&body.graphql_variables, "json");
+        self.form_viewers.clear();
+        replaced
     }
 
     /// Push the current state onto the undo stack (capped) and clear the redo stack.
     pub fn push_undo(&mut self) {
-        self.undo.push(self.edit_snapshot());
-        if self.undo.len() > 200 {
-            self.undo.remove(0);
+        self.push_checkpoint(self.edit_snapshot());
+    }
+
+    /// [`Self::push_undo`] for an edit that replaces the whole body, so
+    /// undoing it brings the old body back too.
+    pub fn push_body_undo(&mut self) {
+        let mut checkpoint = self.edit_snapshot();
+        checkpoint.body = Some(Box::new(BodySnapshot {
+            body_type: self.body_type.clone(),
+            text: self.body_editor.content(),
+            graphql_variables: self.graphql_variables_editor.content(),
+            form_fields: self.form_fields.clone(),
+        }));
+        self.push_checkpoint(checkpoint);
+    }
+
+    /// Pushes `checkpoint`, dropping the oldest ones past the entry and byte
+    /// budgets. The newest is always kept, however large.
+    fn push_checkpoint(&mut self, checkpoint: EditSnapshot) {
+        self.undo.push(checkpoint);
+        let mut held: usize = self.undo.iter().map(EditSnapshot::bytes).sum();
+        let mut dropped = 0;
+        while self.undo.len() - dropped > 1 && (self.undo.len() - dropped > UNDO_ENTRIES || held > UNDO_BYTES) {
+            held -= self.undo[dropped].bytes();
+            dropped += 1;
         }
+        self.undo.drain(..dropped);
         self.redo.clear();
     }
 
@@ -331,6 +594,7 @@ impl RequestTabState {
         self.viewer_full_is_json = is_json;
         self.viewer_page_starts = page_starts(&self.viewer_full);
         self.viewer_page = 0;
+        self.viewer_search.content_changed(&self.viewer_full);
         self.show_viewer_page(0);
     }
 
@@ -378,7 +642,6 @@ impl RequestTabState {
             "txt"
         };
         self.response_editor = make_code_editor(&display, syntax);
-        self.response_editor.set_show_whitespace(false);
     }
 
     /// Toggle the expanded editor for form field `index`. Expanding computes
@@ -433,12 +696,6 @@ impl RequestTabState {
     /// Drop an expanded viewer (called when its row is deleted).
     pub fn drop_form_expand(&mut self, id: &str) {
         self.form_viewers.remove(id);
-    }
-
-    /// Byte length of what the response editor is actually showing (which may
-    /// be a clamped prefix of the real body — see `set_viewer_content`).
-    pub fn response_editor_bytes(&self) -> usize {
-        self.response_editor.content().len()
     }
 
     pub fn reset_body_editor(&mut self, text: &str) {
@@ -503,34 +760,133 @@ impl RequestTabState {
     }
 
     pub fn from_saved(req: &SavedRequest) -> Self {
-        let mut tab = Self::new();
-        tab.title = req.name.clone();
-        tab.method = req.method.clone();
         let (url, params) = crate::domain::request::reconcile_url_params(&req.url, &req.params);
-        tab.set_url(url);
-        tab.headers = req.headers.clone();
-        tab.params = params;
-        tab.body_type = req.body_type.clone();
-        tab.body_editor = make_code_editor(&req.body, body_syntax_for(&req.body_type, &req.body));
-        tab.graphql_variables_editor = make_code_editor(&req.graphql_variables, "json");
-        tab.form_fields = req.form_data_fields.clone();
-        tab.auth_type = req.auth_type.clone();
-        tab.bearer_token = req.bearer_token.clone();
-        tab.basic_user = req.basic_user.clone();
-        tab.basic_pass = req.basic_pass.clone();
-        tab.api_key_name = req.api_key_name.clone();
-        tab.api_key_value = req.api_key_value.clone();
-        tab.api_key_location = req.api_key_location.clone();
-        tab.cookie_string = req.cookie_string.clone();
-        tab.cookies = req.cookies.clone();
-        tab.jwt_secret = req.jwt_secret.clone();
-        tab.jwt_subject = req.jwt_subject.clone();
-        tab.jwt_algo = req.jwt_algo.clone();
-        tab.pre_request_editor = make_code_editor(&req.pre_request_script, "txt");
-        tab.test_editor = make_code_editor(&req.test_script, "txt");
-        tab.saved_as = Some((req.collection_id.clone(), req.id.clone()));
-        tab
+        Self {
+            title: req.name.clone(),
+            method: req.method.clone(),
+            headers: req.headers.clone(),
+            params,
+            body_type: req.body_type.clone(),
+            form_fields: req.form_data_fields.clone(),
+            auth_type: req.auth_type.clone(),
+            bearer_token: req.bearer_token.clone(),
+            basic_user: req.basic_user.clone(),
+            basic_pass: req.basic_pass.clone(),
+            api_key_name: req.api_key_name.clone(),
+            api_key_value: req.api_key_value.clone(),
+            api_key_location: req.api_key_location,
+            cookie_string: req.cookie_string.clone(),
+            cookies: req.cookies.clone(),
+            jwt_secret: req.jwt_secret.clone(),
+            jwt_subject: req.jwt_subject.clone(),
+            jwt_algo: req.jwt_algo.clone(),
+            saved_as: Some((req.collection_id.clone(), req.id.clone())),
+            ..Self::from_parts(EditorText {
+                url,
+                body: &req.body,
+                body_syntax: body_syntax_for(&req.body_type, &req.body),
+                graphql_variables: &req.graphql_variables,
+                pre_request_script: &req.pre_request_script,
+                test_script: &req.test_script,
+            })
+        }
     }
+
+    /// Shows `req` as saved in place of the request this tab edits. The tab
+    /// itself stays: its id (which in-flight responses are routed by), the
+    /// open panels, the response and its viewer, a live socket and running
+    /// jobs.
+    pub fn reload_saved(&mut self, req: &SavedRequest) {
+        let old = std::mem::replace(self, Self::from_saved(req));
+        self.id = old.id;
+        self.active_request_tab = old.active_request_tab;
+        self.active_response_tab = old.active_response_tab;
+        self.response = old.response;
+        self.response_view = old.response_view;
+        self.sent = old.sent;
+        self.failure_details_open = old.failure_details_open;
+        self.revealed = old.revealed;
+        self.is_loading = old.is_loading;
+        self.body_indent_tabs = old.body_indent_tabs;
+        self.response_editor = old.response_editor;
+        self.response_viewer_lines = old.response_viewer_lines;
+        self.response_truncated_bytes = old.response_truncated_bytes;
+        self.viewer_full = old.viewer_full;
+        self.viewer_page_starts = old.viewer_page_starts;
+        self.html_fallback_text = old.html_fallback_text;
+        self.viewer_page = old.viewer_page;
+        self.viewer_search = old.viewer_search;
+        self.viewer_full_is_json = old.viewer_full_is_json;
+        self.viewer_processing = old.viewer_processing;
+        self.response_preview = old.response_preview;
+        self.test_results = old.test_results;
+        self.script_error = old.script_error;
+        self.script_logs = old.script_logs;
+        self.console_editor = old.console_editor;
+        self.ws = old.ws;
+        self.jobs = old.jobs;
+        self.jobs.cancel(JobKind::Format);
+        self.show_basic_pass = old.show_basic_pass;
+    }
+
+    /// The tab a session snapshot describes, as it was when the app closed.
+    pub fn from_snapshot(snap: TabSnapshot) -> Self {
+        let (url, params) = crate::domain::request::reconcile_url_params(&snap.url, &snap.params);
+        let body_syntax = body_syntax_for(&snap.body_type, &snap.body);
+        Self {
+            id: snap.id,
+            title: snap.title,
+            method: snap.method,
+            headers: snap.headers,
+            params,
+            body_type: snap.body_type,
+            form_fields: snap.form_fields,
+            auth_type: snap.auth_type,
+            bearer_token: snap.bearer_token,
+            basic_user: snap.basic_user,
+            basic_pass: snap.basic_pass,
+            api_key_name: snap.api_key_name,
+            api_key_value: snap.api_key_value,
+            api_key_location: snap.api_key_location,
+            cookie_string: snap.cookie_string,
+            cookies: snap.cookies,
+            jwt_secret: snap.jwt_secret,
+            jwt_subject: snap.jwt_subject,
+            jwt_algo: snap.jwt_algo,
+            saved_as: snap.saved_as,
+            active_request_tab: snap.active_request_tab,
+            active_response_tab: snap.active_response_tab,
+            ..Self::from_parts(EditorText {
+                url,
+                body: &snap.body,
+                body_syntax,
+                graphql_variables: &snap.graphql_variables,
+                pre_request_script: &snap.pre_request_script,
+                test_script: &snap.test_script,
+            })
+        }
+    }
+}
+
+/// What a new tab's editors open on.
+struct EditorText<'a> {
+    url: String,
+    body: &'a str,
+    body_syntax: &'a str,
+    graphql_variables: &'a str,
+    pre_request_script: &'a str,
+    test_script: &'a str,
+}
+
+impl EditorText<'static> {
+    const EMPTY: Self = Self {
+        url: String::new(),
+        body: "",
+        body_syntax: "json",
+        graphql_variables: "",
+        pre_request_script: "",
+        test_script: "",
+    };
 }
 
 /// One expanded form-value editor: the current page into `starts`, plus the
@@ -816,7 +1172,7 @@ pub fn body_syntax_for(body_type: &BodyType, content: &str) -> &'static str {
 /// brace-delimited (`{ me { id } }`), so sniffing there would tokenize every
 /// query as JSON.
 pub fn looks_like_json_body(body_type: &BodyType, content: &str) -> bool {
-    !matches!(body_type, BodyType::GraphQL) && looks_like_json(content)
+    !matches!(body_type, BodyType::GraphQL) && has_json_shape(content)
 }
 
 /// Cheap structural check for JSON: does the text start with `{`/`[` and end
@@ -825,7 +1181,7 @@ pub fn looks_like_json_body(body_type: &BodyType, content: &str) -> bool {
 /// Deliberately not a full parse — this runs while the user is mid-edit, when
 /// the body is usually *invalid* JSON, and it should still be highlighted as
 /// JSON. Only the outermost shape is considered.
-pub fn looks_like_json(content: &str) -> bool {
+pub fn has_json_shape(content: &str) -> bool {
     let trimmed = content.trim();
     matches!(
         (trimmed.as_bytes().first(), trimmed.as_bytes().last()),
@@ -839,10 +1195,18 @@ pub fn make_code_editor(content: &str, syntax: &str) -> CodeEditor {
     let mut ed = CodeEditor::new(content, syntax);
     ed.set_theme(Palette::code_editor_style());
     ed.set_font(MONO);
-    ed.set_font_size(12.0, true);
-    // Roomier than the auto 1.43x — JSON reads better with a bit of air.
-    ed.set_line_height(18.5);
+    ed.set_font_size(crate::ui::theme::TEXT_MD, true);
+    ed.set_line_height(crate::ui::theme::EDITOR_LINE_HEIGHT);
     ed.set_indent_style(iced_code_editor::IndentStyle::Spaces(4));
+    ed.set_show_whitespace(false);
+    ed.set_fold_markers(iced_code_editor::FoldMarkers::OnGutterHover);
+    ed.set_fold_marker_position(iced_code_editor::FoldMarkerPosition::BeforeLineNumbers);
+    ed.set_gutter_layout(iced_code_editor::GutterLayout {
+        width: crate::ui::theme::GUTTER_WIDTH,
+        number_size: crate::ui::theme::GUTTER_NUMBER_SIZE,
+        number_right_padding: crate::ui::theme::GUTTER_NUMBER_PADDING,
+    });
+    ed.set_content_padding(crate::ui::theme::EDITOR_PADDING, crate::ui::theme::EDITOR_PADDING);
     ed
 }
 
@@ -869,19 +1233,53 @@ impl TabManager {
         &mut self.tabs[self.active]
     }
 
+    /// The open tab with `id`, for results that arrive after the user may
+    /// have switched tabs or closed this one.
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut RequestTabState> {
+        self.tabs.iter_mut().find(|t| t.id == id)
+    }
+
+    /// A new tab the user asked for, so it is revealed at once.
     pub fn new_tab(&mut self) {
-        self.tabs.push(RequestTabState::new());
+        let mut tab = RequestTabState::new();
+        tab.revealed = true;
+        self.tabs.push(tab);
         self.active = self.tabs.len() - 1;
     }
 
+    /// The workspace is a single untouched tab: show the Start card in
+    /// place of the tab chip, the URL row and the panes.
+    pub fn shows_start(&self) -> bool {
+        matches!(self.tabs.as_slice(), [tab] if tab.is_pristine() && !tab.revealed)
+    }
+
+    /// Mark the active tab as worked with.
+    pub fn reveal_active(&mut self) {
+        if let Some(tab) = self.tabs.get_mut(self.active) {
+            tab.revealed = true;
+        }
+    }
+
+    /// Closes the tab at `idx`, keeping the active tab active. Closing the
+    /// last tab leaves a fresh one.
     pub fn close_tab(&mut self, idx: usize) {
+        if idx >= self.tabs.len() {
+            return;
+        }
         if self.tabs.len() == 1 {
             self.tabs[0] = RequestTabState::new();
             return;
         }
         self.tabs.remove(idx);
-        if self.active >= self.tabs.len() {
-            self.active = self.tabs.len() - 1;
+        if idx < self.active || self.active == self.tabs.len() {
+            self.active -= 1;
+        }
+    }
+
+    /// Closes the tab with `id`, if it is still open.
+    pub fn close(&mut self, id: &str) {
+        if let Some(idx) = self.tabs.iter().position(|t| t.id == id) {
+            self.close_tab(idx);
         }
     }
 
@@ -903,18 +1301,6 @@ impl TabManager {
         }
     }
 
-    pub fn reorder(&mut self, from: usize, to: usize) {
-        if from == to || from >= self.tabs.len() || to >= self.tabs.len() {
-            return;
-        }
-        let active_id = self.tabs[self.active].id.clone();
-        let tab = self.tabs.remove(from);
-        self.tabs.insert(to, tab);
-        if let Some(new_active) = self.tabs.iter().position(|t| t.id == active_id) {
-            self.active = new_active;
-        }
-    }
-
     pub fn open_request(&mut self, req: &SavedRequest) {
         let req_id = &req.id;
         if let Some(idx) = self
@@ -927,6 +1313,7 @@ impl TabManager {
             self.tabs.push(RequestTabState::from_saved(req));
             self.active = self.tabs.len() - 1;
         }
+        self.reveal_active();
     }
 }
 
@@ -993,7 +1380,7 @@ impl From<&RequestTabState> for TabSnapshot {
             basic_pass: t.basic_pass.clone(),
             api_key_name: t.api_key_name.clone(),
             api_key_value: t.api_key_value.clone(),
-            api_key_location: t.api_key_location.clone(),
+            api_key_location: t.api_key_location,
             cookie_string: t.cookie_string.clone(),
             cookies: t.cookies.clone(),
             jwt_secret: t.jwt_secret.clone(),
@@ -1064,10 +1451,10 @@ mod body_syntax_tests {
     /// far as highlighting is concerned, which is the common case while editing.
     #[test]
     fn incomplete_json_is_still_treated_as_json() {
-        assert!(looks_like_json("{\"a\": }"));
-        assert!(looks_like_json("{,,}"));
+        assert!(has_json_shape("{\"a\": }"));
+        assert!(has_json_shape("{,,}"));
         // But an unclosed body genuinely has no closing bracket yet.
-        assert!(!looks_like_json("{\"a\": 1"));
+        assert!(!has_json_shape("{\"a\": 1"));
     }
 
     /// Replacing the body (Format, curl import, scripts) must re-language the
@@ -1301,6 +1688,80 @@ mod viewer_page_tests {
             ArrowDirection::Right,
             false
         )));
+    }
+}
+
+#[cfg(test)]
+mod start_tests {
+    use super::*;
+
+    #[test]
+    fn a_blank_unsaved_tab_is_pristine_until_it_holds_something() {
+        let mut tab = RequestTabState::new();
+        assert!(tab.is_pristine());
+        tab.url = "https://a.io".to_owned();
+        assert!(!tab.is_pristine());
+        let mut edited = RequestTabState::new();
+        edited.modified = true;
+        assert!(!edited.is_pristine());
+        let mut saved = RequestTabState::new();
+        saved.saved_as = Some(("c".to_owned(), "r".to_owned()));
+        assert!(!saved.is_pristine());
+    }
+
+    #[test]
+    fn the_start_card_shows_for_one_untouched_tab_and_returns_after_closing_the_last() {
+        let mut tabs = TabManager::default();
+        assert!(tabs.shows_start(), "first run");
+        tabs.reveal_active();
+        assert!(!tabs.shows_start(), "Ctrl L or a paste reveals the tab");
+        tabs.close_tab(0);
+        assert!(tabs.shows_start(), "closing the last tab is a fresh start");
+        tabs.new_tab();
+        assert!(!tabs.shows_start(), "two tabs");
+        tabs.close_tab(0);
+        assert!(!tabs.shows_start(), "a requested new tab is revealed");
+    }
+
+    #[test]
+    fn undo_history_stays_within_its_byte_budget() {
+        let mut tab = RequestTabState::new();
+        tab.body_editor = make_code_editor(&"x".repeat(UNDO_BYTES / 4), "txt");
+        for _ in 0..8 {
+            tab.push_body_undo();
+        }
+        let held: usize = tab.undo.iter().map(EditSnapshot::bytes).sum();
+        assert!(held <= UNDO_BYTES, "{held} bytes held");
+        assert_eq!(tab.undo.len(), UNDO_BYTES / tab.undo[0].bytes(), "as many as fit");
+        for _ in 0..UNDO_ENTRIES + 10 {
+            tab.push_undo();
+        }
+        assert_eq!(tab.undo.len(), UNDO_ENTRIES);
+    }
+
+    #[test]
+    fn closing_a_tab_keeps_the_active_tab_active() {
+        let mut tabs = TabManager::default();
+        tabs.new_tab();
+        tabs.new_tab();
+        let ids: Vec<String> = tabs.tabs.iter().map(|t| t.id.clone()).collect();
+        tabs.switch_to(1);
+        tabs.close_tab(0);
+        assert_eq!(tabs.active_tab().id, ids[1], "closing to the left");
+        tabs.close_tab(1);
+        assert_eq!(tabs.active_tab().id, ids[1], "closing to the right");
+        tabs.close_tab(7);
+        assert_eq!(tabs.tabs.len(), 1, "an index past the end closes nothing");
+        tabs.close(&ids[0]);
+        assert_eq!(tabs.tabs.len(), 1, "an id no longer open closes nothing");
+    }
+
+    #[test]
+    fn opening_a_request_reveals_its_tab() {
+        let mut tabs = TabManager::default();
+        let req: SavedRequest = RequestTabState::new().to_request().into();
+        tabs.open_request(&req);
+        assert!(!tabs.shows_start());
     }
 }
 

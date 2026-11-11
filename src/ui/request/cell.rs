@@ -62,7 +62,7 @@ pub fn text_cell<'a>(
         row![
             container(text(head).size(size).color(Palette::text()).width(Length::Fill))
                 .width(Length::Fill),
-            text(human_size(value.len()))
+            text(rustman_core::text::human_size(value.len()))
                 .size(10)
                 .color(Palette::text_subtle()),
         ]
@@ -74,14 +74,27 @@ pub fn text_cell<'a>(
     .into()
 }
 
-pub(crate) fn human_size(bytes: usize) -> String {
-    if bytes < 1024 {
-        format!("{bytes} B")
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+/// A value too large for an inline input: its first line, cut, and its size.
+pub fn preview<'a, M: 'a>(value: &str, t: &'a crate::ui::theme::Tokens) -> Element<'a, M> {
+    let mut head: String = value.chars().take(PREVIEW_CHARS).collect();
+    if let Some(nl) = head.find(['\n', '\r']) {
+        head.truncate(nl);
     }
+    head.push('…');
+    row![
+        text(head)
+            .size(crate::ui::theme::TEXT_SM)
+            .font(crate::ui::theme::MONO)
+            .color(t.text)
+            .width(Length::Fill),
+        text(rustman_core::text::human_size(value.len()))
+            .size(crate::ui::theme::TEXT_CAPTION)
+            .color(t.text_subtle),
+    ]
+    .spacing(crate::ui::theme::SPACE_MD)
+    .padding([0.0, crate::ui::theme::SPACE_MD])
+    .align_y(iced::Alignment::Center)
+    .into()
 }
 
 #[cfg(test)]
@@ -102,34 +115,5 @@ mod cell_tests {
         assert!(!is_inline("a\rb"));
         // A huge value must not pay for a full scan: length check first.
         assert!(!is_inline(&"y".repeat(10_000_000)));
-    }
-
-    #[test]
-    fn preview_head_is_first_line_capped() {
-        let mut head: String = "line one\nline two\nline three".chars().take(200).collect();
-        if let Some(nl) = head.find(['\n', '\r']) {
-            head.truncate(nl);
-        }
-        assert_eq!(head, "line one");
-    }
-
-    #[test]
-    fn preview_never_splits_utf8() {
-        // Emoji straddling the tip boundary floors to a char boundary.
-        use crate::consts::HOVER_TIP_BYTES;
-        use crate::services::format::head_capped;
-        let value = "a".repeat(HOVER_TIP_BYTES - 1) + "€";
-        let tip = head_capped(&value, HOVER_TIP_BYTES);
-        assert_eq!(tip, "a".repeat(HOVER_TIP_BYTES - 1));
-        // Head over emoji is whole chars only.
-        let head: String = "🎉".repeat(300).chars().take(200).collect();
-        assert_eq!(head.chars().count(), 200);
-    }
-
-    #[test]
-    fn human_size_formats() {
-        assert_eq!(human_size(0), "0 B");
-        assert_eq!(human_size(1536), "1.5 KB");
-        assert_eq!(human_size(5_242_880), "5.0 MB");
     }
 }

@@ -2,12 +2,17 @@ use iced::advanced::widget::{Operation, Tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, overlay, renderer};
 use iced::{Element, Event, Length, Rectangle, Size, Vector, keyboard};
 
+/// Maps a key press to an app-level shortcut message, if it is one.
+pub type ShortcutMap<Message> = fn(&keyboard::Key, keyboard::Modifiers) -> Option<Message>;
+
 pub struct KeyGuard<'a, Message, Theme, Renderer> {
     content: Element<'a, Message, Theme, Renderer>,
+    enabled: bool,
     active: bool,
     on_undo: Message,
     on_redo: Message,
     on_send: Message,
+    shortcuts: Option<ShortcutMap<Message>>,
 }
 
 pub fn key_guard<'a, Message, Theme, Renderer>(
@@ -19,10 +24,29 @@ pub fn key_guard<'a, Message, Theme, Renderer>(
 ) -> KeyGuard<'a, Message, Theme, Renderer> {
     KeyGuard {
         content: content.into(),
+        enabled: true,
         active,
         on_undo,
         on_redo,
         on_send,
+        shortcuts: None,
+    }
+}
+
+impl<Message, Theme, Renderer> KeyGuard<'_, Message, Theme, Renderer> {
+    /// Off while a modal owns the keyboard: every key then passes through
+    /// untouched, so nothing reaches the request behind the modal.
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    /// Extra app shortcuts, checked before any child sees the key and
+    /// captured when matched — so e.g. Ctrl+L never also lands in an editor.
+    /// Pass `None` to disable them (while a modal owns the keyboard).
+    pub fn shortcuts(mut self, map: Option<ShortcutMap<Message>>) -> Self {
+        self.shortcuts = map;
+        self
     }
 }
 
@@ -78,7 +102,11 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
-        if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
+        // A field typed in elsewhere (see `typing_scope`) already took it.
+        if self.enabled
+            && !shell.is_event_captured()
+            && let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event
+        {
             use keyboard::key::Named;
             // Always intercept Cmd+Enter so body editors don't also insert a newline.
             if *key == keyboard::Key::Named(Named::Enter) && modifiers.command() {
@@ -86,12 +114,12 @@ where
                 shell.capture_event();
                 return;
             }
-            // Always intercept Cmd+S so text inputs don't insert 's' on macOS.
-            if let keyboard::Key::Character(c) = key.as_ref() {
-                if c.eq_ignore_ascii_case("s") && modifiers.command() {
-                    shell.capture_event();
-                    return;
-                }
+            if let Some(map) = self.shortcuts
+                && let Some(message) = map(key, *modifiers)
+            {
+                shell.publish(message);
+                shell.capture_event();
+                return;
             }
             if self.active {
                 if let keyboard::Key::Character(c) = key.as_ref() {

@@ -1,6 +1,6 @@
 use iced::{
     Background, Border, Element, Length,
-    widget::{column, container, row, scrollable, text, text_editor},
+    widget::{column, container, row, text, text_editor},
 };
 
 use crate::{
@@ -15,7 +15,7 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
             column![
                 text("Script error")
                     .size(13)
-                    .color(Palette::ERROR)
+                    .color(Palette::error())
                     .font(crate::ui::theme::UI_FONT_MEDIUM),
                 iced::widget::Space::new().height(6),
                 text(err.clone())
@@ -81,10 +81,9 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
     }
 
     if tab.test_results.is_empty() {
-        return scrollable(col)
+        return crate::ui::components::scroll::vertical(crate::ui::theme::Palette::tokens(), col)
             .width(Length::Fill)
             .height(Length::Fill)
-            .style(crate::ui::theme::thin_scrollbar)
             .into();
     }
 
@@ -96,9 +95,9 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
             text(format!("{passed_count} / {total} passed"))
                 .size(11)
                 .color(if passed_count == total {
-                    Palette::SUCCESS
+                    Palette::success()
                 } else {
-                    Palette::ERROR
+                    Palette::error()
                 })
                 .font(crate::ui::theme::UI_FONT_MEDIUM),
         )
@@ -107,9 +106,9 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
 
     for result in &tab.test_results {
         let (icon, color) = if result.passed {
-            ("✓", Palette::SUCCESS)
+            ("✓", Palette::success())
         } else {
-            ("✗", Palette::ERROR)
+            ("✗", Palette::error())
         };
         col = col.push(
             container(
@@ -140,9 +139,8 @@ pub fn view(tab: &RequestTabState) -> Element<'_, Message> {
         );
     }
 
-    scrollable(col)
+    crate::ui::components::scroll::vertical(crate::ui::theme::Palette::tokens(), col)
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(crate::ui::theme::thin_scrollbar)
         .into()
 }
