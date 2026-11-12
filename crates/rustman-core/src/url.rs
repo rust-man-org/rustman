@@ -65,8 +65,10 @@ pub(crate) fn decode_query_component(s: &str) -> String {
 /// The bytes of the `%XX` escapes at the start of `s`.
 fn leading_escapes(s: &str) -> Vec<u8> {
     s.as_bytes()
-        .chunks_exact(3)
-        .map_while(|escape| match *escape {
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map_while(|&escape| match escape {
             [b'%', hi, lo] => Some((hex_digit(hi)? << 4) | hex_digit(lo)?),
             _ => None,
         })
