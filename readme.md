@@ -173,14 +173,14 @@ Grab the latest build from the [releases page](https://github.com/rust-man-org/r
 | Platform | File |
 |---|---|
 | macOS (Apple Silicon + Intel) | `Rustman-macos-universal.dmg` |
-| Windows x86_64 | `rustman-windows-x86_64.zip` |
-| Windows arm64 | `rustman-windows-aarch64.zip` |
+| Windows x86_64 | `Rustman-*-setup-x86_64.exe` or `rustman-windows-x86_64.zip` |
+| Windows arm64 | `Rustman-*-setup-aarch64.exe` or `rustman-windows-aarch64.zip` |
 | Linux x86_64 | `rustman-linux-x86_64.tar.gz` |
 | Linux arm64 | `rustman-linux-aarch64.tar.gz` |
 
 From 0.4.0 on, each release also has a `SHA256SUMS` file for checking the downloads.
 
-The Linux archive holds the binary, its icon and desktop entry, and `install-desktop-entry.sh`, which installs the last two for your user so the app shows its own icon. The binary has no WebKitGTK, GTK or PDF runtime dependency. HTML responses show as readable text, and PDFs as a binary-response summary.
+The Windows setup.exe installs the binary with Start Menu and uninstall entries (`packaging/windows/rustman.iss`). The zip is still what the in-app updater downloads. The Linux archive holds the binary, its icon and desktop entry, and `install-desktop-entry.sh`, which installs the last two for your user so the app shows its own icon. The binary has no WebKitGTK, GTK or PDF runtime dependency. HTML responses show as readable text, and PDFs as a binary-response summary.
 
 ## Build from source
 
@@ -218,6 +218,14 @@ sudo apt-get install -y \
 ```
 
 macOS needs the Xcode command line tools and Windows the MSVC build tools, plus CMake on both.
+
+On Windows, after a release build, [Inno Setup 6](https://jrsoftware.org/isinfo.php) can turn `target/release/rustman.exe` into an installer:
+
+```bat
+ISCC.exe packaging\windows\rustman.iss
+```
+
+The setup lands in `dist/`. Pass `/DMyAppVersion=…` and `/DMyArch=…` to override the defaults in the script.
 
 ### Development
 
