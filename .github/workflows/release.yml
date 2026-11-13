@@ -311,11 +311,32 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path target\release\rustman.exe -DestinationPath rustman-windows-${{ matrix.arch }}.zip
 
+      # Same role as packaging/linux on the Linux jobs: the zip stays the
+      # updater asset; setup.exe gives Start Menu / uninstall for first install.
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          $iscc = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe not found after Inno Setup install" }
+          & $iscc "/DMyAppVersion=$env:VERSION" "/DMyArch=$env:ARCH" packaging\windows\rustman.iss
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
-          files: rustman-windows-${{ matrix.arch }}.zip
+          files: |
+            rustman-windows-${{ matrix.arch }}.zip
+            dist/Rustman-${{ needs.prepare.outputs.version }}-setup-${{ matrix.arch }}.exe
 
   # ── Checksums the in-app updater verifies downloads against ──────────────────
   checksums:
@@ -334,7 +355,8 @@ jobs:
           set -euo pipefail
           mkdir assets
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir assets \
-            --pattern '*.tar.gz' --pattern '*.zip' --pattern '*.dmg'
+            --pattern '*.tar.gz' --pattern '*.zip' --pattern '*.dmg' \
+            --pattern '*-setup-*.exe'
           (cd assets && sha256sum -- *) > SHA256SUMS
           cat SHA256SUMS
 
