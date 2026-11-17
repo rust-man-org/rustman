@@ -182,6 +182,14 @@ From 0.4.0 on, each release also has a `SHA256SUMS` file for checking the downlo
 
 The Linux archive holds the binary, its icon and desktop entry, and `install-desktop-entry.sh`, which installs the last two for your user so the app shows its own icon. The binary has no WebKitGTK, GTK or PDF runtime dependency. HTML responses show as readable text, and PDFs as a binary-response summary.
 
+### Debian
+
+Rustman is available from the [pkg.haus](https://pkg.haus) APT archive for Debian stable, testing and unstable on amd64 and arm64, built from source at release tags. Set up the archive per the instructions on [pkg.haus](https://pkg.haus), then run:
+
+```sh
+sudo apt install rustman
+```
+
 ## Build from source
 
 You need:
